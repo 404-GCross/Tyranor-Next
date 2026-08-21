@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission
+        android:name="android.permission.BLUETOOTH"
+        android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <application>
+
+        <!-- Kirikiri（kr/krkr2）引擎宿主，独立进程隔离 SDL2 原生符号 -->
+        <activity
+            android:name="com.akira.tyranoemu.remote.Kirikiroid139"
+            android:exported="false"
+            android:process=":kirikiri2"
+            android:launchMode="singleInstance"
+            android:taskAffinity="com.core.Kirikiroid2"
+            android:screenOrientation="sensorLandscape"
+            android:windowSoftInputMode="adjustPan"
+            android:configChanges="keyboardHidden|orientation|screenSize|screenLayout|smallestScreenSize|uiMode|density|fontScale|locale|layoutDirection" />
+        <activity
+            android:name="com.akira.tyranoemu.remote.Kirikiroid134"
+            android:exported="false"
+            android:process=":kirikiri2"
+            android:launchMode="singleInstance"
+            android:taskAffinity="com.core.Kirikiroid2"
+            android:screenOrientation="sensorLandscape"
+            android:windowSoftInputMode="adjustPan"
+            android:configChanges="keyboardHidden|orientation|screenSize|screenLayout|smallestScreenSize|uiMode|density|fontScale|locale|layoutDirection" />
+        <activity
+            android:name="com.akira.tyranoemu.remote.Kirikiroid126"
+            android:exported="false"
+            android:process=":kirikiri2"
+            android:launchMode="singleInstance"
+            android:taskAffinity="com.core.Kirikiroid2"
+            android:screenOrientation="sensorLandscape"
+            android:windowSoftInputMode="adjustPan"
+            android:configChanges="keyboardHidden|orientation|screenSize|screenLayout|smallestScreenSize|uiMode|density|fontScale|locale|layoutDirection" />
+
+        <!-- krkrsdl3 引擎（SDL3 内核，独立入口/独立进程，与 :kirikiri2 隔离） -->
+        <activity
+            android:name="com.core.krkrsdl3.Krkrsdl3Activity"
+            android:exported="false"
+            android:process=":krkrsdl3"
+            android:launchMode="singleInstance"
+            android:taskAffinity="com.core.Krkrsdl3"
+            android:screenOrientation="sensorLandscape"
+            android:configChanges="keyboardHidden|orientation|screenSize|screenLayout|smallestScreenSize|uiMode|density|fontScale|locale|layoutDirection" />
+
+        <!-- Tyrano（ty）WebView 宿主 -->
+        <activity
+            android:name="com.core.tyrano.TyranoActivity"
+            android:exported="false"
+            android:process=":tyrano"
+            android:launchMode="singleInstance"
+            android:taskAffinity="com.core.Tyrano"
+            android:screenOrientation="sensorLandscape"
+            android:configChanges="keyboardHidden|orientation|screenSize|screenLayout|smallestScreenSize|uiMode|density|fontScale|locale|layoutDirection" />
+
+        <!-- Artemis（ar）原生引擎宿主 -->
+        <activity
+            android:name="com.akira.tyranoemu.remote.ArtemisActivityV1"
+            android:exported="false"
+            android:process=":artemis"
+            android:launchMode="singleInstance"
+            android:taskAffinity="com.core.Artemis"
+            android:screenOrientation="sensorLandscape"
+            android:windowSoftInputMode="adjustPan"
+            android:configChanges="keyboardHidden|orientation|screenSize|screenLayout|smallestScreenSize|uiMode|density|fontScale|locale|layoutDirection">
+            <meta-data android:name="android.app.lib_name" android:value="artemis_loader" />
+        </activity>
+        <activity
+            android:name="com.akira.tyranoemu.remote.ArtemisActivityV2"
+            android:exported="false"
+            android:process=":artemis.compat"
+            android:launchMode="singleInstance"
+            android:taskAffinity="com.core.Artemis"
+            android:screenOrientation="sensorLandscape"
+            android:windowSoftInputMode="adjustPan"
+            android:configChanges="keyboardHidden|orientation|screenSize|screenLayout|smallestScreenSize|uiMode|density|fontScale|locale|layoutDirection">
+            <meta-data android:name="android.app.lib_name" android:value="artemis_loader" />
+        </activity>
+        <activity
+            android:name="com.akira.tyranoemu.remote.ArtemisActivityV3"
+            android:exported="false"
+            android:process=":artemis.compat.v2"
+            android:launchMode="singleInstance"
+            android:taskAffinity="com.core.Artemis"
+            android:screenOrientation="sensorLandscape"
+            android:windowSoftInputMode="adjustPan"
+            android:configChanges="keyboardHidden|orientation|screenSize|screenLayout|smallestScreenSize|uiMode|density|fontScale|locale|layoutDirection">
+            <meta-data android:name="android.app.lib_name" android:value="artemis_loader" />
+        </activity>
+
+        <!-- ONS（ons）SDL2 宿主 -->
+        <activity
+            android:name="com.yuri.onscripter.ONScripter"
+            android:exported="false"
+            android:process=":ons"
+            android:launchMode="singleInstance"
+            android:taskAffinity="com.core.ONScripter"
+            android:screenOrientation="sensorLandscape"
+            android:configChanges="keyboardHidden|orientation|screenSize|screenLayout|smallestScreenSize|uiMode|density|fontScale|locale|layoutDirection" />
+
+        <!-- 引擎内辅助播放 Activity -->
+        <activity
+            android:name="com.core.ons.OnsVideoActivity"
+            android:exported="false"
+            android:process=":ons"
+            android:screenOrientation="sensorLandscape"
+            android:configChanges="keyboardHidden|orientation|screenSize|screenLayout|smallestScreenSize|uiMode|density|fontScale|locale|layoutDirection" />
+        <activity
+            android:name="com.ies_net.artemis.VideoViewActivity"
+            android:exported="false"
+            android:process=":artemis"
+            android:screenOrientation="sensorLandscape"
+            android:configChanges="keyboardHidden|orientation|screenSize|screenLayout|smallestScreenSize|uiMode|density|fontScale|locale|layoutDirection" />
+
+    </application>
+
+</manifest>

@@ -1,0 +1,16 @@
+{
+  "engineId": "ons",
+  "pluginVersion": 1,
+  "abi": "arm64-v8a",
+  "bridgeAbi": 1,
+  "libs": [
+    "libSDL2.so",
+    "liblua.so",
+    "libjpeg.so",
+    "libbz2.so",
+    "libSDL2_image.so",
+    "libSDL2_mixer.so",
+    "libSDL2_ttf.so",
+    "libonsyuri.so"
+  ]
+}

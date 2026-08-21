@@ -1,0 +1,240 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    package="com.core.engine" >
+4
+5    <uses-sdk android:minSdkVersion="26" />
+6
+7    <uses-permission android:name="android.permission.VIBRATE" />
+7-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:4:5-66
+7-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:4:22-63
+8    <uses-permission
+8-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:5:5-7:38
+9        android:name="android.permission.BLUETOOTH"
+9-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:6:9-52
+10        android:maxSdkVersion="30" />
+10-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:7:9-35
+11    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+11-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:8:5-76
+11-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:8:22-73
+12    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+12-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:9:5-71
+12-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:9:22-68
+13
+14    <application>
+14-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:11:5-121:19
+15
+16        <!-- Kirikiri（kr/krkr2）引擎宿主，独立进程隔离 SDL2 原生符号 -->
+17        <activity
+17-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:14:9-22:157
+18            android:name="com.akira.tyranoemu.remote.Kirikiroid139"
+18-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:15:13-68
+19            android:configChanges="keyboardHidden|orientation|screenSize|screenLayout|smallestScreenSize|uiMode|density|fontScale|locale|layoutDirection"
+19-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:22:13-154
+20            android:exported="false"
+20-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:16:13-37
+21            android:launchMode="singleInstance"
+21-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:18:13-48
+22            android:process=":kirikiri2"
+22-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:17:13-41
+23            android:screenOrientation="sensorLandscape"
+23-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:20:13-56
+24            android:taskAffinity="com.core.Kirikiroid2"
+24-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:19:13-56
+25            android:windowSoftInputMode="adjustPan" />
+25-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:21:13-52
+26        <activity
+26-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:23:9-31:157
+27            android:name="com.akira.tyranoemu.remote.Kirikiroid134"
+27-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:24:13-68
+28            android:configChanges="keyboardHidden|orientation|screenSize|screenLayout|smallestScreenSize|uiMode|density|fontScale|locale|layoutDirection"
+28-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:31:13-154
+29            android:exported="false"
+29-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:25:13-37
+30            android:launchMode="singleInstance"
+30-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:27:13-48
+31            android:process=":kirikiri2"
+31-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:26:13-41
+32            android:screenOrientation="sensorLandscape"
+32-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:29:13-56
+33            android:taskAffinity="com.core.Kirikiroid2"
+33-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:28:13-56
+34            android:windowSoftInputMode="adjustPan" />
+34-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:30:13-52
+35        <activity
+35-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:32:9-40:157
+36            android:name="com.akira.tyranoemu.remote.Kirikiroid126"
+36-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:33:13-68
+37            android:configChanges="keyboardHidden|orientation|screenSize|screenLayout|smallestScreenSize|uiMode|density|fontScale|locale|layoutDirection"
+37-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:40:13-154
+38            android:exported="false"
+38-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:34:13-37
+39            android:launchMode="singleInstance"
+39-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:36:13-48
+40            android:process=":kirikiri2"
+40-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:35:13-41
+41            android:screenOrientation="sensorLandscape"
+41-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:38:13-56
+42            android:taskAffinity="com.core.Kirikiroid2"
+42-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:37:13-56
+43            android:windowSoftInputMode="adjustPan" />
+43-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:39:13-52
+44
+45        <!-- krkrsdl3 引擎（SDL3 内核，独立入口/独立进程，与 :kirikiri2 隔离） -->
+46        <activity
+46-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:43:9-50:157
+47            android:name="com.core.krkrsdl3.Krkrsdl3Activity"
+47-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:44:13-62
+48            android:configChanges="keyboardHidden|orientation|screenSize|screenLayout|smallestScreenSize|uiMode|density|fontScale|locale|layoutDirection"
+48-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:50:13-154
+49            android:exported="false"
+49-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:45:13-37
+50            android:launchMode="singleInstance"
+50-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:47:13-48
+51            android:process=":krkrsdl3"
+51-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:46:13-40
+52            android:screenOrientation="sensorLandscape"
+52-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:49:13-56
+53            android:taskAffinity="com.core.Krkrsdl3" />
+53-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:48:13-53
+54
+55        <!-- Tyrano（ty）WebView 宿主 -->
+56        <activity
+56-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:53:9-60:157
+57            android:name="com.core.tyrano.TyranoActivity"
+57-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:54:13-58
+58            android:configChanges="keyboardHidden|orientation|screenSize|screenLayout|smallestScreenSize|uiMode|density|fontScale|locale|layoutDirection"
+58-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:60:13-154
+59            android:exported="false"
+59-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:55:13-37
+60            android:launchMode="singleInstance"
+60-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:57:13-48
+61            android:process=":tyrano"
+61-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:56:13-38
+62            android:screenOrientation="sensorLandscape"
+62-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:59:13-56
+63            android:taskAffinity="com.core.Tyrano" />
+63-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:58:13-51
+64
+65        <!-- Artemis（ar）原生引擎宿主 -->
+66        <activity
+66-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:63:9-73:20
+67            android:name="com.akira.tyranoemu.remote.ArtemisActivityV1"
+67-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:64:13-72
+68            android:configChanges="keyboardHidden|orientation|screenSize|screenLayout|smallestScreenSize|uiMode|density|fontScale|locale|layoutDirection"
+68-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:71:13-154
+69            android:exported="false"
+69-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:65:13-37
+70            android:launchMode="singleInstance"
+70-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:67:13-48
+71            android:process=":artemis"
+71-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:66:13-39
+72            android:screenOrientation="sensorLandscape"
+72-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:69:13-56
+73            android:taskAffinity="com.core.Artemis"
+73-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:68:13-52
+74            android:windowSoftInputMode="adjustPan" >
+74-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:70:13-52
+75            <meta-data
+75-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:72:13-93
+76                android:name="android.app.lib_name"
+76-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:72:24-59
+77                android:value="artemis_loader" />
+77-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:72:60-90
+78        </activity>
+79        <activity
+79-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:74:9-84:20
+80            android:name="com.akira.tyranoemu.remote.ArtemisActivityV2"
+80-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:75:13-72
+81            android:configChanges="keyboardHidden|orientation|screenSize|screenLayout|smallestScreenSize|uiMode|density|fontScale|locale|layoutDirection"
+81-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:82:13-154
+82            android:exported="false"
+82-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:76:13-37
+83            android:launchMode="singleInstance"
+83-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:78:13-48
+84            android:process=":artemis.compat"
+84-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:77:13-46
+85            android:screenOrientation="sensorLandscape"
+85-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:80:13-56
+86            android:taskAffinity="com.core.Artemis"
+86-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:79:13-52
+87            android:windowSoftInputMode="adjustPan" >
+87-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:81:13-52
+88            <meta-data
+88-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:72:13-93
+89                android:name="android.app.lib_name"
+89-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:72:24-59
+90                android:value="artemis_loader" />
+90-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:72:60-90
+91        </activity>
+92        <activity
+92-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:85:9-95:20
+93            android:name="com.akira.tyranoemu.remote.ArtemisActivityV3"
+93-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:86:13-72
+94            android:configChanges="keyboardHidden|orientation|screenSize|screenLayout|smallestScreenSize|uiMode|density|fontScale|locale|layoutDirection"
+94-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:93:13-154
+95            android:exported="false"
+95-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:87:13-37
+96            android:launchMode="singleInstance"
+96-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:89:13-48
+97            android:process=":artemis.compat.v2"
+97-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:88:13-49
+98            android:screenOrientation="sensorLandscape"
+98-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:91:13-56
+99            android:taskAffinity="com.core.Artemis"
+99-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:90:13-52
+100            android:windowSoftInputMode="adjustPan" >
+100-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:92:13-52
+101            <meta-data
+101-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:72:13-93
+102                android:name="android.app.lib_name"
+102-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:72:24-59
+103                android:value="artemis_loader" />
+103-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:72:60-90
+104        </activity>
+105
+106        <!-- ONS（ons）SDL2 宿主 -->
+107        <activity
+107-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:98:9-105:157
+108            android:name="com.yuri.onscripter.ONScripter"
+108-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:99:13-58
+109            android:configChanges="keyboardHidden|orientation|screenSize|screenLayout|smallestScreenSize|uiMode|density|fontScale|locale|layoutDirection"
+109-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:105:13-154
+110            android:exported="false"
+110-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:100:13-37
+111            android:launchMode="singleInstance"
+111-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:102:13-48
+112            android:process=":ons"
+112-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:101:13-35
+113            android:screenOrientation="sensorLandscape"
+113-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:104:13-56
+114            android:taskAffinity="com.core.ONScripter" />
+114-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:103:13-55
+115
+116        <!-- 引擎内辅助播放 Activity -->
+117        <activity
+117-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:108:9-113:157
+118            android:name="com.core.ons.OnsVideoActivity"
+118-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:109:13-57
+119            android:configChanges="keyboardHidden|orientation|screenSize|screenLayout|smallestScreenSize|uiMode|density|fontScale|locale|layoutDirection"
+119-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:113:13-154
+120            android:exported="false"
+120-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:110:13-37
+121            android:process=":ons"
+121-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:111:13-35
+122            android:screenOrientation="sensorLandscape" />
+122-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:112:13-56
+123        <activity
+123-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:114:9-119:157
+124            android:name="com.ies_net.artemis.VideoViewActivity"
+124-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:115:13-65
+125            android:configChanges="keyboardHidden|orientation|screenSize|screenLayout|smallestScreenSize|uiMode|density|fontScale|locale|layoutDirection"
+125-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:119:13-154
+126            android:exported="false"
+126-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:116:13-37
+127            android:process=":artemis"
+127-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:117:13-39
+128            android:screenOrientation="sensorLandscape" />
+128-->/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml:118:13-56
+129    </application>
+130
+131</manifest>
