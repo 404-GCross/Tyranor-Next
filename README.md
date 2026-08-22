@@ -45,7 +45,7 @@
 ### 技术栈
 
 - **语言**：Kotlin（引擎层含 Java 桥接代码）
-- **UI**：Jetpack Compose + Material 3 + [Miuix](https://github.com/yukonga/Miuix)
+- **UI**：Jetpack Compose + Material 3 + [Miuix](https://github.com/compose-miuix-ui/miuix)
 - **导航**：底部导航 `NavigationBar` + `Crossfade` 页面切换；详情页由独立 Activity 承载并配系统 fade 动画
 - **构建**：Gradle 9.5.1 / AGP 9.2.1 / Kotlin 2.x + Compose Compiler，`compileSdk 37`、`minSdk 26`、`targetSdk 36`
 - **持久化**：SharedPreferences（扫描结果、引擎全局设置、单游戏设置覆盖、最近记录）
@@ -94,5 +94,5 @@ docs/   设计文档
 
 - **Tyranor 模拟器**：本项目引擎运行时与核心架构的逆向重写基础
 - **RinneMobile**：游戏扫描识别/SAF路径映射逻辑/独立存档映射/krkrsdl3 等多个功能的参考实现
-- [Miuix](https://github.com/yukonga/Miuix)：设置界面组件库
+- [Miuix](https://github.com/compose-miuix-ui/miuix)：设置界面组件库
 - 各引擎运行时均基于其开源许可引入
