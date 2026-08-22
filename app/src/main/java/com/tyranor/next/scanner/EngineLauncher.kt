@@ -19,7 +19,6 @@ import com.tyranor.next.settings.EngineSettingsStore
 import com.tyranor.next.settings.PerGameSettingsStore
 import com.yuri.onscripter.ONScripter
 import java.io.File
-import kotlin.math.abs
 
 /**
  * 游戏引擎启动器：根据 [EngineType] 把扫描到的游戏目录交给对应引擎宿主 Activity。
@@ -130,7 +129,7 @@ object EngineLauncher {
                 }
                 if (ons.sharpness) {
                     args.add("--sharpness")
-                    args.add(ons.sharpnessValue)
+                    args.add(safeSharpnessValue(ons.sharpnessValue))
                 }
                 Intent(context, ONScripter::class.java).apply {
                     putStringArrayListExtra("gameargs", args)
@@ -205,7 +204,7 @@ object EngineLauncher {
                 context.filesDir?.let { internal ->
                     putExtra(
                         "scopedSaveRoot",
-                        File(File(File(internal, "krkr_mirror"), safeSaveName(path)), "savedata").absolutePath,
+                        File(File(File(internal, "krkr_mirror"), EngineScanner.safeSaveName(path)), "savedata").absolutePath,
                     )
                 }
             }
@@ -294,7 +293,7 @@ object EngineLauncher {
             ?: EngineSettingsStore.isTyranoScopedSaveDir(context)
         val scopedSaveRoot = if (scoped) {
             context.getExternalFilesDir(null)?.let { external ->
-                File(File(File(external, "save"), "tyrano"), safeSaveName(path)).absolutePath
+                File(File(File(external, "save"), "tyrano"), EngineScanner.safeSaveName(path)).absolutePath
             }
         } else {
             null
@@ -385,10 +384,14 @@ object EngineLauncher {
         return java.io.File(entry).takeIf { it.isFile }?.name
     }
 
-    private fun safeSaveName(rootPath: String): String {
-        val name = runCatching { File(rootPath).name.takeIf { it.isNotBlank() } }.getOrNull()
-            ?: abs(rootPath.hashCode()).toString()
-        return name.replace(Regex("[\\\\/:*?\"<>|]"), "_").trim().ifEmpty { "default" }
+    /** 与 OnsSettings.safeSharpness 一致：只接受 0.1~10.0 的数字，否则回退 "2"。 */
+    private fun safeSharpnessValue(value: String): String {
+        val v = value.trim()
+        if (v.isEmpty()) return "2"
+        val parsed = v.toDoubleOrNull() ?: return "2"
+        if (parsed.isNaN() || parsed.isInfinite()) return "2"
+        if (parsed < 0.1 || parsed > 10.0) return "2"
+        return v
     }
 
     /**

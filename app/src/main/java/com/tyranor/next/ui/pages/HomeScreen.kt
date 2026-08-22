@@ -45,11 +45,9 @@ import com.tyranor.next.R
 import com.tyranor.next.scanner.EngineScanner
 import com.tyranor.next.scanner.ScanGame
 import com.tyranor.next.theme.NavWhite
+import com.tyranor.next.ui.common.TimeFormats
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 @Composable
 fun HomeScreen(modifier: Modifier = Modifier) {
@@ -81,6 +79,9 @@ fun HomeScreen(modifier: Modifier = Modifier) {
         selectedGame = null
         // 从持久游戏库一并移除，避免首页删了但「游戏」页仍显示（复活）
         EngineScanner.removeGame(context, target.uri)
+        // 最近记录/快捷启动同步持久化移除，避免切页取消 IO 清理协程后残留脏数据
+        EngineScanner.removeRecentGame(context, target.uri)
+        EngineScanner.removeQuickLaunch(context, target.uri)
         // 仅清理应用内数据（每游戏设置、最近记录、封面缓存、应用内存档镜像）；不触碰游戏文件
         scope.launch(Dispatchers.IO) {
             cleanupDeletedGame(context, target)
@@ -251,17 +252,10 @@ private fun RecentGameRow(game: ScanGame, onClick: () -> Unit, onLongClick: () -
             modifier = Modifier.weight(1f).padding(start = 14.dp),
         )
         Text(
-            formatOpenTime(game.openTime),
+            TimeFormats.formatDateTime(game.openTime),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(start = 12.dp),
         )
     }
-}
-
-private fun formatOpenTime(ts: Long): String {
-    if (ts <= 0) return ""
-    return runCatching {
-        SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date(ts))
-    }.getOrDefault("")
 }

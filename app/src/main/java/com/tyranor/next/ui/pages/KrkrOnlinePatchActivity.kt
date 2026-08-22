@@ -54,19 +54,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.tyranor.next.R
-import com.tyranor.next.scanner.EngineType
 import com.tyranor.next.scanner.KrkrOnlinePatchService
 import com.tyranor.next.scanner.KrkrPatchEntry
 import com.tyranor.next.scanner.ScanGame
+import com.tyranor.next.scanner.ScanGameIntents
 import com.tyranor.next.theme.NavWhite
 import com.tyranor.next.theme.TyranorNextTheme
+import com.tyranor.next.ui.common.TimeFormats
 import com.tyranor.next.ui.common.TopBarIcon
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 class KrkrOnlinePatchActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -76,10 +74,6 @@ class KrkrOnlinePatchActivity : ComponentActivity() {
             statusBarStyle = androidx.activity.SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
             navigationBarStyle = androidx.activity.SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
         )
-        @Suppress("DEPRECATION")
-        window.statusBarColor = Color.TRANSPARENT
-        @Suppress("DEPRECATION")
-        window.navigationBarColor = Color.TRANSPARENT
 
         val game = intent.readScanGame()
         if (game == null) {
@@ -103,42 +97,10 @@ class KrkrOnlinePatchActivity : ComponentActivity() {
     }
 
     companion object {
-        private const val EXTRA_TITLE = "extra_title"
-        private const val EXTRA_URI = "extra_uri"
-        private const val EXTRA_ENGINE = "extra_engine"
-        private const val EXTRA_LAUNCH_TARGET = "extra_launch_target"
-        private const val EXTRA_COVER_URI = "extra_cover_uri"
-        private const val EXTRA_VNDB_ID = "extra_vndb_id"
-        private const val EXTRA_METADATA_TITLE = "extra_metadata_title"
+        fun createIntent(context: Context, game: ScanGame): Intent =
+            ScanGameIntents.putGame(Intent(context, KrkrOnlinePatchActivity::class.java), game)
 
-        fun createIntent(context: Context, game: ScanGame): Intent {
-            return Intent(context, KrkrOnlinePatchActivity::class.java).apply {
-                putExtra(EXTRA_TITLE, game.title)
-                putExtra(EXTRA_URI, game.uri)
-                putExtra(EXTRA_ENGINE, game.engine.name)
-                putExtra(EXTRA_LAUNCH_TARGET, game.launchTarget)
-                game.coverUri?.let { putExtra(EXTRA_COVER_URI, it) }
-                game.vndbId?.let { putExtra(EXTRA_VNDB_ID, it) }
-                game.metadataTitle?.let { putExtra(EXTRA_METADATA_TITLE, it) }
-            }
-        }
-
-        private fun Intent.readScanGame(): ScanGame? {
-            val title = getStringExtra(EXTRA_TITLE) ?: return null
-            val uri = getStringExtra(EXTRA_URI) ?: return null
-            val engine = runCatching {
-                EngineType.valueOf(getStringExtra(EXTRA_ENGINE).orEmpty())
-            }.getOrDefault(EngineType.UNKNOWN)
-            return ScanGame(
-                title = title,
-                uri = uri,
-                engine = engine,
-                launchTarget = getStringExtra(EXTRA_LAUNCH_TARGET).orEmpty(),
-                coverUri = getStringExtra(EXTRA_COVER_URI),
-                vndbId = getStringExtra(EXTRA_VNDB_ID),
-                metadataTitle = getStringExtra(EXTRA_METADATA_TITLE),
-            )
-        }
+        private fun Intent.readScanGame(): ScanGame? = ScanGameIntents.getGame(this)
     }
 }
 
@@ -304,7 +266,7 @@ private fun PatchEntryCard(
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                listOf(entry.brand, formatPatchDate(entry.timestamp)).filter { it.isNotBlank() }.joinToString(" · "),
+                listOf(entry.brand, TimeFormats.formatDate(entry.timestamp)).filter { it.isNotBlank() }.joinToString(" · "),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
@@ -357,9 +319,4 @@ private fun PatchEntryCard(
             }
         }
     }
-}
-
-private fun formatPatchDate(timestamp: Long): String {
-    if (timestamp <= 0L) return ""
-    return SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date(timestamp))
 }

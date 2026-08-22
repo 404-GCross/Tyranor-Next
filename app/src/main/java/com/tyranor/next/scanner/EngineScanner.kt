@@ -7,7 +7,9 @@ import androidx.documentfile.provider.DocumentFile
 import com.tyranor.next.settings.AppSettingsStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.File
 import java.util.Locale
+import kotlin.math.abs
 
 /**
  * 精简版游戏扫描器，识别逻辑移植自 RinneMobile 的 EngineDetector/GameScanner。
@@ -68,17 +70,9 @@ object EngineScanner {
 
     // ============ 游戏结果持久化 ============
 
-    fun saveGames(context: Context, games: List<ScanGame>) {
-        val str = games.joinToString("\n") { serializeGame(it) }
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .edit().putString(KEY_GAMES, str).apply()
-    }
+    fun saveGames(context: Context, games: List<ScanGame>) = saveList(context, KEY_GAMES, games)
 
-    fun loadGames(context: Context): List<ScanGame> {
-        val raw = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getString(KEY_GAMES, null) ?: return emptyList()
-        return raw.split("\n").mapNotNull { parseGame(it) }
-    }
+    fun loadGames(context: Context): List<ScanGame> = loadList(context, KEY_GAMES)
 
     fun recordRecentGame(context: Context, game: ScanGame) {
         val touched = game.copy(openTime = System.currentTimeMillis())
@@ -86,11 +80,7 @@ object EngineScanner {
         saveRecentGames(context, next)
     }
 
-    fun loadRecentGames(context: Context): List<ScanGame> {
-        val raw = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getString(KEY_RECENT_GAMES, null) ?: return emptyList()
-        return raw.split("\n").mapNotNull { parseGame(it) }
-    }
+    fun loadRecentGames(context: Context): List<ScanGame> = loadList(context, KEY_RECENT_GAMES)
 
     /** 删除游戏时从最近游戏列表中移除对应条目。 */
     fun removeRecentGame(context: Context, uri: String) {
@@ -102,19 +92,19 @@ object EngineScanner {
         saveGames(context, loadGames(context).filterNot { it.uri == uri })
     }
 
-    internal fun saveRecentGames(context: Context, games: List<ScanGame>) {
-        val str = games.joinToString("\n") { serializeGame(it) }
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .edit().putString(KEY_RECENT_GAMES, str).apply()
+/** 目录名 → 安全文件名（用于应用内镜像/独立存档目录），非法字符替换为下划线。 */
+    fun safeSaveName(rootPath: String): String {
+        val name = runCatching { File(rootPath).name.takeIf { it.isNotBlank() } }.getOrNull()
+            ?: abs(rootPath.hashCode()).toString()
+        return name.replace(Regex("[\\\\/:*?\"<>|]"), "_").trim().ifEmpty { "default" }
     }
+
+internal fun saveRecentGames(context: Context, games: List<ScanGame>) =
+        saveList(context, KEY_RECENT_GAMES, games)
 
     // ============ 首页快捷启动（最多 3 个） ============
 
-    fun loadQuickLaunch(context: Context): List<ScanGame> {
-        val raw = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getString(KEY_QUICK_LAUNCH, null) ?: return emptyList()
-        return raw.split("\n").mapNotNull { parseGame(it) }
-    }
+    fun loadQuickLaunch(context: Context): List<ScanGame> = loadList(context, KEY_QUICK_LAUNCH)
 
     fun isQuickLaunched(context: Context, uri: String): Boolean =
         loadQuickLaunch(context).any { it.uri == uri }
@@ -144,10 +134,21 @@ object EngineScanner {
         return refreshed
     }
 
-    internal fun saveQuickLaunch(context: Context, games: List<ScanGame>) {
+    internal fun saveQuickLaunch(context: Context, games: List<ScanGame>) =
+        saveList(context, KEY_QUICK_LAUNCH, games)
+
+    // ---------- 通用存取助手 ----------
+
+    private fun saveList(context: Context, key: String, games: List<ScanGame>) {
         val str = games.joinToString("\n") { serializeGame(it) }
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .edit().putString(KEY_QUICK_LAUNCH, str).apply()
+            .edit().putString(key, str).apply()
+    }
+
+    private fun loadList(context: Context, key: String): List<ScanGame> {
+        val raw = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getString(key, null) ?: return emptyList()
+        return raw.split("\n").mapNotNull { parseGame(it) }
     }
 
     private fun serializeGame(g: ScanGame): String {
