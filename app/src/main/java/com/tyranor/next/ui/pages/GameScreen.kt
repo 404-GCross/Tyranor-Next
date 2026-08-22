@@ -41,7 +41,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudDownload
-import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Save
@@ -231,16 +230,6 @@ private fun GameLibraryContent(
                             .size(31.dp)
                             .clip(RoundedCornerShape(6.dp))
                             .clickable { syncMissingCovers() }
-                            .padding(4.dp),
-                    )
-                    Icon(
-                        Icons.Filled.FolderOpen,
-                        contentDescription = "添加文件夹",
-                        tint = MaterialTheme.colorScheme.onBackground,
-                        modifier = Modifier
-                            .size(31.dp)
-                            .clip(RoundedCornerShape(6.dp))
-                            .clickable { dirPickerLaunch() }
                             .padding(4.dp),
                     )
                     Icon(
