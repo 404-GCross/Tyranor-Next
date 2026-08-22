@@ -1,7 +1,9 @@
 package com.tyranor.next.ui.pages
 
+import android.content.Intent
 import android.net.Uri
 import android.provider.OpenableColumns
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.DrawableRes
@@ -32,6 +34,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,8 +48,11 @@ import com.tyranor.next.R
 import com.tyranor.next.settings.EngineSettingsStore
 import com.tyranor.next.theme.MiuixSettingsTheme
 import com.tyranor.next.ui.common.TopBarIcon
+import com.tyranor.next.updater.GitHubUpdateChecker
+import com.tyranor.next.updater.UpdateCheckResult
 import java.io.File
 import kotlin.math.roundToInt
+import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Card as MiuixCard
 import top.yukonga.miuix.kmp.basic.Scaffold as MiuixScaffold
 import top.yukonga.miuix.kmp.basic.Slider
@@ -60,6 +66,26 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 @Composable
 fun SettingsScreen(modifier: Modifier = Modifier) {
     val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var checkingUpdate by remember { mutableStateOf(false) }
+    var updateAvailable by remember { mutableStateOf<UpdateCheckResult.UpdateAvailable?>(null) }
+
+    fun checkUpdate() {
+        if (checkingUpdate) return
+        checkingUpdate = true
+        scope.launch {
+            when (val result = GitHubUpdateChecker.check(ctx)) {
+                is UpdateCheckResult.UpdateAvailable -> updateAvailable = result
+                is UpdateCheckResult.UpToDate -> {
+                    Toast.makeText(ctx, "已经是最新版本", Toast.LENGTH_SHORT).show()
+                }
+                is UpdateCheckResult.Failed -> {
+                    Toast.makeText(ctx, "检查更新失败：${result.message}", Toast.LENGTH_SHORT).show()
+                }
+            }
+            checkingUpdate = false
+        }
+    }
 
     MiuixSettingsTheme {
         MiuixScaffold(
@@ -99,7 +125,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                     MiuixCard(modifier = Modifier.fillMaxWidth(), cornerRadius = 8.dp) {
                         Column(Modifier.padding(vertical = 4.dp)) {
                             ArrowPreference(title = "应用设置", onClick = { startActivityWithFade(ctx, AppSettingsActivity.createIntent(ctx)) })
-                            ArrowPreference(title = "更新检查", onClick = { })
+                            ArrowPreference(title = if (checkingUpdate) "正在检查更新" else "更新检查", onClick = { checkUpdate() })
                             ArrowPreference(title = "加入群聊", onClick = { })
                         }
                     }
@@ -107,6 +133,43 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                 item { BottomInsetSpacer() }
             }
         }
+    }
+
+    updateAvailable?.let { update ->
+        AppAlertDialog(
+            onDismissRequest = { updateAvailable = null },
+            title = { Text("发现新版本", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "当前版本：${update.currentVersion}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MiuixTheme.colorScheme.onBackground,
+                    )
+                    Text(
+                        "最新版本：${update.latestVersion}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MiuixTheme.colorScheme.onBackground,
+                    )
+                    Text(
+                        "是否跳转到 GitHub 发布页下载新版本？",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MiuixTheme.colorScheme.onBackground,
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { updateAvailable = null }) { Text("取消") }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        updateAvailable = null
+                        ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(update.releaseUrl)))
+                    },
+                ) { Text("去下载") }
+            },
+        )
     }
 }
 

@@ -1,15 +1,11 @@
 name: Android Beta Release
 
 on:
-  workflow_dispatch:
-    inputs:
-      version_name:
-        description: "Beta version label, for example 1.0-beta.1. Defaults to beta-<run_number>."
-        required: false
-        type: string
   push:
-    tags:
-      - "beta-*"
+    branches:
+      - main
+    paths:
+      - "app/build.gradle.kts"
 
 permissions:
   contents: write
@@ -19,8 +15,48 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  detect-version-change:
+    name: Detect Version Change
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.version.outputs.changed }}
+      version_name: ${{ steps.version.outputs.version_name }}
+      version_code: ${{ steps.version.outputs.version_code }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Detect app version change
+        id: version
+        run: |
+          before="${{ github.event.before }}"
+          after="${{ github.sha }}"
+          if [[ -z "${before}" || "${before}" == "0000000000000000000000000000000000000000" ]]; then
+            before="${after}^"
+          fi
+
+          old_version="$(git show "${before}:app/build.gradle.kts" 2>/dev/null | grep -E 'version(Name|Code)[[:space:]]*=' || true)"
+          new_version="$(grep -E 'version(Name|Code)[[:space:]]*=' app/build.gradle.kts || true)"
+
+          if [[ "${old_version}" == "${new_version}" ]]; then
+            echo "changed=false" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          version_name="$(grep -E 'versionName[[:space:]]*=' app/build.gradle.kts | head -n 1 | sed -E 's/.*versionName[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/')"
+          version_code="$(grep -E 'versionCode[[:space:]]*=' app/build.gradle.kts | head -n 1 | sed -E 's/.*versionCode[[:space:]]*=[[:space:]]*([0-9]+).*/\1/')"
+
+          echo "changed=true" >> "${GITHUB_OUTPUT}"
+          echo "version_name=${version_name}" >> "${GITHUB_OUTPUT}"
+          echo "version_code=${version_code}" >> "${GITHUB_OUTPUT}"
+
   release-beta:
     name: Release Beta APK
+    needs: detect-version-change
+    if: needs.detect-version-change.outputs.changed == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
@@ -49,16 +85,10 @@ jobs:
 
       - name: Prepare release metadata
         id: meta
-        env:
-          INPUT_VERSION_NAME: ${{ inputs.version_name }}
         run: |
-          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
-            tag="${GITHUB_REF_NAME}"
-            version="${tag#beta-}"
-          else
-            version="${INPUT_VERSION_NAME:-beta-${GITHUB_RUN_NUMBER}}"
-            tag="beta-${version}"
-          fi
+          version="${{ needs.detect-version-change.outputs.version_name }}"
+          version_code="${{ needs.detect-version-change.outputs.version_code }}"
+          tag="beta-${version}"
 
           apk="$(find app/build/outputs/apk/release -name '*.apk' -type f | head -n 1)"
           if [[ -z "${apk}" ]]; then
@@ -68,6 +98,7 @@ jobs:
 
           echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
           echo "version=${version}" >> "${GITHUB_OUTPUT}"
+          echo "version_code=${version_code}" >> "${GITHUB_OUTPUT}"
           echo "apk=${apk}" >> "${GITHUB_OUTPUT}"
 
       - name: Create GitHub prerelease
@@ -75,6 +106,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG_NAME: ${{ steps.meta.outputs.tag }}
           VERSION_NAME: ${{ steps.meta.outputs.version }}
+          VERSION_CODE: ${{ steps.meta.outputs.version_code }}
           APK_PATH: ${{ steps.meta.outputs.apk }}
         run: |
           if gh release view "${TAG_NAME}" >/dev/null 2>&1; then
@@ -83,6 +115,6 @@ jobs:
             gh release create "${TAG_NAME}" "${APK_PATH}" \
               --target "${GITHUB_SHA}" \
               --title "Tyranor Next ${VERSION_NAME}" \
-              --notes "Automated beta build from ${GITHUB_SHA}." \
+              --notes "Automated beta build from versionCode ${VERSION_CODE}, commit ${GITHUB_SHA}." \
               --prerelease
           fi
