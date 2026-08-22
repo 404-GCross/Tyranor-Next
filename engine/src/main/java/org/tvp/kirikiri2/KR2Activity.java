@@ -22,6 +22,7 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import bridge.NativeBridge;
 import bridge.KrPathUtils;
+import com.core.nativeplugin.NativeLibraryLoader;
 import java.util.Locale;
 import org.cocos2dx.lib.Cocos2dxActivity;
 import org.cocos2dx.lib.Cocos2dxGLSurfaceView;
@@ -289,9 +290,9 @@ public class KR2Activity extends Cocos2dxActivity {
     public static native void onMessageBoxText(String text);
 
     @Override public void onLoadNativeLibraries() {
-        System.loadLibrary("SDL2");
-        System.loadLibrary("ffmpeg");
-        System.loadLibrary("game");
+        if (NativeLibraryLoader.loadKirikiroid139(this) == null) {
+            throw new UnsatisfiedLinkError("Kirikiroid2 native plugin is missing or invalid");
+        }
         System.loadLibrary("krkr_bridge");
     }
     @Override public void onCreate(Bundle savedInstanceState) {

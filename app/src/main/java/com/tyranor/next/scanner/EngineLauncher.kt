@@ -43,6 +43,7 @@ object EngineLauncher {
             return "无法解析游戏目录（仅支持本地文件路径）"
         }
         requestAllFilesAccessIfNeeded(context, path)?.let { return it }
+        EnginePluginBootstrap.ensureForLaunch(context, game.engine)?.let { return it }
         return try {
             val intent = buildIntent(context, game.engine, path, game)
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

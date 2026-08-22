@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import com.core.engine.EnginePrefs
 import com.core.nativeplugin.NativePluginConstants
+import com.core.nativeplugin.NativePluginInstallState
 import com.core.nativeplugin.NativePluginManager
 import java.io.File
 
@@ -48,23 +49,82 @@ object EnginePluginBootstrap {
     @JvmStatic
     fun provisionIfNeeded(context: Context) {
         val app = context.applicationContext
-        val prefs = app.getSharedPreferences(EnginePrefs.APP_PREFS, Context.MODE_PRIVATE)
         for (spec in engines) {
-            if (prefs.getBoolean(spec.installedKey, false)) continue
-            try {
-                copyAssetDir(app, spec.engineId, currentDirFor(app, spec.engineId))
-                markInstalled(prefs, spec)
-                android.util.Log.i(TAG, "provisioned native plugin: ${spec.engineId}")
-            } catch (t: Throwable) {
-                android.util.Log.w(TAG, "provision ${spec.engineId} failed", t)
-            }
+            provisionEngineIfNeeded(app, spec, requireEnabled = false)
         }
     }
 
-    private fun markInstalled(prefs: SharedPreferences, spec: EngineSpec) {
+    /** 启动前同步保障：对应引擎插件必须已安装、已启用且文件完整。 */
+    @JvmStatic
+    fun ensureForLaunch(context: Context, engine: EngineType): String? {
+        val engineId = when (engine) {
+            EngineType.KIRIKIRI -> NativePluginConstants.ENGINE_KIRIKIROID2
+            EngineType.ONS -> NativePluginConstants.ENGINE_ONS
+            EngineType.ARTEMIS -> NativePluginConstants.ENGINE_ARTEMIS
+            EngineType.TYRANO, EngineType.UNKNOWN -> return null
+        }
+        val app = context.applicationContext
+        val spec = engines.firstOrNull { it.engineId == engineId }
+            ?: return "未知引擎插件：$engineId"
+        return if (provisionEngineIfNeeded(app, spec, requireEnabled = true)) {
+            null
+        } else {
+            "引擎插件安装失败，请重启应用或检查安装包完整性"
+        }
+    }
+
+    @Synchronized
+    private fun provisionEngineIfNeeded(app: Context, spec: EngineSpec, requireEnabled: Boolean): Boolean {
+        val prefs = app.getSharedPreferences(EnginePrefs.APP_PREFS, Context.MODE_PRIVATE)
+        val state = installState(app, spec.engineId)
+        if (state == NativePluginInstallState.INSTALLED_ENABLED) {
+            markInstalled(prefs, spec, enabled = true)
+            return true
+        }
+        if (!requireEnabled && state == NativePluginInstallState.INSTALLED_DISABLED) {
+            markInstalled(prefs, spec, enabled = false)
+            return true
+        }
+        if (requireEnabled && state == NativePluginInstallState.INSTALLED_DISABLED) {
+            markInstalled(prefs, spec, enabled = true)
+            return isReady(app, spec.engineId)
+        }
+        return try {
+            val target = currentDirFor(app, spec.engineId)
+            if (target.exists()) target.deleteRecursively()
+            copyAssetDir(app, spec.engineId, target)
+            markInstalled(prefs, spec, enabled = true)
+            val ready = isReady(app, spec.engineId)
+            if (ready) {
+                android.util.Log.i(TAG, "provisioned native plugin: ${spec.engineId}")
+            } else {
+                android.util.Log.w(TAG, "provision ${spec.engineId} finished but validation failed")
+            }
+            ready
+        } catch (t: Throwable) {
+            android.util.Log.w(TAG, "provision ${spec.engineId} failed", t)
+            false
+        }
+    }
+
+    private fun isReady(app: Context, engineId: String): Boolean {
+        return installState(app, engineId) == NativePluginInstallState.INSTALLED_ENABLED
+    }
+
+    private fun installState(app: Context, engineId: String): NativePluginInstallState {
+        val state = when (engineId) {
+            NativePluginConstants.ENGINE_KIRIKIROID2 -> NativePluginManager.kirikiroid2InstallState(app)
+            NativePluginConstants.ENGINE_ONS -> NativePluginManager.onsInstallState(app)
+            NativePluginConstants.ENGINE_ARTEMIS -> NativePluginManager.artemisInstallState(app)
+            else -> NativePluginInstallState.INVALID
+        }
+        return state
+    }
+
+    private fun markInstalled(prefs: SharedPreferences, spec: EngineSpec, enabled: Boolean) {
         prefs.edit()
             .putBoolean(spec.installedKey, true)
-            .putBoolean(spec.enabledKey, true)
+            .putBoolean(spec.enabledKey, enabled)
             .apply()
     }
 
