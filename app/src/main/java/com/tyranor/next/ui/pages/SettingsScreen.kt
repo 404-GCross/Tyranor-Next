@@ -99,7 +99,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                 item {
                     MiuixCard(modifier = Modifier.fillMaxWidth(), cornerRadius = 8.dp) {
                         Column(Modifier.padding(vertical = 4.dp)) {
-                            ArrowPreference(title = "应用设置", onClick = { })
+                            ArrowPreference(title = "应用设置", onClick = { startActivityWithFade(ctx, AppSettingsActivity.createIntent(ctx)) })
                             ArrowPreference(title = "更新检查", onClick = { })
                             ArrowPreference(title = "加入群聊", onClick = { })
                         }

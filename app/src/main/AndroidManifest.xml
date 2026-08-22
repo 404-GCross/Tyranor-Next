@@ -28,6 +28,9 @@
             android:name=".ui.pages.PerGameSettingsActivity"
             android:exported="false" />
         <activity
+            android:name=".ui.pages.AppSettingsActivity"
+            android:exported="false" />
+        <activity
             android:name=".MainActivity"
             android:exported="true">
             <intent-filter>
