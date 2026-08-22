@@ -268,10 +268,10 @@ private fun GameLibraryContent(
                         Modifier.align(Alignment.Center),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
-                        Text("暂无游戏", style = MaterialTheme.typography.bodyLarge)
+                        Text("暂无游戏", style = MaterialTheme.typography.bodyMedium)
                         Text(
                             "点击右上角添加文件夹并扫描",
-                            style = MaterialTheme.typography.bodySmall,
+                            style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = 8.dp),
                         )
@@ -338,7 +338,7 @@ private fun GameActionsSheet(
         launchError?.let {
             Text(
                 it,
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.error,
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
             )
@@ -417,12 +417,12 @@ private fun VndbSearchDialog(
                     enabled = !searching,
                     modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
                 ) {
-                    Text(if (searching) "搜索中…" else "搜索")
+                    Text(if (searching) "搜索中…" else "搜索", style = MaterialTheme.typography.bodyMedium)
                 }
                 error?.let {
                     Text(
                         it,
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.error,
                         modifier = Modifier.padding(top = 8.dp),
                     )
@@ -441,13 +441,13 @@ private fun VndbSearchDialog(
                                     .clickable { onBind(candidate) }
                                     .padding(10.dp),
                             ) {
-                                Text(candidate.title.ifBlank { candidate.originalTitle }, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(candidate.title.ifBlank { candidate.originalTitle }, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 if (candidate.originalTitle.isNotBlank()) {
-                                    Text(candidate.originalTitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text(candidate.originalTitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 }
                                 Text(
                                     listOf(candidate.id, candidate.released, candidate.developer).filter { it.isNotBlank() }.joinToString(" · "),
-                                    style = MaterialTheme.typography.bodySmall,
+                                    style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
@@ -480,7 +480,7 @@ private fun GameActionRow(
         Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface)
         Text(
             label,
-            style = MaterialTheme.typography.bodyLarge,
+            style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.padding(start = 20.dp),
         )
     }
@@ -527,12 +527,12 @@ internal fun GameCard(game: ScanGame, onClick: () -> Unit) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
                         "Tyranor",
-                        style = MaterialTheme.typography.labelMedium,
+                        style = MaterialTheme.typography.bodyMedium,
                         color = Color.White.copy(alpha = 0.7f),
                     )
                     Text(
                         game.engine.displayName,
-                        style = MaterialTheme.typography.labelLarge,
+                        style = MaterialTheme.typography.bodyMedium,
                         color = Color.White,
                         modifier = Modifier.padding(top = 4.dp),
                     )
@@ -541,7 +541,7 @@ internal fun GameCard(game: ScanGame, onClick: () -> Unit) {
         }
         Text(
             game.title,
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyMedium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center,

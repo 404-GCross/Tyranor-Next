@@ -1,7 +1,10 @@
 package com.example.tyranornext.theme
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.unit.sp
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.theme.defaultTextStyles
 import top.yukonga.miuix.kmp.theme.lightColorScheme
 
 /**
@@ -18,7 +21,20 @@ private val TyranorMiuixLightColors = lightColorScheme(
     onSurfaceContainer = TextColor,
 )
 
+/**
+ * 文字统一规范：页面内容只用 titleMedium(16sp)/bodyMedium(14sp) 两档。
+ * Miuix preference 的标题默认用 headline1(17sp)，这里覆盖为 16sp，
+ * 使其严格落入两档内，与 Material titleMedium 一致。
+ */
+private val TyranorMiuixTextStyles = defaultTextStyles(
+    headline1 = TextStyle(fontSize = 16.sp),
+)
+
 @Composable
 fun MiuixSettingsTheme(content: @Composable () -> Unit) {
-    MiuixTheme(colors = TyranorMiuixLightColors, content = content)
+    MiuixTheme(
+        colors = TyranorMiuixLightColors,
+        textStyles = TyranorMiuixTextStyles,
+        content = content,
+    )
 }

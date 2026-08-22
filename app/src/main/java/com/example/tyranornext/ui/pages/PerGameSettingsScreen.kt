@@ -163,7 +163,7 @@ fun PerGameSettingsScreen(game: ScanGame) {
                             if (!isSdl3) {
                                 OverrideFont("默认字体", globalKrFont, krFont, onReset = { krFont = "" }, onPick = { fontLauncher.launch("*/*") })
                                 OverrideSwitch("强制默认字体", globalForce, krForceFont) { krForceFont = it }
-                                OverrideChoice("渲染器", KR_RENDERER_MAP2, globalRenderer, krRender[PerGameSettingsStore.F_RENDERER]!!.value) {
+                                OverrideChoice("渲染器", KR_RENDERER_MAP2, globalRenderer, krRender[PerGameSettingsStore.F_RENDERER]!!.value, emptyLabel = "引擎默认") {
                                     krRender[PerGameSettingsStore.F_RENDERER]!!.value = it
                                 }
                             }
@@ -219,11 +219,11 @@ private fun SectionCard(title: String, content: @Composable () -> Unit) {
 
 /** 覆盖版下拉行：Miuix OverlayDropdownPreference，选项首位为“跟随全局”。 */
 @Composable
-private fun OverrideChoice(label: String, options: Map<String, String>, global: String, override: String?, onSet: (String?) -> Unit) {
+private fun OverrideChoice(label: String, options: Map<String, String>, global: String, override: String?, emptyLabel: String = "内置字体", onSet: (String?) -> Unit) {
     val following = override == null
     val effValue = override ?: global
     val keys = options.keys.toList()
-    val labels = listOf("跟随全局 · ${labelOf(effValue, options)}") + keys.map { options[it] ?: it }
+    val labels = listOf("跟随全局 · ${labelOf(effValue, options, emptyLabel)}") + keys.map { options[it] ?: it }
     val index = if (following) 0 else (keys.indexOf(override).takeIf { it >= 0 } ?: -1) + 1
     OverlayDropdownPreference(
         title = label,
@@ -259,8 +259,8 @@ private fun OverrideFont(label: String, global: String, override: String?, onRes
             title = { Text(label, style = MaterialTheme.typography.titleMedium) },
             text = {
                 Column {
-                    Row(Modifier.fillMaxWidth().clickable { onReset(); open = false }.padding(vertical = 8.dp)) { Text("跟随全局", style = MaterialTheme.typography.bodyLarge) }
-                    Row(Modifier.fillMaxWidth().clickable { open = false; onPick() }.padding(vertical = 8.dp)) { Text("选择字体文件…", style = MaterialTheme.typography.bodyLarge) }
+                    Row(Modifier.fillMaxWidth().clickable { onReset(); open = false }.padding(vertical = 8.dp)) { Text("跟随全局", style = MaterialTheme.typography.bodyMedium) }
+                    Row(Modifier.fillMaxWidth().clickable { open = false; onPick() }.padding(vertical = 8.dp)) { Text("选择字体文件…", style = MaterialTheme.typography.bodyMedium) }
                 }
             },
             confirmButton = { TextButton(onClick = { open = false }) { Text("取消") } },
@@ -268,7 +268,7 @@ private fun OverrideFont(label: String, global: String, override: String?, onRes
     }
 }
 
-private fun labelOf(v: String, map: Map<String, String>): String = map[v] ?: v.ifEmpty { "内置字体" }
+private fun labelOf(v: String, map: Map<String, String>, emptyLabel: String): String = map[v] ?: v.ifEmpty { emptyLabel }
 
 private fun copyFontToPrivate(ctx: android.content.Context, uri: android.net.Uri): String? = try {
     val name = (uri.lastPathSegment ?: "font.ttf").substringAfterLast('/').substringAfterLast('\\')

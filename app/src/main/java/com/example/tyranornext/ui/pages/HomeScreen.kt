@@ -56,7 +56,7 @@ fun HomeScreen(modifier: Modifier = Modifier) {
             if (recentGames.isEmpty()) {
                 Text(
                     "暂无最近打开的游戏",
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.align(Alignment.Center),
                 )
@@ -77,7 +77,7 @@ fun HomeScreen(modifier: Modifier = Modifier) {
             launchError?.let {
                 Text(
                     it,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp),
                 )

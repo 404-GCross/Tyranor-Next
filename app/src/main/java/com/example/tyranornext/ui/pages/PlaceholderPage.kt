@@ -44,10 +44,10 @@ internal fun PlaceholderPage(title: String, description: String, modifier: Modif
       verticalArrangement = Arrangement.Center,
       horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-      Text(title, style = MaterialTheme.typography.headlineMedium)
+      Text(title, style = MaterialTheme.typography.titleMedium)
       Text(
         description,
-        style = MaterialTheme.typography.bodyLarge,
+        style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         textAlign = TextAlign.Center,
         modifier = Modifier.padding(top = 16.dp),

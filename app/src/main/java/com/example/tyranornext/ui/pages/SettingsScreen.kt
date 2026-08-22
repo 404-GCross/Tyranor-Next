@@ -80,23 +80,25 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                 contentPadding = PaddingValues(top = innerPadding.calculateTopPadding() + 12.dp, bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                item {
-                    MiuixCard(modifier = Modifier.fillMaxWidth(), cornerRadius = 8.dp) {
-                        EngineSettingsKind.entries.forEach { kind ->
-                            ArrowPreference(
-                                title = kind.title,
-                                startAction = {
-                                    MiuixIcon(
-                                        kind.icon,
-                                        modifier = Modifier.padding(end = 6.dp),
-                                        contentDescription = kind.title,
-                                        tint = MiuixTheme.colorScheme.onBackground,
-                                    )
-                                },
-                                onClick = {
-                                    startActivityWithFade(ctx, EngineSettingsActivity.createIntent(ctx, kind))
-                                },
-                            )
+                EngineSettingsKind.entries.forEach { kind ->
+                    item {
+                        MiuixCard(modifier = Modifier.fillMaxWidth(), cornerRadius = 8.dp) {
+                            Column(Modifier.padding(vertical = 2.5.dp)) {
+                                ArrowPreference(
+                                    title = kind.title,
+                                    startAction = {
+                                        MiuixIcon(
+                                            kind.icon,
+                                            modifier = Modifier.padding(end = 6.dp),
+                                            contentDescription = kind.title,
+                                            tint = MiuixTheme.colorScheme.primary,
+                                        )
+                                    },
+                                    onClick = {
+                                        startActivityWithFade(ctx, EngineSettingsActivity.createIntent(ctx, kind))
+                                    },
+                                )
+                            }
                         }
                     }
                 }
@@ -459,10 +461,10 @@ private fun FontRow(label: String, value: String, onReset: () -> Unit, onPick: (
             text = {
                 Column {
                     Row(Modifier.fillMaxWidth().clickable { onReset(); open = false }.padding(vertical = 8.dp)) {
-                        Text("使用内置字体", style = MaterialTheme.typography.bodyLarge)
+                        Text("使用内置字体", style = MaterialTheme.typography.bodyMedium)
                     }
                     Row(Modifier.fillMaxWidth().clickable { open = false; onPick() }.padding(vertical = 8.dp)) {
-                        Text("选择字体文件…", style = MaterialTheme.typography.bodyLarge)
+                        Text("选择字体文件…", style = MaterialTheme.typography.bodyMedium)
                     }
                 }
             },
