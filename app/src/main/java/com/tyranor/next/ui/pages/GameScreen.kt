@@ -43,13 +43,16 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.RadioButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -385,6 +388,7 @@ internal fun GameActionsSheet(
     var launchError by remember { mutableStateOf<String?>(null) }
     var showVndbSearch by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    var showLaunchFilePicker by remember { mutableStateOf(false) }
 
     // 打开相册选择自定义封面
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
@@ -420,6 +424,13 @@ internal fun GameActionsSheet(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
+            if (game.engine == EngineType.KIRIKIRI) {
+                GameActionRow(
+                    icon = Icons.Filled.Description,
+                    label = "启动文件",
+                    subtitle = game.launchFile ?: "自动",
+                ) { showLaunchFilePicker = true }
+            }
             GameActionRow(Icons.Filled.PlayArrow, "启动游戏") {
                 launchError = EngineLauncher.launch(context, game)
                 if (launchError == null) onDismiss()
@@ -472,6 +483,17 @@ internal fun GameActionsSheet(
                         launchError = "封面下载失败"
                     }
                 }
+            },
+        )
+    }
+
+    if (showLaunchFilePicker) {
+        LaunchFileDialog(
+            game = game,
+            onDismiss = { showLaunchFilePicker = false },
+            onConfirm = { name ->
+                showLaunchFilePicker = false
+                onGameUpdated(game.copy(launchFile = name))
             },
         )
     }
@@ -589,10 +611,88 @@ private fun VndbSearchDialog(
     )
 }
 
+/** KRKR 专属：选择游戏启动入口文件（目录内 xp3 / exe）。 */
+@Composable
+private fun LaunchFileDialog(
+    game: ScanGame,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit,
+) {
+    val context = LocalContext.current
+    var loading by remember { mutableStateOf(true) }
+    var files by remember { mutableStateOf<List<String>>(emptyList()) }
+    var selected by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(game.uri) {
+        val (names, current) = withContext(Dispatchers.IO) {
+            val names = EngineLauncher.listKrLaunchFiles(context, game)
+            val current = EngineLauncher.currentKrLaunchFileName(context, game)
+            names to current
+        }
+        files = names
+        selected = current?.takeIf { names.contains(it) }
+        loading = false
+    }
+
+    AppAlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("启动文件", style = MaterialTheme.typography.titleMedium) },
+        text = {
+            when {
+                loading -> Box(Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+                files.isEmpty() -> Text(
+                    "目录中未找到 xp3 或 exe 文件",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                else -> LazyColumn(
+                    modifier = Modifier.fillMaxWidth().height(260.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    lazyItems(files) { name ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { selected = name }
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            RadioButton(
+                                selected = selected == name,
+                                onClick = { selected = name },
+                            )
+                            Text(
+                                name,
+                                style = MaterialTheme.typography.bodyMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.padding(start = 10.dp),
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { selected?.let(onConfirm) },
+                enabled = selected != null,
+            ) { Text("确定") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("取消") }
+        },
+    )
+}
+
 @Composable
 private fun GameActionRow(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     label: String,
+    subtitle: String? = null,
     danger: Boolean = false,
     onClick: () -> Unit,
 ) {
@@ -610,12 +710,21 @@ private fun GameActionRow(
             contentDescription = null,
             tint = if (danger) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
         )
-        Text(
-            label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = if (danger) MaterialTheme.colorScheme.error else Color.Unspecified,
-            modifier = Modifier.padding(start = 20.dp),
-        )
+        Column(Modifier.padding(start = 20.dp)) {
+            Text(
+                label,
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (danger) MaterialTheme.colorScheme.error else Color.Unspecified,
+            )
+            subtitle?.let {
+                Text(
+                    it,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
+        }
     }
 }
 

@@ -318,6 +318,12 @@ object EngineLauncher {
             ?.filter { it.isFile }
             .orEmpty()
 
+        // 用户通过“启动文件”手动指定的入口优先（文件不存在时回退自动逻辑）
+        game.launchFile?.takeIf { it.isNotBlank() }?.let { manual ->
+            val f = java.io.File(path, manual)
+            if (f.isFile) return f.absolutePath
+        }
+
         // 脚本/主启动归档优先（此类 xp3 内含 start.ks / FirstConductor 等启动脚本），
         // 避开 bgimage/bgm/video/voice 等纯素材档。
         val preferred = listOf(
@@ -342,6 +348,26 @@ object EngineLauncher {
         }?.let { return it.absolutePath }
 
         return path
+    }
+
+    /**
+     * 列出游戏目录内可作为启动入口的文件（xp3 与 exe），供“启动文件”选择弹窗展示。
+     */
+    internal fun listKrLaunchFiles(context: Context, game: ScanGame): List<String> {
+        val path = resolveGameDirectory(context, game) ?: return emptyList()
+        val files = java.io.File(path).listFiles()?.filter { it.isFile }.orEmpty()
+        val xp3 = files.filter { it.name.lowercase().endsWith(".xp3") }.sortedBy { it.name.lowercase() }.map { it.name }
+        val exe = files.filter { it.name.lowercase().endsWith(".exe") }.sortedBy { it.name.lowercase() }.map { it.name }
+        return xp3 + exe
+    }
+
+    /**
+     * 当前 KRKR 启动入口对应的文件名（仅当入口为目录内文件时返回；入口为目录本身时返回 null）。
+     */
+    internal fun currentKrLaunchFileName(context: Context, game: ScanGame): String? {
+        val path = resolveGameDirectory(context, game) ?: return null
+        val entry = pickKrActivateEntry(path, game)
+        return java.io.File(entry).takeIf { it.isFile }?.name
     }
 
     private fun safeSaveName(rootPath: String): String {

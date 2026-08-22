@@ -94,7 +94,7 @@ object EngineScanner {
         saveRecentGames(context, loadRecentGames(context).filterNot { it.uri == uri })
     }
 
-    private fun saveRecentGames(context: Context, games: List<ScanGame>) {
+    internal fun saveRecentGames(context: Context, games: List<ScanGame>) {
         val str = games.joinToString("\n") { serializeGame(it) }
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit().putString(KEY_RECENT_GAMES, str).apply()
@@ -109,6 +109,7 @@ object EngineScanner {
             g.coverUri.orEmpty(),
             g.vndbId.orEmpty(),
             g.metadataTitle.orEmpty(),
+            g.launchFile.orEmpty(),
         ).joinToString("\u0001")
     }
 
@@ -123,6 +124,7 @@ object EngineScanner {
             coverUri = p.getOrElse(4) { "" }.takeIf { it.isNotBlank() },
             vndbId = p.getOrElse(5) { "" }.takeIf { it.isNotBlank() },
             metadataTitle = p.getOrElse(6) { "" }.takeIf { it.isNotBlank() },
+            launchFile = p.getOrElse(7) { "" }.takeIf { it.isNotBlank() },
         )
     }
 

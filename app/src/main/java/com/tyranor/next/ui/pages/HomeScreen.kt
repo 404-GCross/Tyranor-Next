@@ -40,6 +40,13 @@ fun HomeScreen(modifier: Modifier = Modifier) {
 
     fun replaceGame(updated: ScanGame) {
         recentGames = recentGames.map { if (it.uri == updated.uri) updated else it }
+        selectedGame = selectedGame?.let { if (it.uri == updated.uri) updated else it }
+        // 同步持久化最近记录与主游戏库，避免修改丢失
+        EngineScanner.saveRecentGames(context, recentGames)
+        EngineScanner.saveGames(
+            context,
+            EngineScanner.loadGames(context).map { if (it.uri == updated.uri) updated else it },
+        )
     }
 
     fun deleteGame(target: ScanGame) {
