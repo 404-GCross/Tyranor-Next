@@ -44,7 +44,7 @@ class PerGameSettingsActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background,
                 ) {
-                    PerGameSettingsScreen(game = game, onBack = { finish() })
+                    PerGameSettingsScreen(game = game)
                 }
             }
         }

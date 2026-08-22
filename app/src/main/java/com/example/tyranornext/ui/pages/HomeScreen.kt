@@ -22,6 +22,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.tyranornext.scanner.EngineLauncher
 import com.example.tyranornext.scanner.EngineScanner
@@ -44,7 +45,7 @@ fun HomeScreen(modifier: Modifier = Modifier) {
                 modifier = Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.Center,
             ) {
-                Text("首页", style = MaterialTheme.typography.titleLarge)
+                Text("首页", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             }
         }
 

@@ -218,6 +218,7 @@ private fun GameLibraryContent(
                 Text(
                     "游戏",
                     style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f),
                 )
                 Icon(

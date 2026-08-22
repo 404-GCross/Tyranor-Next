@@ -24,7 +24,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.RocketLaunch
@@ -45,6 +44,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -106,7 +106,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
 }
 
 @Composable
-internal fun EngineSettingsDetailScreen(kind: EngineSettingsKind, onBack: () -> Unit) {
+internal fun EngineSettingsDetailScreen(kind: EngineSettingsKind) {
     val ctx = LocalContext.current
 
     var krVersion by remember { mutableStateOf(EngineSettingsStore.getKrEngineVersion(ctx)) }
@@ -175,13 +175,17 @@ internal fun EngineSettingsDetailScreen(kind: EngineSettingsKind, onBack: () -> 
             topBar = {
                 Column(modifier = Modifier.fillMaxWidth().statusBarsPadding()) {
                     Row(
-                        modifier = Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 8.dp),
+                        modifier = Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 16.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回", tint = MaterialTheme.colorScheme.onSurface)
-                        }
-                        Text(kind.title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(
+                            kind.title,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.weight(1f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
                         IconButton(onClick = {
                             saveAll()
                             android.widget.Toast.makeText(ctx, "引擎设置已保存", android.widget.Toast.LENGTH_SHORT).show()
@@ -237,7 +241,7 @@ private fun SettingsTopBar(title: String) {
             modifier = Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+            Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
         }
     }
 }

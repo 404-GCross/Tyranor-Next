@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.tyranornext.R
@@ -44,7 +45,7 @@ fun EngineScreen(modifier: Modifier = Modifier) {
                 modifier = Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.Center,
             ) {
-                Text("引擎", style = MaterialTheme.typography.titleLarge)
+                Text("引擎", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             }
         }
 

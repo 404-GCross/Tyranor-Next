@@ -44,7 +44,7 @@ class EngineSettingsActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background,
                 ) {
-                    EngineSettingsDetailScreen(kind = kind, onBack = { finish() })
+                    EngineSettingsDetailScreen(kind = kind)
                 }
             }
         }

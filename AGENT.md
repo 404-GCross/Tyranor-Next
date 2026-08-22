@@ -20,6 +20,7 @@
 
 - 顶部栏使用 **Column + Centre**，**不使用** Material3 的 `TopAppBar` / `Scaffold`。
 - 页面整体由外层 `Column` 组装，顺序固定为：顶部栏 → 正文内容。
+- **禁止在顶部栏放置任何返回按钮/图标**。返回统一依赖系统返回键/手势（`Activity` 默认 `finish()`），不要通过 `onBack` 参数下发返回回调。
 
 ### 2. 高度
 
@@ -30,6 +31,7 @@
 
 - 标题**居左**，水平内边距 `horizontal = 16.dp`，纵向居中。
 - 标题字号使用 `MaterialTheme.typography.titleLarge`。
+- 标题**必须加粗**：`fontWeight = FontWeight.Bold`。
 
 ### 4. 背景色
 

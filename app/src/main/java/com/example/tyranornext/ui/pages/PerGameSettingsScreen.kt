@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -36,6 +35,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.tyranornext.scanner.EngineType
@@ -50,7 +50,7 @@ import org.json.JSONObject
  * 顶部右侧保存图标提交覆盖；左上返回。
  */
 @Composable
-fun PerGameSettingsScreen(game: ScanGame, onBack: () -> Unit) {
+fun PerGameSettingsScreen(game: ScanGame) {
     val ctx = LocalContext.current
     val gid = game.uri
 
@@ -129,13 +129,10 @@ fun PerGameSettingsScreen(game: ScanGame, onBack: () -> Unit) {
     Column(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxWidth().statusBarsPadding()) {
             Row(
-                modifier = Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 8.dp),
+                modifier = Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回", tint = MaterialTheme.colorScheme.onSurface)
-                }
-                Text(game.title, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                Text(game.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                 IconButton(onClick = { save(); android.widget.Toast.makeText(ctx, "已保存", android.widget.Toast.LENGTH_SHORT).show() }) {
                     Icon(Icons.Filled.Save, contentDescription = "保存", tint = MaterialTheme.colorScheme.onSurface)
                 }

@@ -26,12 +26,10 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -79,7 +77,7 @@ class SaveManagementActivity : ComponentActivity() {
         setContent {
             TyranorNextTheme {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    SaveManagementScreen(game = game, onBack = { finish() })
+                    SaveManagementScreen(game = game)
                 }
             }
         }
@@ -132,7 +130,7 @@ class SaveManagementActivity : ComponentActivity() {
 }
 
 @Composable
-private fun SaveManagementScreen(game: ScanGame, onBack: () -> Unit) {
+private fun SaveManagementScreen(game: ScanGame) {
     val context = LocalContext.current
     val manager = remember { GameSaveManager(context) }
     var location by remember { mutableStateOf(manager.resolveSaveLocation(game)) }
@@ -176,15 +174,13 @@ private fun SaveManagementScreen(game: ScanGame, onBack: () -> Unit) {
     Column(Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxWidth().statusBarsPadding()) {
             Row(
-                modifier = Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 8.dp),
+                modifier = Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回", tint = MaterialTheme.colorScheme.onSurface)
-                }
                 Text(
                     "存档管理",
                     style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
