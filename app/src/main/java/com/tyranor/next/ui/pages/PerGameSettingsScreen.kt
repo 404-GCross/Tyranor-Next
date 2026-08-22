@@ -142,7 +142,7 @@ fun PerGameSettingsScreen(game: ScanGame) {
                         ) {
                             Text(game.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MiuixTheme.colorScheme.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                             IconButton(onClick = { save(); android.widget.Toast.makeText(ctx, "已保存", android.widget.Toast.LENGTH_SHORT).show() }) {
-                                Icon(Icons.Filled.Save, contentDescription = "保存", tint = MiuixTheme.colorScheme.onBackground)
+                                Icon(Icons.Filled.Save, contentDescription = "保存", tint = MiuixTheme.colorScheme.primary)
                             }
                         }
                     }

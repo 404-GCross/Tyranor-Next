@@ -191,7 +191,7 @@ internal fun EngineSettingsDetailScreen(kind: EngineSettingsKind) {
                                 saveAll()
                                 android.widget.Toast.makeText(ctx, "引擎设置已保存", android.widget.Toast.LENGTH_SHORT).show()
                             }) {
-                                Icon(Icons.Filled.Save, contentDescription = "保存设置", tint = MiuixTheme.colorScheme.onBackground)
+                                Icon(Icons.Filled.Save, contentDescription = "保存设置", tint = MiuixTheme.colorScheme.primary)
                             }
                         }
                     }

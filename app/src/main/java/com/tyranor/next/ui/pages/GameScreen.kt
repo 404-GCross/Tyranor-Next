@@ -268,7 +268,7 @@ private fun GameLibraryContent(
                     Icon(
                         Icons.Filled.Search,
                         contentDescription = "搜索游戏",
-                        tint = MaterialTheme.colorScheme.onBackground,
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier
                             .size(31.dp)
                             .clip(RoundedCornerShape(6.dp))
@@ -281,7 +281,7 @@ private fun GameLibraryContent(
                     Icon(
                         Icons.Filled.CloudDownload,
                         contentDescription = "自动获取封面",
-                        tint = MaterialTheme.colorScheme.onBackground,
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier
                             .size(31.dp)
                             .clip(RoundedCornerShape(6.dp))
@@ -291,7 +291,7 @@ private fun GameLibraryContent(
                     Icon(
                         Icons.Filled.Refresh,
                         contentDescription = "扫描游戏",
-                        tint = MaterialTheme.colorScheme.onBackground,
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier
                             .size(31.dp)
                             .clip(RoundedCornerShape(6.dp))
@@ -307,12 +307,13 @@ private fun GameLibraryContent(
                         placeholder = { Text("搜索游戏") },
                         singleLine = true,
                         shape = RoundedCornerShape(8.dp),
-                        leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                        leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                         trailingIcon = {
                             if (query.isNotEmpty()) {
                                 Icon(
                                     Icons.Filled.Close,
                                     contentDescription = "清除",
+                                    tint = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(6.dp))
                                         .clickable { query = "" },
@@ -607,7 +608,7 @@ private fun GameActionRow(
         Icon(
             icon,
             contentDescription = null,
-            tint = if (danger) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+            tint = if (danger) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
         )
         Text(
             label,

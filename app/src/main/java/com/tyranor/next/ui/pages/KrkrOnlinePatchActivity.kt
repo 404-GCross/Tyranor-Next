@@ -191,7 +191,7 @@ private fun KrkrOnlinePatchScreen(game: ScanGame) {
                     Icon(
                         Icons.Filled.Refresh,
                         contentDescription = "刷新",
-                        tint = MaterialTheme.colorScheme.onBackground,
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(40.dp).clickable { loadIndex() }.padding(8.dp),
                     )
                 }

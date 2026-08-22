@@ -280,7 +280,7 @@ private fun SaveActionCard(title: String, onClick: () -> Unit) {
             Icon(
                 Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = MaterialTheme.colorScheme.primary,
             )
         }
     }
