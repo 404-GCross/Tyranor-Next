@@ -104,6 +104,17 @@ fun PerGameSettingsScreen(game: ScanGame) {
 
     val isSdl3 = (krKernel ?: globalKrKernel) == EngineSettingsStore.KERNEL_KRKRSDL3
     val effVersion = krVersion ?: globalKrVersion
+    val krIs134126 = effVersion == EngineSettingsStore.KR_134 || effVersion == EngineSettingsStore.KR_126
+
+    // 渲染相关全局值（跟随全局时展示用）
+    val globalAccurate = EngineSettingsStore.getKrOglAccurateRender(ctx) == "1"
+    val globalMem = EngineSettingsStore.getKrMemUsage(ctx)
+    val globalDrawThread = EngineSettingsStore.getKrSoftwareDrawThread(ctx)
+    val globalSwCompress = EngineSettingsStore.getKrSoftwareCompressTex(ctx)
+    val globalOglCompress = EngineSettingsStore.getKrOglCompressTex(ctx)
+    val globalTexsize = EngineSettingsStore.getKrOglMaxTexsize(ctx)
+    val globalFps = EngineSettingsStore.getKrFpsLimit(ctx)
+    val effRenderer = krRender[PerGameSettingsStore.F_RENDERER]!!.value ?: globalRenderer
 
     fun save() {
         PerGameSettingsStore.setStr(ctx, gid, PerGameSettingsStore.F_ENGINE_VERSION, krVersion)
@@ -155,16 +166,55 @@ fun PerGameSettingsScreen(game: ScanGame) {
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 when (game.engine) {
-                    EngineType.KIRIKIRI -> item {
-                        SectionCard("KRKR") {
-                            OverrideSwitch("独立存档目录", globalKrScoped, krScoped) { krScoped = it }
-                            OverrideChoice("引擎版本", KR_VERSION_MAP2, globalKrVersion, krVersion) { krVersion = it }
-                            OverrideChoice("引擎内核", KR_KERNEL_MAP2, globalKrKernel, krKernel) { krKernel = it }
-                            if (!isSdl3) {
-                                OverrideFont("默认字体", globalKrFont, krFont, onReset = { krFont = "" }, onPick = { fontLauncher.launch("*/*") })
-                                OverrideSwitch("强制默认字体", globalForce, krForceFont) { krForceFont = it }
-                                OverrideChoice("渲染器", KR_RENDERER_MAP2, globalRenderer, krRender[PerGameSettingsStore.F_RENDERER]!!.value, emptyLabel = "引擎默认") {
-                                    krRender[PerGameSettingsStore.F_RENDERER]!!.value = it
+                    EngineType.KIRIKIRI -> {
+                        item {
+                            SectionCard("KRKR") {
+                                OverrideSwitch("独立存档目录", globalKrScoped, krScoped) { krScoped = it }
+                                OverrideChoice("引擎版本", KR_VERSION_MAP2, globalKrVersion, krVersion) { krVersion = it }
+                                OverrideChoice("引擎内核", KR_KERNEL_MAP2, globalKrKernel, krKernel) { krKernel = it }
+                            }
+                        }
+                        if (!isSdl3) {
+                            item {
+                                SectionCard("渲染") {
+                                    OverrideSwitch("OpenGL 精确渲染", globalAccurate, krRender[PerGameSettingsStore.F_OGL_ACCURATE_RENDER]!!.value == "1") { b ->
+                                        krRender[PerGameSettingsStore.F_OGL_ACCURATE_RENDER]!!.value = when (b) { null -> ""; true -> "1"; false -> "0" }
+                                    }
+                                    OverrideChoice("内存用量", KR_MEM_MAP2, globalMem, krRender[PerGameSettingsStore.F_MEM_USAGE]!!.value, emptyLabel = "引擎默认") {
+                                        krRender[PerGameSettingsStore.F_MEM_USAGE]!!.value = it
+                                    }
+                                    OverrideChoice("渲染器", KR_RENDERER_MAP2, globalRenderer, krRender[PerGameSettingsStore.F_RENDERER]!!.value, emptyLabel = "引擎默认") {
+                                        krRender[PerGameSettingsStore.F_RENDERER]!!.value = it
+                                    }
+                                    if (effRenderer == "" || effRenderer == EngineSettingsStore.RENDERER_SOFTWARE) {
+                                        OverrideChoice("软件渲染线程数", KR_THREAD_MAP2, globalDrawThread, krRender[PerGameSettingsStore.F_SOFTWARE_DRAW_THREAD]!!.value, emptyLabel = "自动") {
+                                            krRender[PerGameSettingsStore.F_SOFTWARE_DRAW_THREAD]!!.value = it
+                                        }
+                                        OverrideChoice("软件纹理压缩", KR_SW_COMPRESS_MAP2, globalSwCompress, krRender[PerGameSettingsStore.F_SOFTWARE_COMPRESS_TEX]!!.value, emptyLabel = "引擎默认") {
+                                            krRender[PerGameSettingsStore.F_SOFTWARE_COMPRESS_TEX]!!.value = it
+                                        }
+                                    }
+                                    if (!krIs134126) {
+                                        OverrideChoice("FPS 限制", KR_FPS_MAP2, globalFps, krRender[PerGameSettingsStore.F_FPS_LIMIT]!!.value, emptyLabel = "引擎默认") {
+                                            krRender[PerGameSettingsStore.F_FPS_LIMIT]!!.value = it
+                                        }
+                                    }
+                                    if (effRenderer == "" || effRenderer == EngineSettingsStore.RENDERER_OPENGL) {
+                                        OverrideChoice("OpenGL 纹理压缩", KR_OGL_COMPRESS_MAP2, globalOglCompress, krRender[PerGameSettingsStore.F_OGL_COMPRESS_TEX]!!.value, emptyLabel = "引擎默认") {
+                                            krRender[PerGameSettingsStore.F_OGL_COMPRESS_TEX]!!.value = it
+                                        }
+                                        OverrideChoice("最大纹理尺寸", KR_TEXSIZE_MAP2, globalTexsize, krRender[PerGameSettingsStore.F_OGL_MAX_TEXSIZE]!!.value, emptyLabel = "自动") {
+                                            krRender[PerGameSettingsStore.F_OGL_MAX_TEXSIZE]!!.value = it
+                                        }
+                                    }
+                                }
+                            }
+                            item {
+                                SectionCard("字体") {
+                                    OverrideFont("默认字体", globalKrFont, krFont, onReset = { krFont = "" }, onPick = { fontLauncher.launch("*/*") })
+                                    if (effVersion != EngineSettingsStore.KR_126) {
+                                        OverrideSwitch("强制默认字体", globalForce, krForceFont) { krForceFont = it }
+                                    }
                                 }
                             }
                         }
@@ -300,6 +350,21 @@ private val KR_RENDERER_MAP2 = mapOf(
     EngineSettingsStore.RENDERER_SOFTWARE to "软件渲染",
     EngineSettingsStore.RENDERER_OPENGL to "OpenGL",
 )
+private val KR_THREAD_MAP2 = mapOf("0" to "自动") + (1..8).associate { it.toString() to "$it 线程" }
+private val KR_SW_COMPRESS_MAP2 = mapOf(
+    "none" to "无", "halfline" to "半行", "lz4" to "LZ4", "lz4+tlg5" to "LZ4+TLG5",
+)
+private val KR_OGL_COMPRESS_MAP2 = mapOf(
+    "none" to "无", "half" to "半精度", "etc2" to "ETC2", "pvrtc" to "PVRTC",
+)
+private val KR_MEM_MAP2 = mapOf(
+    EngineSettingsStore.MEM_USAGE_UNLIMITED to "不限制",
+    EngineSettingsStore.MEM_USAGE_HIGH to "高",
+    EngineSettingsStore.MEM_USAGE_MEDIUM to "中",
+    EngineSettingsStore.MEM_USAGE_LOW to "低",
+)
+private val KR_TEXSIZE_MAP2 = mapOf("0" to "自动") + listOf(1024, 2048, 4096, 8192, 16384).associate { it.toString() to it.toString() }
+private val KR_FPS_MAP2 = mapOf("60" to "60", "45" to "45", "30" to "30", "15" to "15")
 private val ONS_ENCODING_MAP2 = mapOf("gbk" to "GBK", "sjis" to "Shift-JIS", "utf8" to "UTF-8")
 private val ART_VERSION_MAP2 = mapOf(
     EngineSettingsStore.ART_ENGINE_AUTO to "自动",
