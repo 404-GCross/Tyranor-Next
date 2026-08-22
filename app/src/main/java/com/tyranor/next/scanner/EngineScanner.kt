@@ -126,6 +126,18 @@ object EngineScanner {
         saveQuickLaunch(context, loadQuickLaunch(context).filterNot { it.uri == uri })
     }
 
+    /**
+     * 用主游戏库最新数据刷新快捷启动快照（游戏页修改封面等后首页实时同步），并回写存储。
+     * 已从库中删除的游戏保留原快照（不主动移除）。
+     */
+    fun refreshQuickLaunch(context: Context): List<ScanGame> {
+        val library = loadGames(context).associateBy { it.uri }
+        val current = loadQuickLaunch(context)
+        val refreshed = current.mapNotNull { library[it.uri] ?: it }
+        if (refreshed != current) saveQuickLaunch(context, refreshed)
+        return refreshed
+    }
+
     internal fun saveQuickLaunch(context: Context, games: List<ScanGame>) {
         val str = games.joinToString("\n") { serializeGame(it) }
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)

@@ -1,8 +1,9 @@
 package com.tyranor.next.ui.pages
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,6 +24,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -32,14 +34,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.tyranor.next.scanner.EngineLauncher
+import com.tyranor.next.R
 import com.tyranor.next.scanner.EngineScanner
 import com.tyranor.next.scanner.ScanGame
 import com.tyranor.next.theme.NavWhite
@@ -53,10 +55,12 @@ import java.util.Locale
 fun HomeScreen(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    // 首页数据每次进入重组时重新加载，保证游戏页改动后切回立即生效
-    var quickLaunch by remember { mutableStateOf(EngineScanner.loadQuickLaunch(context)) }
+    // 首页数据每次进入重组时重新加载，保证游戏页改动后切回立即生效；
+    // 快捷启动用主库最新数据刷新，封面等修改实时同步
+    var quickLaunch by remember { mutableStateOf(EngineScanner.refreshQuickLaunch(context)) }
     var recentGames by remember { mutableStateOf(EngineScanner.loadRecentGames(context).take(10)) }
     var selectedGame by remember { mutableStateOf<ScanGame?>(null) }
+    var removeRecentTarget by remember { mutableStateOf<ScanGame?>(null) }
 
     fun replaceGame(updated: ScanGame) {
         quickLaunch = quickLaunch.map { if (it.uri == updated.uri) updated else it }
@@ -81,6 +85,12 @@ fun HomeScreen(modifier: Modifier = Modifier) {
         }
     }
 
+    /** 仅删除该条最近游玩记录，不影响游戏库。 */
+    fun removeRecentRecord(target: ScanGame) {
+        recentGames = recentGames.filterNot { it.uri == target.uri }
+        EngineScanner.removeRecentGame(context, target.uri)
+    }
+
     Column(modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background)) {
             Column(modifier = Modifier.fillMaxWidth().statusBarsPadding()) {
@@ -102,7 +112,7 @@ fun HomeScreen(modifier: Modifier = Modifier) {
                 val game = quickLaunch.getOrNull(i)
                 QuickLaunchSlot(
                     game = game,
-                    onClick = { game?.let { EngineLauncher.launch(context, it) } },
+                    onClick = { if (game != null) selectedGame = game },
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -124,7 +134,11 @@ fun HomeScreen(modifier: Modifier = Modifier) {
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 items(recentGames, key = { it.uri }) { game ->
-                    RecentGameRow(game, onClick = { selectedGame = game })
+                    RecentGameRow(
+                        game = game,
+                        onClick = { selectedGame = game },
+                        onLongClick = { removeRecentTarget = game },
+                    )
                 }
             }
         }
@@ -143,79 +157,96 @@ fun HomeScreen(modifier: Modifier = Modifier) {
             },
         )
     }
+
+    // ===== 长按最近游玩项：确认删除该条游玩记录 =====
+    removeRecentTarget?.let { game ->
+        AppAlertDialog(
+            onDismissRequest = { removeRecentTarget = null },
+            title = {
+                Text("删除游玩记录", style = MaterialTheme.typography.titleMedium)
+            },
+            text = {
+                Text(
+                    "将「${game.title}」从最近游玩中移除？",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    removeRecentRecord(game)
+                    removeRecentTarget = null
+                }) { Text("确定") }
+            },
+            dismissButton = {
+                TextButton(onClick = { removeRecentTarget = null }) { Text("取消") }
+            },
+        )
+    }
 }
 
-/** 首页快捷启动槽位：已设置显示封面/引擎色，空槽显示白色封面 + 加号。 */
+/** 首页快捷启动槽位：已设置复用游戏页卡片样式（封面跟随游戏页），空槽显示白色封面 + 加号。 */
 @Composable
 private fun QuickLaunchSlot(
     game: ScanGame?,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(3f / 4f)
-                .clip(RoundedCornerShape(8.dp))
-                .background(if (game == null) NavWhite else game.engine.coverColor())
-                .clickable(enabled = game != null, onClick = onClick),
-            contentAlignment = Alignment.Center,
-        ) {
-            if (game == null) {
+    if (game != null) {
+        GameCard(game = game, onClick = onClick, modifier = modifier)
+    } else {
+        Column(modifier) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(3f / 4f)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(NavWhite),
+                contentAlignment = Alignment.Center,
+            ) {
                 Icon(
                     Icons.Filled.Add,
                     contentDescription = "空槽位",
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(28.dp),
                 )
-            } else {
-                val coverBitmap by rememberCoverBitmap(game.coverUri)
-                if (coverBitmap != null) {
-                    Image(
-                        bitmap = coverBitmap!!,
-                        contentDescription = game.title,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                } else {
-                    Text(
-                        game.engine.displayName,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.White,
-                    )
-                }
             }
+            Text(
+                "快捷启动",
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+            )
         }
-        Text(
-            game?.title ?: "快捷启动",
-            style = MaterialTheme.typography.bodyMedium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-        )
     }
 }
 
-/** 最近打开列表项：圆角长矩形，左侧游戏名，右侧打开时间。 */
+/** 最近打开列表项：圆角长矩形，左侧统一图标 + 游戏名，右侧打开时间；长按删除该条记录。 */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun RecentGameRow(game: ScanGame, onClick: () -> Unit) {
+private fun RecentGameRow(game: ScanGame, onClick: () -> Unit, onLongClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(8.dp))
             .background(NavWhite)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 16.5.dp),
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .padding(horizontal = 16.dp, vertical = 23.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        Image(
+            painter = painterResource(R.drawable.ic_recent),
+            contentDescription = null,
+            colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.primary),
+            modifier = Modifier.size(24.dp),
+        )
         Text(
             game.title,
             style = MaterialTheme.typography.titleMedium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1f).padding(start = 14.dp),
         )
         Text(
             formatOpenTime(game.openTime),

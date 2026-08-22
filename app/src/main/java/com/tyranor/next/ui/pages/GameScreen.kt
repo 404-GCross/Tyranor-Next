@@ -778,8 +778,13 @@ private fun GameGrid(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-internal fun GameCard(game: ScanGame, onClick: () -> Unit, onLongClick: (() -> Unit)? = null) {
-    Column {
+internal fun GameCard(
+    game: ScanGame,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    onLongClick: (() -> Unit)? = null,
+) {
+    Column(modifier) {
         val coverBitmap by rememberCoverBitmap(game.coverUri)
         val pressModifier = if (onLongClick != null) {
             Modifier.combinedClickable(onClick = onClick, onLongClick = onLongClick)
