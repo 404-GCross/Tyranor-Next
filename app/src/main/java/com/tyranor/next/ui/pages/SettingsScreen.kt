@@ -283,27 +283,35 @@ private fun LazyListPlaceholder(
                 SwitchPreference(title = "独立存档目录", checked = krScoped, onCheckedChange = onKrScoped)
                 DropdownRow("引擎版本", KR_SELECT_MAP, krVersion, onKrVersion)
                 DropdownRow("引擎内核", KR_KERNEL_MAP, krKernel, onKrKernel)
-                if (!isSdl3) {
-                    FontRow("默认字体", krFont.ifEmpty { "内置字体" }, onResetKrFont, { fontLauncher.launch("*/*") })
-                    if (krVersion != EngineSettingsStore.KR_126) {
-                        SwitchPreference(title = "强制使用默认字体", checked = krForceFont, onCheckedChange = onKrForceFont)
-                    }
-                    SwitchPreference(title = "OpenGL 精确渲染", checked = krAccurate == "1", onCheckedChange = { b -> onKrAccurate(if (b) "1" else "0") })
-                    DropdownRow("渲染器", KR_RENDERER_MAP, krRenderer.ifEmpty { "default" }) {
-                        onKrRenderer(if (it == "default") "" else it)
-                    }
-                    if (krRenderer == "" || krRenderer == EngineSettingsStore.RENDERER_SOFTWARE) {
-                        EnumSliderRow("软件渲染线程数", KR_THREAD_MAP, krDrawThread, onKrDrawThread)
-                        EnumSliderRow("软件纹理压缩", KR_SW_COMPRESS_MAP, krSwCompress, onKrSwCompress)
-                    }
-                    if (krRenderer == "" || krRenderer == EngineSettingsStore.RENDERER_OPENGL) {
-                        EnumSliderRow("OpenGL 纹理压缩", KR_OGL_COMPRESS_MAP, krOglCompress, onKrOglCompress)
-                        EnumSliderRow("最大纹理尺寸", KR_TEXSIZE_MAP, krTexsize, onKrTexsize)
-                    }
-                    EnumSliderRow("内存用量", KR_MEM_MAP, krMem, onKrMem)
-                    if (!krIs134126) {
-                        EnumSliderRow("FPS 限制", KR_FPS_MAP, krFps, onKrFps)
-                    }
+            }
+        }
+
+        if (kind == EngineSettingsKind.KRKR && !isSdl3) item {
+            EngineCard("渲染") {
+                SwitchPreference(title = "OpenGL 精确渲染", checked = krAccurate == "1", onCheckedChange = { b -> onKrAccurate(if (b) "1" else "0") })
+                EnumSliderRow("内存用量", KR_MEM_MAP, krMem, onKrMem)
+                DropdownRow("渲染器", KR_RENDERER_MAP, krRenderer.ifEmpty { "default" }) {
+                    onKrRenderer(if (it == "default") "" else it)
+                }
+                if (krRenderer == "" || krRenderer == EngineSettingsStore.RENDERER_SOFTWARE) {
+                    EnumSliderRow("软件渲染线程数", KR_THREAD_MAP, krDrawThread, onKrDrawThread)
+                    DropdownRow("软件纹理压缩", KR_SW_COMPRESS_MAP, krSwCompress, onKrSwCompress)
+                }
+                if (!krIs134126) {
+                    EnumSliderRow("FPS 限制", KR_FPS_MAP, krFps, onKrFps)
+                }
+                if (krRenderer == "" || krRenderer == EngineSettingsStore.RENDERER_OPENGL) {
+                    DropdownRow("OpenGL 纹理压缩", KR_OGL_COMPRESS_MAP, krOglCompress, onKrOglCompress)
+                    EnumSliderRow("最大纹理尺寸", KR_TEXSIZE_MAP, krTexsize, onKrTexsize)
+                }
+            }
+        }
+
+        if (kind == EngineSettingsKind.KRKR && !isSdl3) item {
+            EngineCard("字体") {
+                FontRow("默认字体", krFont.ifEmpty { "内置字体" }, onResetKrFont, { fontLauncher.launch("*/*") })
+                if (krVersion != EngineSettingsStore.KR_126) {
+                    SwitchPreference(title = "强制使用默认字体", checked = krForceFont, onCheckedChange = onKrForceFont)
                 }
             }
         }
