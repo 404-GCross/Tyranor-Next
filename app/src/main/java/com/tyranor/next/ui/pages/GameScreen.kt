@@ -46,7 +46,6 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
@@ -63,14 +62,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.tyranor.next.R
 import com.tyranor.next.scanner.EngineLauncher
 import com.tyranor.next.scanner.EngineScanner
 import com.tyranor.next.scanner.EngineType
@@ -236,6 +238,24 @@ internal fun startActivityWithFade(context: android.content.Context, intent: and
 }
 
 @Composable
+private fun GameTopBarIcon(
+    iconRes: Int,
+    contentDescription: String,
+    onClick: () -> Unit,
+) {
+    Image(
+        painter = painterResource(iconRes),
+        contentDescription = contentDescription,
+        colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.primary),
+        modifier = Modifier
+            .size(31.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .clickable(onClick = onClick)
+            .padding(4.dp),
+    )
+}
+
+@Composable
 private fun GameLibraryContent(
     modifier: Modifier,
     games: List<ScanGame>,
@@ -268,39 +288,16 @@ private fun GameLibraryContent(
                         color = MaterialTheme.colorScheme.onBackground,
                         modifier = Modifier.weight(1f),
                     )
-                    Icon(
-                        Icons.Filled.Search,
-                        contentDescription = "搜索游戏",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier
-                            .size(31.dp)
-                            .clip(RoundedCornerShape(6.dp))
-                            .clickable {
-                                showSearch = !showSearch
-                                if (!showSearch) query = ""
-                            }
-                            .padding(4.dp),
-                    )
-                    Icon(
-                        Icons.Filled.CloudDownload,
-                        contentDescription = "自动获取封面",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier
-                            .size(31.dp)
-                            .clip(RoundedCornerShape(6.dp))
-                            .clickable { syncMissingCovers() }
-                            .padding(4.dp),
-                    )
-                    Icon(
-                        Icons.Filled.Refresh,
-                        contentDescription = "扫描游戏",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier
-                            .size(31.dp)
-                            .clip(RoundedCornerShape(6.dp))
-                            .clickable { refreshGames() }
-                            .padding(4.dp),
-                    )
+                    GameTopBarIcon(R.drawable.ic_game_search, "搜索游戏") {
+                        showSearch = !showSearch
+                        if (!showSearch) query = ""
+                    }
+                    GameTopBarIcon(R.drawable.ic_game_cover, "自动获取封面") {
+                        syncMissingCovers()
+                    }
+                    GameTopBarIcon(R.drawable.ic_game_scan, "扫描游戏") {
+                        refreshGames()
+                    }
                 }
                 // 搜索框：点击搜索按钮后出现在顶部栏下方
                 if (showSearch) {
