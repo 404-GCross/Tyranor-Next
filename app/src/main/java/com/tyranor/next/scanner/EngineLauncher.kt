@@ -199,6 +199,16 @@ object EngineLauncher {
             putExtra("launchMode", "internal.kirikiroid2")
             putExtra("orientation", 6)
             putExtra("scopedSaveDir", scoped)
+            // 独立存档：把 scopedSaveRoot 指向与 GameSaveManager 一致的镜像目录，
+            // 否则 KR2 引擎会回退到游戏目录内 savedata，存档管理对着空镜像。
+            if (scoped) {
+                context.filesDir?.let { internal ->
+                    putExtra(
+                        "scopedSaveRoot",
+                        File(File(File(internal, "krkr_mirror"), safeSaveName(path)), "savedata").absolutePath,
+                    )
+                }
+            }
             putExtra("focus", "true")
             // 引擎版本
             putExtra("krEngineVersion", when (version) {

@@ -148,14 +148,16 @@ fun GameScreen(modifier: Modifier = Modifier) {
             scope.launch {
                 scanning = true
                 EngineScanner.saveRoot(context, u)
+                val existing = EngineScanner.loadGames(context)
                 val all = mutableListOf<ScanGame>()
                 EngineScanner.loadRoots(context).forEach { root ->
                     all += EngineScanner.scanRoot(context, root)
                 }
                 val seen = mutableSetOf<String>()
                 val dedup = all.filter { seen.add(it.uri) }
-                EngineScanner.saveGames(context, dedup)
-                games = dedup
+                val merged = EngineScanner.mergeScannedGames(existing, dedup)
+                EngineScanner.saveGames(context, merged)
+                games = merged
                 scanning = false
             }
         }
@@ -174,14 +176,16 @@ fun GameScreen(modifier: Modifier = Modifier) {
                     scanning = true
                     val roots = EngineScanner.loadRoots(context)
                     if (roots.isNotEmpty()) {
+                        val existing = EngineScanner.loadGames(context)
                         val all = mutableListOf<ScanGame>()
                         roots.forEach { root ->
                             all += EngineScanner.scanRoot(context, root)
                         }
                         val seen = mutableSetOf<String>()
                         val dedup = all.filter { seen.add(it.uri) }
-                        EngineScanner.saveGames(context, dedup)
-                        games = dedup
+                        val merged = EngineScanner.mergeScannedGames(existing, dedup)
+                        EngineScanner.saveGames(context, merged)
+                        games = merged
                     }
                     scanning = false
                 }
@@ -796,9 +800,10 @@ internal fun GameCard(
                 .then(pressModifier),
             contentAlignment = Alignment.Center,
         ) {
-            if (coverBitmap != null) {
+            val bmp = coverBitmap
+            if (bmp != null) {
                 Image(
-                    bitmap = coverBitmap!!,
+                    bitmap = bmp,
                     contentDescription = game.title,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
