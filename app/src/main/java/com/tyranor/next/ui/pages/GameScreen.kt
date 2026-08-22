@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items as lazyItems
@@ -83,6 +82,7 @@ import com.tyranor.next.scanner.VndbCoverService
 import com.tyranor.next.settings.PerGameSettingsStore
 import com.tyranor.next.theme.NavWhite
 import com.tyranor.next.theme.PageGrey
+import com.tyranor.next.ui.common.TopBarIcon
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -240,24 +240,6 @@ internal fun startActivityWithFade(context: android.content.Context, intent: and
 }
 
 @Composable
-private fun GameTopBarIcon(
-    iconRes: Int,
-    contentDescription: String,
-    onClick: () -> Unit,
-) {
-    Image(
-        painter = painterResource(iconRes),
-        contentDescription = contentDescription,
-        colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.primary),
-        modifier = Modifier
-            .size(31.dp)
-            .clip(RoundedCornerShape(6.dp))
-            .clickable(onClick = onClick)
-            .padding(4.dp),
-    )
-}
-
-@Composable
 private fun GameLibraryContent(
     modifier: Modifier,
     games: List<ScanGame>,
@@ -290,14 +272,14 @@ private fun GameLibraryContent(
                         color = MaterialTheme.colorScheme.onBackground,
                         modifier = Modifier.weight(1f),
                     )
-                    GameTopBarIcon(R.drawable.ic_game_search, "搜索游戏") {
+                    TopBarIcon(painterResource(R.drawable.ic_game_search), "搜索游戏", MaterialTheme.colorScheme.primary) {
                         showSearch = !showSearch
                         if (!showSearch) query = ""
                     }
-                    GameTopBarIcon(R.drawable.ic_game_cover, "自动获取封面") {
+                    TopBarIcon(painterResource(R.drawable.ic_game_cover), "自动获取封面", MaterialTheme.colorScheme.primary) {
                         syncMissingCovers()
                     }
-                    GameTopBarIcon(R.drawable.ic_game_scan, "扫描游戏") {
+                    TopBarIcon(painterResource(R.drawable.ic_game_scan), "扫描游戏", MaterialTheme.colorScheme.primary) {
                         refreshGames()
                     }
                 }

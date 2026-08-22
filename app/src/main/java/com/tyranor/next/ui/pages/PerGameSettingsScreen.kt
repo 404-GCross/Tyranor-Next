@@ -17,8 +17,6 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -40,6 +38,7 @@ import com.tyranor.next.scanner.ScanGame
 import com.tyranor.next.settings.EngineSettingsStore
 import com.tyranor.next.settings.PerGameSettingsStore
 import com.tyranor.next.theme.MiuixSettingsTheme
+import com.tyranor.next.ui.common.TopBarIcon
 import org.json.JSONObject
 import top.yukonga.miuix.kmp.basic.Card as MiuixCard
 import top.yukonga.miuix.kmp.basic.Scaffold as MiuixScaffold
@@ -152,8 +151,9 @@ fun PerGameSettingsScreen(game: ScanGame) {
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(game.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MiuixTheme.colorScheme.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                            IconButton(onClick = { save(); android.widget.Toast.makeText(ctx, "已保存", android.widget.Toast.LENGTH_SHORT).show() }) {
-                                Icon(painterResource(R.drawable.ic_save), contentDescription = "保存", tint = MiuixTheme.colorScheme.primary)
+                            TopBarIcon(painterResource(R.drawable.ic_save), "保存", MiuixTheme.colorScheme.primary) {
+                                save()
+                                android.widget.Toast.makeText(ctx, "已保存", android.widget.Toast.LENGTH_SHORT).show()
                             }
                         }
                     }

@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import com.tyranor.next.R
 import com.tyranor.next.settings.EngineSettingsStore
 import com.tyranor.next.theme.MiuixSettingsTheme
+import com.tyranor.next.ui.common.TopBarIcon
 import java.io.File
 import kotlin.math.roundToInt
 import top.yukonga.miuix.kmp.basic.Card as MiuixCard
@@ -192,11 +193,9 @@ internal fun EngineSettingsDetailScreen(kind: EngineSettingsKind) {
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
-                            IconButton(onClick = {
+                            TopBarIcon(painterResource(R.drawable.ic_save), "保存设置", MiuixTheme.colorScheme.primary) {
                                 saveAll()
                                 android.widget.Toast.makeText(ctx, "引擎设置已保存", android.widget.Toast.LENGTH_SHORT).show()
-                            }) {
-                                Icon(painterResource(R.drawable.ic_save), contentDescription = "保存设置", tint = MiuixTheme.colorScheme.primary)
                             }
                         }
                     }

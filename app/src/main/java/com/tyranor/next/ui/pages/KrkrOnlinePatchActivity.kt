@@ -27,7 +27,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudDownload
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -50,15 +49,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.tyranor.next.R
 import com.tyranor.next.scanner.EngineType
 import com.tyranor.next.scanner.KrkrOnlinePatchService
 import com.tyranor.next.scanner.KrkrPatchEntry
 import com.tyranor.next.scanner.ScanGame
 import com.tyranor.next.theme.NavWhite
 import com.tyranor.next.theme.TyranorNextTheme
+import com.tyranor.next.ui.common.TopBarIcon
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -188,12 +190,9 @@ private fun KrkrOnlinePatchScreen(game: ScanGame) {
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    Icon(
-                        Icons.Filled.Refresh,
-                        contentDescription = "刷新",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(40.dp).clickable { loadIndex() }.padding(8.dp),
-                    )
+                    TopBarIcon(painterResource(R.drawable.ic_refresh), "刷新", MaterialTheme.colorScheme.primary) {
+                        loadIndex()
+                    }
                 }
             }
         }
