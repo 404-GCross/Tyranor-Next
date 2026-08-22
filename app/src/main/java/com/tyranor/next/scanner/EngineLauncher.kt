@@ -210,9 +210,13 @@ object EngineLauncher {
             if (defaultFont.isNotEmpty()) putExtra("default_font", defaultFont)
             if (forceFont) putExtra("force_default_font", true)
             // 渲染/内存偏好 JSON：单游戏覆盖 与 全局 逐键合并
+            // 注意：buildKrEnginePrefsJson 遍历的是全局键（kr_renderer 等），
+            // 而单游戏覆盖以 PerGameSettingsStore.KR_FIELDS（renderer 等）存储，需做键名映射。
             runCatching {
-                putExtra("krkr_engine_prefs", EngineSettingsStore.buildKrEnginePrefsJson(context) { key ->
-                    PerGameSettingsStore.getStr(context, gid, key)
+                val renderKeyMap = EngineSettingsStore.KR_RENDER_PREF_KEYS
+                    .zip(PerGameSettingsStore.KR_FIELDS).toMap()
+                putExtra("krkr_engine_prefs", EngineSettingsStore.buildKrEnginePrefsJson(context) { globalKey ->
+                    renderKeyMap[globalKey]?.let { PerGameSettingsStore.getStr(context, gid, it) }
                 })
             }
         }
