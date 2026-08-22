@@ -405,6 +405,13 @@ internal fun GameActionsSheet(
     var showVndbSearch by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var showLaunchFilePicker by remember { mutableStateOf(false) }
+    var showPatchConfirm by remember { mutableStateOf(false) }
+
+    // 发起启动；Artemis 需要 PFS 基础补丁且策略为“启动时询问”时，先弹窗确认再带选择启动
+    fun startLaunch(patchChoice: EngineLauncher.ArtemisPatchChoice? = null) {
+        launchError = EngineLauncher.launch(context, game, patchChoice)
+        if (launchError == null) onDismiss()
+    }
 
     // 打开相册选择自定义封面
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
@@ -448,8 +455,11 @@ internal fun GameActionsSheet(
                 ) { showLaunchFilePicker = true }
             }
             GameActionRow(R.drawable.ic_sheet_launch, "启动游戏") {
-                launchError = EngineLauncher.launch(context, game)
-                if (launchError == null) onDismiss()
+                if (EngineLauncher.needsArtemisPatchConfirm(context, game)) {
+                    showPatchConfirm = true
+                } else {
+                    startLaunch()
+                }
             }
             GameActionRow(R.drawable.ic_sheet_search_cover, "搜索封面") { showVndbSearch = true }
             GameActionRow(R.drawable.ic_sheet_edit_cover, "修改封面") { imagePicker.launch("image/*") }
@@ -478,6 +488,45 @@ internal fun GameActionsSheet(
 
         // 底部安全区留白
         Box(Modifier.navigationBarsPadding().height(16.dp))
+    }
+
+    // ===== Artemis 自动补丁确认：总是（记住 auto）/ 本次 / 不再（记住 off）；点遮罩取消 = 不启动 =====
+    if (showPatchConfirm) {
+        AppAlertDialog(
+            onDismissRequest = { showPatchConfirm = false },
+            title = { Text("应用自动补丁", style = MaterialTheme.typography.titleMedium) },
+            text = {
+                Text(
+                    "「${game.title}」的启动文件打包在 .pfs 归档内，首次启动需要解出少量基础文件" +
+                        "（system.ini、窗口配置与视频）并适配 Android 平台。是否应用补丁？",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showPatchConfirm = false
+                        startLaunch(EngineLauncher.ArtemisPatchChoice.ALWAYS)
+                    },
+                ) { Text("总是") }
+            },
+            dismissButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    TextButton(
+                        onClick = {
+                            showPatchConfirm = false
+                            startLaunch(EngineLauncher.ArtemisPatchChoice.NEVER)
+                        },
+                    ) { Text("不再") }
+                    TextButton(
+                        onClick = {
+                            showPatchConfirm = false
+                            startLaunch(EngineLauncher.ArtemisPatchChoice.ONCE)
+                        },
+                    ) { Text("本次") }
+                }
+            },
+        )
     }
 
     if (showVndbSearch) {

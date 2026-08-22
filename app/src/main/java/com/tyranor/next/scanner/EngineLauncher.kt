@@ -37,16 +37,31 @@ object EngineLauncher {
         EngineType.ARTEMIS,
     )
 
-    /** 尝试启动游戏。返回错误信息；null 表示成功发起。 */
-    fun launch(context: Context, game: ScanGame): String? {
+    /** Artemis 补丁确认弹窗的用户选择：
+     *  本次 = 仅当次应用；总是 = 记住为全局 auto；不再 = 记住为全局 off。 */
+    enum class ArtemisPatchChoice { ONCE, ALWAYS, NEVER }
+
+    /** 尝试启动游戏。返回错误信息；null 表示成功发起。
+     *  [patchChoice] 为 Artemis 补丁确认弹窗（见 [needsArtemisPatchConfirm]）的选择结果。 */
+    fun launch(context: Context, game: ScanGame, patchChoice: ArtemisPatchChoice? = null): String? {
         val path = resolveGameDirectory(context, game)
         if (path == null) {
             return "无法解析游戏目录（仅支持本地文件路径）"
         }
         requestAllFilesAccessIfNeeded(context, path)?.let { return it }
         EnginePluginBootstrap.ensureForLaunch(context, game.engine)?.let { return it }
+        // “总是/不再”持久化为全局补丁策略；“本次”不落盘，仅本次按 auto 生效
+        if (game.engine == EngineType.ARTEMIS) {
+            when (patchChoice) {
+                ArtemisPatchChoice.ALWAYS ->
+                    EngineSettingsStore.setArtAutoPatch(context, EngineSettingsStore.AUTO_PATCH_AUTO)
+                ArtemisPatchChoice.NEVER ->
+                    EngineSettingsStore.setArtAutoPatch(context, EngineSettingsStore.AUTO_PATCH_OFF)
+                else -> Unit
+            }
+        }
         return try {
-            val intent = buildIntent(context, game.engine, path, game)
+            val intent = buildIntent(context, game.engine, path, game, patchChoice)
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             context.startActivity(intent)
             EngineScanner.recordRecentGame(context, game)
@@ -54,6 +69,20 @@ object EngineLauncher {
         } catch (e: Exception) {
             e.message ?: "启动失败"
         }
+    }
+
+    /**
+     * Artemis 补丁确认弹窗的触发条件：补丁策略为“启动时询问”（单游戏覆盖 > 全局）
+     * 且该游戏确实需要 PFS 基础补丁（缺 system.ini 且存在 .pfs）。
+     * UI 层据此弹窗，用户选择经 [launch] 的 [patchChoice] 传入。
+     */
+    fun needsArtemisPatchConfirm(context: Context, game: ScanGame): Boolean {
+        if (game.engine != EngineType.ARTEMIS) return false
+        val strategy = PerGameSettingsStore.getStr(context, game.uri, PerGameSettingsStore.F_ART_PATCH)
+            ?: EngineSettingsStore.getArtAutoPatch(context)
+        if (strategy != EngineSettingsStore.AUTO_PATCH_ASK) return false
+        val path = resolveGameDirectory(context, game) ?: return false
+        return ArtemisPfsUnpacker.needsBasePatch(path)
     }
 
     /**
@@ -95,7 +124,13 @@ object EngineLauncher {
     }
 
     /** 构建引擎 Intent；path 为真实文件路径。 */
-    private fun buildIntent(context: Context, engine: EngineType, path: String, game: ScanGame): Intent {
+    private fun buildIntent(
+        context: Context,
+        engine: EngineType,
+        path: String,
+        game: ScanGame,
+        patchChoice: ArtemisPatchChoice? = null,
+    ): Intent {
         val intent = when (engine) {
             EngineType.KIRIKIRI ->
                 buildKirikiriIntent(context, path, game)
@@ -147,7 +182,7 @@ object EngineLauncher {
 
             EngineType.TYRANO -> buildTyranoIntent(context, path, game)
 
-            EngineType.ARTEMIS -> buildArtemisIntent(context, path, game)
+            EngineType.ARTEMIS -> buildArtemisIntent(context, path, game, patchChoice)
 
             EngineType.UNKNOWN -> Intent(context, TyranoActivity::class.java).apply {
                 putExtra("path", path)
@@ -247,13 +282,25 @@ object EngineLauncher {
 
     /**
      * Artemis 启动：按设置页选择的引擎版本路由到 V1/V2/V3，并应用画面反转与补丁策略。
+     * 策略为“启动时询问”时由 UI 层先弹窗确认（needsArtemisPatchConfirm）；
+     * [patchChoice] 为弹窗选择，本次/总是按 auto、不再按 off 覆盖生效值（持久化在 launch() 完成）。
      */
-    private fun buildArtemisIntent(context: Context, path: String, game: ScanGame): Intent {
+    private fun buildArtemisIntent(
+        context: Context,
+        path: String,
+        game: ScanGame,
+        patchChoice: ArtemisPatchChoice? = null,
+    ): Intent {
         val gid = game.uri
         fun <T> or(override: T?, global: T): T = override ?: global
         var version = or(PerGameSettingsStore.getStr(context, gid, PerGameSettingsStore.F_ART_VERSION), EngineSettingsStore.getArtEngineVersion(context))
         val rotate = or(PerGameSettingsStore.getBool(context, gid, PerGameSettingsStore.F_ART_ROTATE), EngineSettingsStore.isArtRotateScreen(context))
-        val autoPatch = or(PerGameSettingsStore.getStr(context, gid, PerGameSettingsStore.F_ART_PATCH), EngineSettingsStore.getArtAutoPatch(context))
+        var autoPatch = or(PerGameSettingsStore.getStr(context, gid, PerGameSettingsStore.F_ART_PATCH), EngineSettingsStore.getArtAutoPatch(context))
+        when (patchChoice) {
+            ArtemisPatchChoice.ONCE, ArtemisPatchChoice.ALWAYS -> autoPatch = EngineSettingsStore.AUTO_PATCH_AUTO
+            ArtemisPatchChoice.NEVER -> autoPatch = EngineSettingsStore.AUTO_PATCH_OFF
+            null -> Unit
+        }
         applyArtemisBasePatchIfNeeded(path, autoPatch)
         // 自动补丁=off 时禁用自动回退；否则 auto 版本启用兼容回退
         val auto = version == EngineSettingsStore.ART_ENGINE_AUTO &&
@@ -329,7 +376,8 @@ object EngineLauncher {
 
     /**
      * RinneMobile 的 Artemis 启动链路会在启动前补齐部分 PFS 打包游戏所需的基础文件。
-     * TyranorNext 目前没有确认弹窗，所以“启动时询问”按幂等自动补丁处理；“关闭”仍跳过。
+     * “启动时询问”策略已由 UI 层弹窗确认（needsArtemisPatchConfirm），到达这里时
+     * ask 已按弹窗结果改写为 auto/off：auto（含 ask 遗留路径）幂等自动补丁，off 跳过。
      */
     private fun applyArtemisBasePatchIfNeeded(path: String, strategy: String) {
         if (strategy == EngineSettingsStore.AUTO_PATCH_OFF) return
