@@ -9,6 +9,16 @@ plugins {
 val nativePluginSourceDir = layout.projectDirectory.dir("src/main/nativeplugins")
 val bundledNativePluginAssetsDir = layout.buildDirectory.dir("generated/assets/nativeplugins")
 val bundledNativePluginEngineIds = listOf("kirikiroid2", "ons", "artemis")
+val ciKeystoreFile = System.getenv("ANDROID_KEYSTORE_FILE")?.takeIf { it.isNotBlank() }
+val ciKeystorePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")?.takeIf { it.isNotBlank() }
+val ciKeyAlias = System.getenv("ANDROID_KEY_ALIAS")?.takeIf { it.isNotBlank() }
+val ciKeyPassword = System.getenv("ANDROID_KEY_PASSWORD")?.takeIf { it.isNotBlank() }
+val hasCiReleaseSigning = listOf(
+    ciKeystoreFile,
+    ciKeystorePassword,
+    ciKeyAlias,
+    ciKeyPassword,
+).all { !it.isNullOrBlank() }
 
 val bundledNativePluginZipTasks = bundledNativePluginEngineIds.map { engineId ->
     tasks.register<Zip>("package${engineId.replaceFirstChar { it.uppercase() }}NativePlugin") {
@@ -44,12 +54,24 @@ android {
         versionName = "0.4"
     }
 
+    signingConfigs {
+        create("ciRelease") {
+            if (hasCiReleaseSigning) {
+                storeFile = file(ciKeystoreFile!!)
+                storePassword = ciKeystorePassword
+                keyAlias = ciKeyAlias
+                keyPassword = ciKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
-            // 临时：用 debug 签名，便于 R8 包直接安装实机调试；正式发布应替换为正式 keystore
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName(
+                if (hasCiReleaseSigning) "ciRelease" else "debug"
+            )
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
