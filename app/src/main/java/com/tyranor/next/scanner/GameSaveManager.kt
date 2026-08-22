@@ -121,6 +121,34 @@ class GameSaveManager(private val context: Context) {
         return clearSaveDirectory(directory, game.engine)
     }
 
+    /**
+     * 删除游戏时清理应用内数据（独立/镜像存档目录），
+     * 仅触碰应用专属存储，绝不删除游戏目录内的任何文件。
+     */
+    fun cleanupAppData(game: ScanGame) {
+        val root = resolveGameDirectory(game) ?: return
+        val target = when (game.engine) {
+            EngineType.KIRIKIRI -> {
+                val internal = appContext.filesDir ?: return
+                File(File(internal, "krkr_mirror"), safeSaveName(root))
+            }
+            EngineType.ONS -> {
+                val external = appContext.getExternalFilesDir(null) ?: return
+                File(File(external, "save"), File(root).name)
+            }
+            EngineType.TYRANO -> {
+                val external = appContext.getExternalFilesDir(null) ?: return
+                File(File(File(external, "save"), "tyrano"), safeSaveName(root))
+            }
+            else -> return
+        }
+        val appInternal = appContext.filesDir.canonicalPath + File.separator
+        val appExternal = appContext.getExternalFilesDir(null)?.canonicalPath
+        val inAppStorage = target.canonicalPath.startsWith(appInternal) ||
+            (appExternal != null && target.canonicalPath.startsWith(appExternal + File.separator))
+        if (inAppStorage) target.deleteRecursively()
+    }
+
     private fun resolveGameDirectory(game: ScanGame): String? {
         EngineScanner.safUriToPath(game.uri)?.let { path ->
             if (File(path).isDirectory) return File(path).absolutePath

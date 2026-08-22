@@ -89,6 +89,11 @@ object EngineScanner {
         return raw.split("\n").mapNotNull { parseGame(it) }
     }
 
+    /** 删除游戏时从最近游戏列表中移除对应条目。 */
+    fun removeRecentGame(context: Context, uri: String) {
+        saveRecentGames(context, loadRecentGames(context).filterNot { it.uri == uri })
+    }
+
     private fun saveRecentGames(context: Context, games: List<ScanGame>) {
         val str = games.joinToString("\n") { serializeGame(it) }
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)

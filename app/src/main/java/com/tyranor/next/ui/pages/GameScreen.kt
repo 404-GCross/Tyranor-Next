@@ -41,12 +41,12 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -69,12 +69,15 @@ import androidx.compose.ui.unit.dp
 import com.tyranor.next.scanner.EngineLauncher
 import com.tyranor.next.scanner.EngineScanner
 import com.tyranor.next.scanner.EngineType
+import com.tyranor.next.scanner.GameSaveManager
 import com.tyranor.next.scanner.ScanGame
 import com.tyranor.next.scanner.VndbCandidate
 import com.tyranor.next.scanner.VndbCoverService
+import com.tyranor.next.settings.PerGameSettingsStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 
 @Composable
 fun GameScreen(modifier: Modifier = Modifier) {
@@ -92,6 +95,20 @@ fun GameScreen(modifier: Modifier = Modifier) {
         games = nextGames
         selectedGame = selectedGame?.let { if (it.uri == updated.uri) updated else it }
         EngineScanner.saveGames(context, nextGames)
+    }
+
+    fun deleteGame(target: ScanGame) {
+        val nextGames = games.filterNot { it.uri == target.uri }
+        games = nextGames
+        selectedGame = null
+        EngineScanner.saveGames(context, nextGames)
+        // 仅清理应用内数据：每游戏设置、最近游戏记录、封面缓存、应用内存档镜像；不触碰游戏文件
+        scope.launch(Dispatchers.IO) {
+            PerGameSettingsStore.clear(context, target.uri)
+            EngineScanner.removeRecentGame(context, target.uri)
+            deleteCoverFile(context, target.coverUri)
+            GameSaveManager(context).cleanupAppData(target)
+        }
     }
 
     fun syncMissingCovers() {
@@ -174,11 +191,21 @@ fun GameScreen(modifier: Modifier = Modifier) {
             game = game,
             onDismiss = { selectedGame = null },
             onGameUpdated = { replaceGame(it) },
+            onDeleteGame = { deleteGame(game) },
             onEngineSettings = {
                 startActivityWithFade(context, PerGameSettingsActivity.createIntent(context, game))
                 selectedGame = null
             },
         )
+    }
+}
+
+private fun deleteCoverFile(context: android.content.Context, coverUri: String?) {
+    if (coverUri.isNullOrBlank()) return
+    val file = runCatching { File(android.net.Uri.parse(coverUri).path ?: return) }.getOrNull() ?: return
+    val coverDir = File(context.filesDir, "covers_remote").canonicalPath
+    if (runCatching { file.canonicalPath }.getOrNull()?.startsWith(coverDir) == true) {
+        file.delete()
     }
 }
 
@@ -288,12 +315,14 @@ private fun GameActionsSheet(
     game: ScanGame,
     onDismiss: () -> Unit,
     onGameUpdated: (ScanGame) -> Unit,
+    onDeleteGame: () -> Unit,
     onEngineSettings: () -> Unit,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var launchError by remember { mutableStateOf<String?>(null) }
     var showVndbSearch by remember { mutableStateOf(false) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -321,7 +350,7 @@ private fun GameActionsSheet(
                 onDismiss()
             }
             GameActionRow(Icons.Filled.Settings, "引擎设置", onClick = onEngineSettings)
-            GameActionRow(Icons.Filled.Star, "收藏游戏") { onDismiss() }
+            GameActionRow(Icons.Filled.Delete, "删除游戏", danger = true) { showDeleteConfirm = true }
         }
 
         launchError?.let {
@@ -356,6 +385,28 @@ private fun GameActionsSheet(
                         launchError = "封面下载失败"
                     }
                 }
+            },
+        )
+    }
+
+    if (showDeleteConfirm) {
+        AppAlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("删除游戏", style = MaterialTheme.typography.titleMedium) },
+            text = {
+                Text(
+                    "将移除「${game.title}」的应用内记录、设置与缓存，不会删除游戏文件。",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDeleteConfirm = false
+                    onDeleteGame()
+                }) { Text("删除", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) { Text("取消") }
             },
         )
     }
@@ -455,6 +506,7 @@ private fun VndbSearchDialog(
 private fun GameActionRow(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     label: String,
+    danger: Boolean = false,
     onClick: () -> Unit,
 ) {
     Row(
@@ -466,10 +518,15 @@ private fun GameActionRow(
             .padding(horizontal = 16.dp, vertical = 16.5.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface)
+        Icon(
+            icon,
+            contentDescription = null,
+            tint = if (danger) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+        )
         Text(
             label,
             style = MaterialTheme.typography.bodyMedium,
+            color = if (danger) MaterialTheme.colorScheme.error else Color.Unspecified,
             modifier = Modifier.padding(start = 20.dp),
         )
     }
