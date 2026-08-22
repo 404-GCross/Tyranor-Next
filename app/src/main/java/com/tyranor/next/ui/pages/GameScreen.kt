@@ -5,9 +5,11 @@ import android.app.ActivityOptions
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import android.graphics.BitmapFactory
-import androidx.compose.foundation.background
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -96,6 +98,7 @@ fun GameScreen(modifier: Modifier = Modifier) {
     var games by remember { mutableStateOf(EngineScanner.loadGames(context)) }
     var scanning by remember { mutableStateOf(false) }
     var selectedGame by remember { mutableStateOf<ScanGame?>(null) }
+    var quickLaunchTarget by remember { mutableStateOf<ScanGame?>(null) }
 
     val gridState = rememberLazyGridState()
 
@@ -191,6 +194,7 @@ fun GameScreen(modifier: Modifier = Modifier) {
             }
         },
         onGameClick = { selectedGame = it },
+        onGameLongClick = { quickLaunchTarget = it },
     )
 
     // ===== 点击游戏卡片的底部抽屉栏 =====
@@ -206,12 +210,48 @@ fun GameScreen(modifier: Modifier = Modifier) {
             },
         )
     }
+
+    // ===== 长按游戏卡片：加入/移除首页快捷启动 =====
+    quickLaunchTarget?.let { game ->
+        val already = EngineScanner.isQuickLaunched(context, game.uri)
+        AppAlertDialog(
+            onDismissRequest = { quickLaunchTarget = null },
+            title = {
+                Text(
+                    if (already) "移除快捷启动" else "加入快捷启动",
+                    style = MaterialTheme.typography.titleMedium,
+                )
+            },
+            text = {
+                Text(
+                    if (already) "将「${game.title}」从首页快捷启动中移除？" else "将「${game.title}」加入首页快捷启动？",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (already) {
+                            EngineScanner.removeQuickLaunch(context, game.uri)
+                        } else if (!EngineScanner.addQuickLaunch(context, game)) {
+                            android.widget.Toast.makeText(context, "首页快捷启动已满（最多 3 个）", android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                        quickLaunchTarget = null
+                    },
+                ) { Text("确定") }
+            },
+            dismissButton = {
+                TextButton(onClick = { quickLaunchTarget = null }) { Text("取消") }
+            },
+        )
+    }
 }
 
-/** 删除游戏后清理应用内关联数据（设置/最近记录/封面/存档镜像），绝不触碰游戏文件。 */
+/** 删除游戏后清理应用内关联数据（设置/最近记录/快捷启动/封面/存档镜像），绝不触碰游戏文件。 */
 internal fun cleanupDeletedGame(context: android.content.Context, target: ScanGame) {
     PerGameSettingsStore.clear(context, target.uri)
     EngineScanner.removeRecentGame(context, target.uri)
+    EngineScanner.removeQuickLaunch(context, target.uri)
     deleteCoverFile(context, target.coverUri)
     GameSaveManager(context).cleanupAppData(target)
 }
@@ -249,6 +289,7 @@ private fun GameLibraryContent(
     syncMissingCovers: () -> Unit,
     refreshGames: () -> Unit,
     onGameClick: (ScanGame) -> Unit,
+    onGameLongClick: (ScanGame) -> Unit,
 ) {
     var showSearch by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
@@ -347,6 +388,7 @@ private fun GameLibraryContent(
                             games = filteredGames,
                             gridState = gridState,
                             onGameClick = onGameClick,
+                            onGameLongClick = onGameLongClick,
                         )
                     }
                 }
@@ -710,7 +752,12 @@ private fun GameActionRow(
 }
 
 @Composable
-private fun GameGrid(games: List<ScanGame>, gridState: LazyGridState, onGameClick: (ScanGame) -> Unit) {
+private fun GameGrid(
+    games: List<ScanGame>,
+    gridState: LazyGridState,
+    onGameClick: (ScanGame) -> Unit,
+    onGameLongClick: (ScanGame) -> Unit,
+) {
     LazyVerticalGrid(
         columns = GridCells.Fixed(3),            // 一行三个
         state = gridState,
@@ -720,15 +767,25 @@ private fun GameGrid(games: List<ScanGame>, gridState: LazyGridState, onGameClic
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         gridItems(games, key = { it.uri }) { game ->
-            GameCard(game, onClick = { onGameClick(game) })
+            GameCard(
+                game = game,
+                onClick = { onGameClick(game) },
+                onLongClick = { onGameLongClick(game) },
+            )
         }
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-internal fun GameCard(game: ScanGame, onClick: () -> Unit) {
+internal fun GameCard(game: ScanGame, onClick: () -> Unit, onLongClick: (() -> Unit)? = null) {
     Column {
         val coverBitmap by rememberCoverBitmap(game.coverUri)
+        val pressModifier = if (onLongClick != null) {
+            Modifier.combinedClickable(onClick = onClick, onLongClick = onLongClick)
+        } else {
+            Modifier.clickable(onClick = onClick)
+        }
         // 卡片 1:3（高:宽 = 4:3 立式封面，一行三列）
         Box(
             modifier = Modifier
@@ -736,7 +793,7 @@ internal fun GameCard(game: ScanGame, onClick: () -> Unit) {
                 .aspectRatio(3f / 4f)
                 .clip(RoundedCornerShape(8.dp))
                 .background(game.engine.coverColor())
-                .clickable(onClick = onClick),
+                .then(pressModifier),
             contentAlignment = Alignment.Center,
         ) {
             if (coverBitmap != null) {
@@ -774,7 +831,7 @@ internal fun GameCard(game: ScanGame, onClick: () -> Unit) {
 }
 
 @Composable
-private fun rememberCoverBitmap(coverUri: String?): androidx.compose.runtime.State<ImageBitmap?> {
+internal fun rememberCoverBitmap(coverUri: String?): androidx.compose.runtime.State<ImageBitmap?> {
     val context = LocalContext.current
     return produceState<ImageBitmap?>(initialValue = null, coverUri) {
         value = withContext(Dispatchers.IO) {
@@ -788,7 +845,7 @@ private fun rememberCoverBitmap(coverUri: String?): androidx.compose.runtime.Sta
     }
 }
 
-private fun EngineType.coverColor(): Color = when (this) {
+internal fun EngineType.coverColor(): Color = when (this) {
     EngineType.KIRIKIRI -> Color(0xFF3B5998)
     EngineType.ONS -> Color(0xFF43A047)
     EngineType.TYRANO -> Color(0xFFC6443C)

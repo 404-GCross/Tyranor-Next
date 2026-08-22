@@ -18,6 +18,7 @@ object EngineScanner {
     private const val KEY_ROOTS = "scan_roots"      // uri 按换行分隔
     private const val KEY_GAMES = "scan_games"      // 已有游戏 entry，按行；每行字段用 \u0001 分隔
     private const val KEY_RECENT_GAMES = "recent_games"
+    private const val KEY_QUICK_LAUNCH = "quick_launch" // 首页快捷启动（最多 3 个）
 
     /**
      * 将 SAF tree/document URI 映射为真实文件路径（用于引擎 native 启动）。
@@ -79,7 +80,8 @@ object EngineScanner {
     }
 
     fun recordRecentGame(context: Context, game: ScanGame) {
-        val next = (listOf(game) + loadRecentGames(context).filterNot { it.uri == game.uri }).take(20)
+        val touched = game.copy(openTime = System.currentTimeMillis())
+        val next = (listOf(touched) + loadRecentGames(context).filterNot { it.uri == game.uri }).take(20)
         saveRecentGames(context, next)
     }
 
@@ -100,6 +102,36 @@ object EngineScanner {
             .edit().putString(KEY_RECENT_GAMES, str).apply()
     }
 
+    // ============ 首页快捷启动（最多 3 个） ============
+
+    fun loadQuickLaunch(context: Context): List<ScanGame> {
+        val raw = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getString(KEY_QUICK_LAUNCH, null) ?: return emptyList()
+        return raw.split("\n").mapNotNull { parseGame(it) }
+    }
+
+    fun isQuickLaunched(context: Context, uri: String): Boolean =
+        loadQuickLaunch(context).any { it.uri == uri }
+
+    /** 加入快捷启动。已存在视为成功；槽位满 3 个返回 false。 */
+    fun addQuickLaunch(context: Context, game: ScanGame): Boolean {
+        val current = loadQuickLaunch(context)
+        if (current.any { it.uri == game.uri }) return true
+        if (current.size >= 3) return false
+        saveQuickLaunch(context, current + game)
+        return true
+    }
+
+    fun removeQuickLaunch(context: Context, uri: String) {
+        saveQuickLaunch(context, loadQuickLaunch(context).filterNot { it.uri == uri })
+    }
+
+    internal fun saveQuickLaunch(context: Context, games: List<ScanGame>) {
+        val str = games.joinToString("\n") { serializeGame(it) }
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit().putString(KEY_QUICK_LAUNCH, str).apply()
+    }
+
     private fun serializeGame(g: ScanGame): String {
         return listOf(
             g.title,
@@ -110,6 +142,7 @@ object EngineScanner {
             g.vndbId.orEmpty(),
             g.metadataTitle.orEmpty(),
             g.launchFile.orEmpty(),
+            g.openTime.toString(),
         ).joinToString("\u0001")
     }
 
@@ -125,6 +158,7 @@ object EngineScanner {
             vndbId = p.getOrElse(5) { "" }.takeIf { it.isNotBlank() },
             metadataTitle = p.getOrElse(6) { "" }.takeIf { it.isNotBlank() },
             launchFile = p.getOrElse(7) { "" }.takeIf { it.isNotBlank() },
+            openTime = p.getOrElse(8) { "" }.toLongOrNull() ?: 0,
         )
     }
 
