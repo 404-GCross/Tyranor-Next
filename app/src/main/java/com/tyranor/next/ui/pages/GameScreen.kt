@@ -81,6 +81,7 @@ import com.tyranor.next.scanner.VndbCoverService
 import com.tyranor.next.settings.PerGameSettingsStore
 import com.tyranor.next.theme.NavWhite
 import com.tyranor.next.ui.common.glassNavBottomInset
+import com.tyranor.next.ui.common.isWideScreen
 import com.tyranor.next.theme.PageGrey
 import com.tyranor.next.ui.common.TopBarIcon
 import kotlinx.coroutines.Dispatchers
@@ -754,8 +755,10 @@ private fun GameGrid(
     // 液态玻璃导航悬浮时不占布局：列表底部预留导航高度，滚动到底时最后一行可完全露出不被遮挡；
     // 滚动过程中内容仍可经过玻璃后面（沉浸）
     val glassBottomInset = glassNavBottomInset()
+    // 大屏（横屏/平板）一行六个卡片，避免卡片被撑得过大；窄屏保持一行三个
+    val columns = if (isWideScreen()) 6 else 3
     LazyVerticalGrid(
-        columns = GridCells.Fixed(3),            // 一行三个
+        columns = GridCells.Fixed(columns),
         state = gridState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 12.dp + glassBottomInset),

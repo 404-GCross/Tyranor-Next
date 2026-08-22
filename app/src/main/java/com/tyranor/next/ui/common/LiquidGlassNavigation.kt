@@ -1,5 +1,6 @@
 package com.tyranor.next.ui.common
 
+import android.content.res.Configuration
 import android.os.Build
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.core.animateFloatAsState
@@ -41,6 +42,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
@@ -291,4 +293,13 @@ fun glassNavBottomInset(): Dp {
     } else {
         0.dp
     }
+}
+
+/** 宽屏判定：横屏或宽设备（screenWidthDp / smallestScreenWidthDp ≥ 600），用于大屏布局适配（如游戏页 6 列网格）。 */
+@Composable
+fun isWideScreen(): Boolean {
+    val configuration = LocalConfiguration.current
+    return configuration.orientation == Configuration.ORIENTATION_LANDSCAPE ||
+        configuration.screenWidthDp >= 600 ||
+        configuration.smallestScreenWidthDp >= 600
 }

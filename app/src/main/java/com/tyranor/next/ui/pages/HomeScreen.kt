@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -108,17 +109,24 @@ fun HomeScreen(modifier: Modifier = Modifier) {
         }
 
         // ===== 顶部栏底下固定三个快捷启动游戏（一行三个） =====
-        Row(
+        // 平板上整行三列会把每张卡撑得过大：限制快捷启动区最大宽度并水平居中，
+        // 手机宽度不变，平板仅占居中一段（约 3 列 × 166dp）
+        Box(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            contentAlignment = Alignment.Center,
         ) {
-            repeat(3) { i ->
-                val game = quickLaunch.getOrNull(i)
-                QuickLaunchSlot(
-                    game = game,
-                    onClick = { if (game != null) selectedGame = game },
-                    modifier = Modifier.weight(1f),
-                )
+            Row(
+                modifier = Modifier.widthIn(max = 520.dp).fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                repeat(3) { i ->
+                    val game = quickLaunch.getOrNull(i)
+                    QuickLaunchSlot(
+                        game = game,
+                        onClick = { if (game != null) selectedGame = game },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
             }
         }
 
