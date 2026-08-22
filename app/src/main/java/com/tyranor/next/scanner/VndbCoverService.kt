@@ -52,6 +52,37 @@ object VndbCoverService {
         )
     }
 
+    /** 将用户从相册选择的图片保存为该游戏的自定义封面，返回更新后的游戏（失败返回 null）。 */
+    fun saveCustomCover(context: Context, game: ScanGame, pickedUri: Uri): ScanGame? {
+        val dir = File(context.filesDir, "covers_remote")
+        if (!dir.exists() && !dir.mkdirs()) return null
+        val ext = when (context.contentResolver.getType(pickedUri)?.lowercase()?.substringAfterLast('/')) {
+            "png" -> "png"
+            "webp" -> "webp"
+            "gif" -> "gif"
+            else -> "jpg"
+        }
+        val target = File(dir, "custom_${stableKey(game.uri)}.$ext")
+        return try {
+            context.contentResolver.openInputStream(pickedUri)?.use { input ->
+                FileOutputStream(target).use { output -> input.copyTo(output) }
+            } ?: return null
+            // 删除旧封面文件（仅限应用封面缓存目录内）
+            game.coverUri?.let { old ->
+                val oldFile = runCatching { File(Uri.parse(old).path ?: "") }.getOrNull()
+                if (oldFile != null && oldFile.canonicalPath != target.canonicalPath &&
+                    runCatching { oldFile.canonicalPath }.getOrNull()?.startsWith(dir.canonicalPath) == true
+                ) {
+                    oldFile.delete()
+                }
+            }
+            game.copy(coverUri = Uri.fromFile(target).toString())
+        } catch (_: Exception) {
+            target.delete()
+            null
+        }
+    }
+
     fun searchCandidates(keyword: String, limit: Int): List<VndbCandidate> {
         val query = cleanTitle(keyword)
         if (query.isBlank()) return emptyList()

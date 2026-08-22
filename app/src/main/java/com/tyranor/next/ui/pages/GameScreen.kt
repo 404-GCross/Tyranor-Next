@@ -41,7 +41,9 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Save
@@ -241,8 +243,15 @@ private fun GameLibraryContent(
     refreshGames: () -> Unit,
     onGameClick: (ScanGame) -> Unit,
 ) {
+    var showSearch by remember { mutableStateOf(false) }
+    var query by remember { mutableStateOf("") }
+    val filteredGames = remember(games, query) {
+        val q = query.trim()
+        if (q.isEmpty()) games else games.filter { it.title.contains(q, ignoreCase = true) }
+    }
+
     Column(modifier.fillMaxSize()) {
-        // ===== 顶部栏：页面背景色，标题居左 + 右侧三个图标按钮 =====
+        // ===== 顶部栏：页面背景色，标题居左 + 右侧四个图标按钮 =====
         Column(modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background)) {
             Column(modifier = Modifier.fillMaxWidth().statusBarsPadding()) {
                 Row(
@@ -255,6 +264,19 @@ private fun GameLibraryContent(
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onBackground,
                         modifier = Modifier.weight(1f),
+                    )
+                    Icon(
+                        Icons.Filled.Search,
+                        contentDescription = "搜索游戏",
+                        tint = MaterialTheme.colorScheme.onBackground,
+                        modifier = Modifier
+                            .size(31.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .clickable {
+                                showSearch = !showSearch
+                                if (!showSearch) query = ""
+                            }
+                            .padding(4.dp),
                     )
                     Icon(
                         Icons.Filled.CloudDownload,
@@ -275,6 +297,29 @@ private fun GameLibraryContent(
                             .clip(RoundedCornerShape(6.dp))
                             .clickable { refreshGames() }
                             .padding(4.dp),
+                    )
+                }
+                // 搜索框：点击搜索按钮后出现在顶部栏下方
+                if (showSearch) {
+                    OutlinedTextField(
+                        value = query,
+                        onValueChange = { query = it },
+                        placeholder = { Text("搜索游戏") },
+                        singleLine = true,
+                        shape = RoundedCornerShape(8.dp),
+                        leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                        trailingIcon = {
+                            if (query.isNotEmpty()) {
+                                Icon(
+                                    Icons.Filled.Close,
+                                    contentDescription = "清除",
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .clickable { query = "" },
+                                )
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 10.dp),
                     )
                 }
             }
@@ -305,11 +350,20 @@ private fun GameLibraryContent(
                     }
                 }
                 else -> {
-                    GameGrid(
-                        games = games,
-                        gridState = gridState,
-                        onGameClick = onGameClick,
-                    )
+                    if (filteredGames.isEmpty()) {
+                        Text(
+                            "未找到匹配的游戏",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.align(Alignment.Center),
+                        )
+                    } else {
+                        GameGrid(
+                            games = filteredGames,
+                            gridState = gridState,
+                            onGameClick = onGameClick,
+                        )
+                    }
                 }
             }
         }
@@ -330,6 +384,24 @@ internal fun GameActionsSheet(
     var launchError by remember { mutableStateOf<String?>(null) }
     var showVndbSearch by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
+
+    // 打开相册选择自定义封面
+    val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            launchError = "正在设置封面…"
+            val updated = withContext(Dispatchers.IO) {
+                runCatching { VndbCoverService.saveCustomCover(context, game, uri) }.getOrNull()
+            }
+            if (updated != null) {
+                onGameUpdated(updated)
+                launchError = null
+                onDismiss()
+            } else {
+                launchError = "封面设置失败"
+            }
+        }
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -352,6 +424,7 @@ internal fun GameActionsSheet(
                 if (launchError == null) onDismiss()
             }
             GameActionRow(Icons.Filled.Search, "搜索封面") { showVndbSearch = true }
+            GameActionRow(Icons.Filled.Edit, "修改封面") { imagePicker.launch("image/*") }
             GameActionRow(Icons.Filled.Save, "存档管理") {
                 startActivityWithFade(context, SaveManagementActivity.createIntent(context, game))
                 onDismiss()
