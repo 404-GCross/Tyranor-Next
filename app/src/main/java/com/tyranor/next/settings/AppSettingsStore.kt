@@ -12,9 +12,13 @@ object AppSettingsStore {
 
     const val KEY_THEME_COLOR = "theme_color"
     const val KEY_NAV_STYLE = "nav_style"
+    const val KEY_SCAN_DEPTH = "scan_depth"
 
     /** 默认主题色：#307DEF，与 theme/Color.kt 的 Blue40 一致。 */
     const val DEFAULT_THEME_COLOR = "#307DEF"
+
+    /** 文件夹扫描深度默认值（层级，1..5）。 */
+    const val DEFAULT_SCAN_DEPTH = 3
 
     /** 底部导航栏样式：默认。 */
     const val NAV_STYLE_DEFAULT = "default"
@@ -48,4 +52,11 @@ object AppSettingsStore {
         prefs(c).edit().putString(KEY_NAV_STYLE, style).apply()
         navStyleState.value = style
     }
+
+    /** 文件夹扫描深度（1..5，默认 3）。 */
+    fun getScanDepth(c: Context): Int =
+        prefs(c).getInt(KEY_SCAN_DEPTH, DEFAULT_SCAN_DEPTH).coerceIn(1, 5)
+
+    fun setScanDepth(c: Context, depth: Int) =
+        prefs(c).edit().putInt(KEY_SCAN_DEPTH, depth.coerceIn(1, 5)).apply()
 }

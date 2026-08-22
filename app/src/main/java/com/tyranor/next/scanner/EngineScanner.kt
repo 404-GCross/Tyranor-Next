@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import android.provider.DocumentsContract
 import androidx.documentfile.provider.DocumentFile
+import com.tyranor.next.settings.AppSettingsStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.Locale
@@ -210,8 +211,9 @@ object EngineScanner {
     /** 全量扫描所有根目录（结果以本次扫描为准，用于首次/无数据场景）。 */
     suspend fun scanAll(context: Context): List<ScanGame> = withContext(Dispatchers.IO) {
         val all = mutableListOf<ScanGame>()
+        val maxDepth = AppSettingsStore.getScanDepth(context)
         loadRoots(context).forEach { root ->
-            all += scanRoot(context, root)
+            all += scanRoot(context, root, maxDepth)
         }
         val seen = mutableSetOf<String>()
         all.filter { seen.add(it.uri) }
@@ -226,11 +228,12 @@ object EngineScanner {
         val known = existing.mapTo(HashSet()) { it.uri }
         val seen = HashSet<String>()
         val found = mutableListOf<ScanGame>()
+        val maxDepth = AppSettingsStore.getScanDepth(context)
         loadRoots(context).forEach { root ->
             val rootUri = Uri.parse(root)
             val rootDir = DocumentFile.fromTreeUri(context.applicationContext, rootUri)
             if (rootDir != null) {
-                scanRootIncremental(context.applicationContext, rootDir, 0, known, found)
+                scanRootIncremental(context.applicationContext, rootDir, 0, maxDepth, known, found)
             }
         }
         existing + found.filter { seen.add(it.uri) }
@@ -241,10 +244,11 @@ object EngineScanner {
         context: Context,
         dir: DocumentFile,
         level: Int,
+        maxDepth: Int,
         known: HashSet<String>,
         out: MutableList<ScanGame>,
     ) {
-        if (level > 3) return
+        if (level > maxDepth) return
         if (dir.uri.toString() in known) return
         val children = dir.listFiles() ?: return
 
@@ -263,24 +267,30 @@ object EngineScanner {
         }
         for (child in children) {
             if (child.isDirectory) {
-                scanRootIncremental(context, child, level + 1, known, out)
+                scanRootIncremental(context, child, level + 1, maxDepth, known, out)
             }
         }
     }
 
-    suspend fun scanRoot(context: Context, rootUriStr: String): List<ScanGame> = withContext(Dispatchers.IO) {
+    suspend fun scanRoot(context: Context, rootUriStr: String, maxDepth: Int = 3): List<ScanGame> = withContext(Dispatchers.IO) {
         val rootUri = Uri.parse(rootUriStr)
         val root = DocumentFile.fromTreeUri(context.applicationContext, rootUri)
         if (root == null || !root.isDirectory) return@withContext emptyList()
 
         val results = mutableListOf<ScanGame>()
-        // 深度优先遍历子目录，识别每个候选游戏目录
-        traverseDirectories(context.applicationContext, root, 0, results)
+        // 深度优先遍历子目录，识别每个候选游戏目录（深度由应用设置「扫描深度」控制）
+        traverseDirectories(context.applicationContext, root, 0, maxDepth, results)
         results
     }
 
-    private fun traverseDirectories(context: Context, dir: DocumentFile, level: Int, out: MutableList<ScanGame>) {
-        if (level > 3) return
+    private fun traverseDirectories(
+        context: Context,
+        dir: DocumentFile,
+        level: Int,
+        maxDepth: Int,
+        out: MutableList<ScanGame>,
+    ) {
+        if (level > maxDepth) return
         val children = dir.listFiles()
 
         // 1) 本级目录本身可能是游戏（含引擎特征文件）
@@ -302,7 +312,7 @@ object EngineScanner {
         // 2) 否则递归子目录
         for (child in children) {
             if (child.isDirectory) {
-                traverseDirectories(context, child, level + 1, out)
+                traverseDirectories(context, child, level + 1, maxDepth, out)
             }
         }
     }
