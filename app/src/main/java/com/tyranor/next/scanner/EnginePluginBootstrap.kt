@@ -7,19 +7,20 @@ import com.core.nativeplugin.NativePluginConstants
 import com.core.nativeplugin.NativePluginInstallState
 import com.core.nativeplugin.NativePluginManager
 import java.io.File
+import java.util.zip.ZipInputStream
 
 /**
- * 直接集成（非模块化）：把随 APK 打包在 assets 的引擎原生插件，
+ * 直接集成（非模块化）：把随 APK 打包在 assets 的引擎原生插件 zip，
  * 首次启动时自动"安装"到 app 私有插件目录，并标记为已安装+已启用。
  *
  * 引擎加载器（NativeLibraryLoader/OnsLibLoader/Artemis 相关）从
  * filesDir/engine_plugins/<engine>/current/arm64-v8a/ 读取 .so；
- * 此处复制打包为 assets 的 <engine> 目录到该目录，无需用户手动导入 zip。
+ * 此处解压 assets/nativeplugins/<engine>.zip 到该目录，无需用户手动导入 zip。
  */
 object EnginePluginBootstrap {
 
     private const val TAG = "EnginePluginBootstrap"
-    // sourceSets.assets.srcDir 取目录内容为 assets 根，故捆绑资源直接位于 <engine>/ 下。
+    private const val ASSET_PLUGIN_DIR = "nativeplugins"
 
     private class EngineSpec(
         val engineId: String,
@@ -92,7 +93,7 @@ object EnginePluginBootstrap {
         return try {
             val target = currentDirFor(app, spec.engineId)
             if (target.exists()) target.deleteRecursively()
-            copyAssetDir(app, spec.engineId, target)
+            extractPluginZip(app, spec.engineId, target)
             markInstalled(prefs, spec, enabled = true)
             val ready = isReady(app, spec.engineId)
             if (ready) {
@@ -135,20 +136,33 @@ object EnginePluginBootstrap {
         else -> error("unknown engine: $engineId")
     }
 
-    private fun copyAssetDir(context: Context, assetDir: String, destDir: File) {
-        val children = context.assets.list(assetDir) ?: return
-        for (child in children) {
-            val assetPath = "$assetDir/$child"
-            val isDir = context.assets.list(assetPath)?.isNotEmpty() == true
-            if (isDir) {
-                copyAssetDir(context, assetPath, File(destDir, child))
-            } else {
-                val out = File(destDir, child)
-                out.parentFile?.mkdirs()
-                context.assets.open(assetPath).use { input ->
-                    out.outputStream().use { output -> input.copyTo(output) }
+    private fun extractPluginZip(context: Context, engineId: String, destDir: File) {
+        val canonicalDest = destDir.canonicalFile
+        val canonicalDestPath = canonicalDest.path + File.separator
+        destDir.mkdirs()
+        context.assets.open("$ASSET_PLUGIN_DIR/$engineId.zip").use { asset ->
+            ZipInputStream(asset.buffered()).use { zip ->
+                while (true) {
+                    val entry = zip.nextEntry ?: break
+                    val out = File(destDir, entry.name)
+                    val canonicalOut = out.canonicalFile
+                    if (canonicalOut.path != canonicalDest.path &&
+                        !canonicalOut.path.startsWith(canonicalDestPath)
+                    ) {
+                        throw SecurityException("Invalid native plugin zip entry: ${entry.name}")
+                    }
+                    if (entry.isDirectory) {
+                        canonicalOut.mkdirs()
+                    } else {
+                        canonicalOut.parentFile?.mkdirs()
+                        canonicalOut.outputStream().use { output -> zip.copyTo(output) }
+                    }
+                    zip.closeEntry()
                 }
             }
+        }
+        require(destDir.isDirectory) {
+            "native plugin extraction produced no directory: $engineId"
         }
     }
 }

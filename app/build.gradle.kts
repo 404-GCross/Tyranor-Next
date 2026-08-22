@@ -1,7 +1,31 @@
+import org.gradle.api.tasks.bundling.Zip
+
 plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.compose.compiler)
   alias(libs.plugins.kotlin.serialization)
+}
+
+val nativePluginSourceDir = layout.projectDirectory.dir("src/main/nativeplugins")
+val bundledNativePluginAssetsDir = layout.buildDirectory.dir("generated/assets/nativeplugins")
+val bundledNativePluginEngineIds = listOf("kirikiroid2", "ons", "artemis")
+
+val bundledNativePluginZipTasks = bundledNativePluginEngineIds.map { engineId ->
+    tasks.register<Zip>("package${engineId.replaceFirstChar { it.uppercase() }}NativePlugin") {
+        group = "native plugins"
+        description = "Packages the $engineId native engine plugin as a compressed asset."
+        from(nativePluginSourceDir.dir(engineId))
+        destinationDirectory.set(bundledNativePluginAssetsDir)
+        archiveFileName.set("$engineId.zip")
+        isPreserveFileTimestamps = false
+        isReproducibleFileOrder = true
+    }
+}
+
+val packageBundledNativePlugins by tasks.registering {
+    group = "native plugins"
+    description = "Packages bundled native engine plugins as compressed assets."
+    dependsOn(bundledNativePluginZipTasks)
 }
 
 android {
@@ -41,17 +65,27 @@ android {
     }
 
     packaging {
+      jniLibs {
+        useLegacyPackaging = true
+      }
       resources {
         excludes += "/META-INF/{AL2.0,LGPL2.1}"
       }
     }
 
-    // 引擎原生插件作为 assets 打包，首次启动自动安装到 app 私有目录
+    // 引擎原生插件先压缩为 assets/nativeplugins/<engine>.zip，首次启动自动安装到 app 私有目录
     sourceSets {
       getByName("main") {
-        assets.srcDir("src/main/nativeplugins")
+        assets.setSrcDirs(listOf("src/main/assets", "build/generated/assets"))
       }
     }
+}
+
+tasks.matching {
+    (it.name.startsWith("merge") && it.name.endsWith("Assets")) ||
+        it.name.contains("Lint", ignoreCase = true)
+}.configureEach {
+    dependsOn(packageBundledNativePlugins)
 }
 
 kotlin {
