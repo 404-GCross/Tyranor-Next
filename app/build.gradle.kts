@@ -99,5 +99,7 @@ dependencies {
   // Miuix 组件库（设置页 Card + Preference 体系）
   implementation(libs.miuix.ui)
   implementation(libs.miuix.preference)
+  // 液态玻璃导航（圆角流体玻璃底部导航，参考 RinneMobile）
+  implementation(libs.backdrop)
   implementation(project(":engine"))
 }

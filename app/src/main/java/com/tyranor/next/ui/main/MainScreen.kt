@@ -3,6 +3,7 @@ package com.tyranor.next.ui.main
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,15 +16,23 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.tyranor.next.R
+import com.tyranor.next.settings.AppSettingsStore
 import com.tyranor.next.theme.UnselectedGrey
+import com.tyranor.next.ui.common.LiquidGlassNavItem
+import com.tyranor.next.ui.common.LiquidGlassNavigationBar
 import com.tyranor.next.ui.pages.EngineScreen
 import com.tyranor.next.ui.pages.GameScreen
 import com.tyranor.next.ui.pages.HomeScreen
@@ -44,54 +53,84 @@ private val tabItems = listOf(
 
 @Composable
 fun MainScreen(modifier: Modifier = Modifier) {
+  val context = LocalContext.current
   var selectedIndex by rememberSaveable { mutableStateOf(0) }
   val unselectedColor = UnselectedGrey
+  // 导航栏样式：应用设置 → 默认 / 圆角液态玻璃（内存态，设置页切换即时生效）
+  remember { AppSettingsStore.initNavStyle(context) }
+  val liquidGlass = AppSettingsStore.navStyleState.value == AppSettingsStore.NAV_STYLE_LIQUID_GLASS
 
   // 外层只负责布局：内容区 + 底部导航栏（不用 Scaffold，避免与子页顶部栏的 inset 冲突）
-  Column(modifier.fillMaxSize()) {
-    Box(Modifier.weight(1f).fillMaxWidth()) {
-      Crossfade(
-        targetState = selectedIndex,
-        animationSpec = tween(durationMillis = 180),
-        label = "main_page_fade",
-      ) { page ->
-        when (page) {
-          0 -> HomeScreen(Modifier.fillMaxSize())
-          1 -> GameScreen(Modifier.fillMaxSize())
-          2 -> EngineScreen(Modifier.fillMaxSize())
-          3 -> SettingsScreen(Modifier.fillMaxSize())
+  Box(modifier.fillMaxSize()) {
+    // 内容层录制进 backdrop，供液态玻璃导航采样页面内容。
+    // 关键：背景必须在 layerBackdrop 之后（内层）——layerBackdrop 只录制它之后的内容，
+    // 放在外层（Surface/Column 背景）的内容不会被采样，玻璃会采到透明而漏出文字。
+    val backdrop = rememberLayerBackdrop()
+    Column(
+      Modifier
+        .fillMaxSize()
+        .layerBackdrop(backdrop)
+        .background(MaterialTheme.colorScheme.background),
+    ) {
+      Box(Modifier.weight(1f).fillMaxWidth()) {
+        Crossfade(
+          targetState = selectedIndex,
+          animationSpec = tween(durationMillis = 180),
+          label = "main_page_fade",
+        ) { page ->
+          when (page) {
+            0 -> HomeScreen(Modifier.fillMaxSize())
+            1 -> GameScreen(Modifier.fillMaxSize())
+            2 -> EngineScreen(Modifier.fillMaxSize())
+            3 -> SettingsScreen(Modifier.fillMaxSize())
+          }
+        }
+      }
+      if (!liquidGlass) {
+        NavigationBar(
+          containerColor = com.tyranor.next.theme.NavWhite,
+          contentColor = androidx.compose.material3.LocalContentColor.current,
+        ) {
+          tabItems.forEachIndexed { index, tab ->
+            val selected = selectedIndex == index
+            val itemColor = if (selected) MaterialTheme.colorScheme.primary else unselectedColor
+            NavigationBarItem(
+              selected = selected,
+              onClick = { selectedIndex = index },
+              icon = {
+                Image(
+                  painter = painterResource(tab.iconRes),
+                  contentDescription = tab.label,
+                  colorFilter = ColorFilter.tint(itemColor),
+                  modifier = Modifier.size(28.dp),
+                )
+              },
+              label = { Text(tab.label) },
+              // 去掉选中高亮：仅图标与文字通过主题色区分选中态
+              colors = androidx.compose.material3.NavigationBarItemDefaults.colors(
+                selectedIconColor = MaterialTheme.colorScheme.primary,
+                selectedTextColor = MaterialTheme.colorScheme.primary,
+                indicatorColor = Color.Transparent,
+                unselectedIconColor = unselectedColor,
+                unselectedTextColor = unselectedColor,
+              ),
+            )
+          }
         }
       }
     }
-    NavigationBar(
-      containerColor = com.tyranor.next.theme.NavWhite,
-      contentColor = androidx.compose.material3.LocalContentColor.current,
-    ) {
-      tabItems.forEachIndexed { index, tab ->
-        val selected = selectedIndex == index
-        val itemColor = if (selected) MaterialTheme.colorScheme.primary else unselectedColor
-        NavigationBarItem(
-          selected = selected,
-          onClick = { selectedIndex = index },
-          icon = {
-            Image(
-              painter = painterResource(tab.iconRes),
-              contentDescription = tab.label,
-              colorFilter = ColorFilter.tint(itemColor),
-              modifier = Modifier.size(28.dp),
-            )
-          },
-          label = { Text(tab.label) },
-          // 去掉选中高亮：仅图标与文字通过主题色区分选中态
-          colors = androidx.compose.material3.NavigationBarItemDefaults.colors(
-            selectedIconColor = MaterialTheme.colorScheme.primary,
-            selectedTextColor = MaterialTheme.colorScheme.primary,
-            indicatorColor = Color.Transparent,
-            unselectedIconColor = unselectedColor,
-            unselectedTextColor = unselectedColor,
-          ),
-        )
-      }
+
+    // 圆角液态玻璃导航：悬浮在内容之上
+    if (liquidGlass) {
+      LiquidGlassNavigationBar(
+        backdrop = backdrop,
+        selectedIndex = selectedIndex,
+        primaryColor = MaterialTheme.colorScheme.primary,
+        unselectedColor = unselectedColor,
+        items = tabItems.map { LiquidGlassNavItem(it.label, it.iconRes) },
+        onItemClick = { selectedIndex = it },
+        modifier = Modifier.align(Alignment.BottomCenter),
+      )
     }
   }
 }

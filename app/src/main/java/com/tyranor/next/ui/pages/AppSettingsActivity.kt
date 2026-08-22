@@ -49,6 +49,7 @@ import top.yukonga.miuix.kmp.basic.Card as MiuixCard
 import top.yukonga.miuix.kmp.basic.ColorPicker
 import top.yukonga.miuix.kmp.basic.Scaffold as MiuixScaffold
 import top.yukonga.miuix.kmp.preference.ArrowPreference
+import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /** 应用设置页 Activity：入口见设置页「应用设置」项。 */
@@ -145,6 +146,22 @@ internal fun AppSettingsScreen() {
                                     )
                                 },
                                 onClick = { showColorPicker = true },
+                            )
+                        }
+                    }
+                }
+                item {
+                    MiuixCard(modifier = Modifier.fillMaxWidth(), cornerRadius = 8.dp) {
+                        Column(Modifier.padding(vertical = 4.dp)) {
+                            SwitchPreference(
+                                title = "圆角液态玻璃导航",
+                                checked = AppSettingsStore.navStyleState.value == AppSettingsStore.NAV_STYLE_LIQUID_GLASS,
+                                onCheckedChange = { checked ->
+                                    AppSettingsStore.setNavStyle(
+                                        ctx,
+                                        if (checked) AppSettingsStore.NAV_STYLE_LIQUID_GLASS else AppSettingsStore.NAV_STYLE_DEFAULT,
+                                    )
+                                },
                             )
                         }
                     }
