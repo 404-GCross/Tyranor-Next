@@ -126,7 +126,12 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                         Column(Modifier.padding(vertical = 4.dp)) {
                             ArrowPreference(title = "应用设置", onClick = { startActivityWithFade(ctx, AppSettingsActivity.createIntent(ctx)) })
                             ArrowPreference(title = if (checkingUpdate) "正在检查更新" else "更新检查", onClick = { checkUpdate() })
-                            ArrowPreference(title = "加入群聊", onClick = { })
+                            ArrowPreference(
+                                title = "加入群聊",
+                                onClick = {
+                                    ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://qm.qq.com/q/M9JH8A9Yys")))
+                                },
+                            )
                         }
                     }
                 }
