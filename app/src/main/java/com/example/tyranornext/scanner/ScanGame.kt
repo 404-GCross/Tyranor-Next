@@ -9,6 +9,8 @@ data class ScanGame(
     val engine: EngineType,
     val launchTarget: String,
     val coverUri: String? = null,
+    val vndbId: String? = null,
+    val metadataTitle: String? = null,
 )
 
 /** 简化描述，兼容 SharedPreferences 持久化所需的字段。 */

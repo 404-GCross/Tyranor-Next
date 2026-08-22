@@ -1,5 +1,6 @@
 package com.example.tyranornext.ui.pages
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,18 +18,19 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Games
-import androidx.compose.material.icons.filled.VideogameAsset
-import androidx.compose.material.icons.filled.Widgets
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.example.tyranornext.R
 import com.example.tyranornext.scanner.EngineLauncher
 import com.example.tyranornext.scanner.EngineType
+import com.example.tyranornext.theme.NavWhite
 
 /** 引擎页：列表行展示已集成的游戏引擎。 */
 @Composable
@@ -52,14 +54,6 @@ fun EngineScreen(modifier: Modifier = Modifier) {
             contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item {
-                Text(
-                    "已集成 ${engines.size} 个游戏引擎，扫描到的游戏将自动匹配对应引擎启动。",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(bottom = 4.dp),
-                )
-            }
             items(engines, key = { it.name }) { engine ->
                 EngineRow(engine)
             }
@@ -71,26 +65,34 @@ fun EngineScreen(modifier: Modifier = Modifier) {
 private fun EngineRow(engine: EngineType) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        colors = CardDefaults.cardColors(containerColor = NavWhite),
+        shape = RoundedCornerShape(8.dp),
     ) {
         androidx.compose.foundation.layout.Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(
-                engineIcon(engine),
+            Image(
+                painter = painterResource(R.drawable.engine_logo),
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
+                contentScale = ContentScale.Fit,
+                colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.primary),
                 modifier = Modifier.size(28.dp),
             )
             Column(Modifier.weight(1f).padding(start = 14.dp)) {
-                Text(engine.displayName, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    engine.displayName,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
                 Text(
                     engineDescription(engine),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(top = 2.dp),
                 )
             }
@@ -102,14 +104,6 @@ private fun EngineRow(engine: EngineType) {
             )
         }
     }
-}
-
-private fun engineIcon(engine: EngineType): ImageVector = when (engine) {
-    EngineType.KIRIKIRI -> Icons.Filled.VideogameAsset
-    EngineType.ONS -> Icons.Filled.Games
-    EngineType.TYRANO -> Icons.Filled.Widgets
-    EngineType.ARTEMIS -> Icons.Filled.Build
-    EngineType.UNKNOWN -> Icons.Filled.Build
 }
 
 private fun engineDescription(engine: EngineType): String = when (engine) {

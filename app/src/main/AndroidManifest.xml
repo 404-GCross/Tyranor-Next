@@ -16,6 +16,15 @@
         android:windowSoftInputMode="adjustResize"
         android:theme="@style/Theme.TyranorNext">
         <activity
+            android:name=".ui.pages.SaveManagementActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.pages.EngineSettingsActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.pages.PerGameSettingsActivity"
+            android:exported="false" />
+        <activity
             android:name=".MainActivity"
             android:exported="true">
             <intent-filter>

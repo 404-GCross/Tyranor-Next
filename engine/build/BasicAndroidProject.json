@@ -1,0 +1,1778 @@
+{
+    "path": ":engine",
+    "projectType": "LIBRARY",
+    "mainSourceSet": {
+        "sourceProvider": {
+            "name": "main",
+            "manifestFile": {
+                "absolute": true,
+                "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml",
+                "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml",
+                "directory": false,
+                "file": true,
+                "freeSpace": 65293172736,
+                "hidden": false,
+                "name": "AndroidManifest.xml",
+                "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/main",
+                "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/main/AndroidManifest.xml",
+                "totalSpace": 494384795648,
+                "usableSpace": 65293172736
+            },
+            "javaDirectories": [
+                {
+                    "absolute": true,
+                    "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/main/java",
+                    "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/main/java",
+                    "directory": true,
+                    "file": false,
+                    "freeSpace": 65293172736,
+                    "hidden": false,
+                    "name": "java",
+                    "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/main",
+                    "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/main/java",
+                    "totalSpace": 494384795648,
+                    "usableSpace": 65293172736
+                }
+            ],
+            "kotlinDirectories": [
+                {
+                    "absolute": true,
+                    "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/main/java",
+                    "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/main/java",
+                    "directory": true,
+                    "file": false,
+                    "freeSpace": 65293172736,
+                    "hidden": false,
+                    "name": "java",
+                    "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/main",
+                    "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/main/java",
+                    "totalSpace": 494384795648,
+                    "usableSpace": 65293172736
+                },
+                {
+                    "absolute": true,
+                    "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/main/kotlin",
+                    "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/main/kotlin",
+                    "directory": false,
+                    "file": false,
+                    "freeSpace": 0,
+                    "hidden": false,
+                    "name": "kotlin",
+                    "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/main",
+                    "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/main/kotlin",
+                    "totalSpace": 0,
+                    "usableSpace": 0
+                }
+            ],
+            "resourcesDirectories": [
+                {
+                    "absolute": true,
+                    "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/main/resources",
+                    "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/main/resources",
+                    "directory": false,
+                    "file": false,
+                    "freeSpace": 0,
+                    "hidden": false,
+                    "name": "resources",
+                    "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/main",
+                    "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/main/resources",
+                    "totalSpace": 0,
+                    "usableSpace": 0
+                }
+            ],
+            "aidlDirectories": null,
+            "renderscriptDirectories": null,
+            "baselineProfileDirectories": [
+                {
+                    "absolute": true,
+                    "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/main/baselineProfiles",
+                    "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/main/baselineProfiles",
+                    "directory": false,
+                    "file": false,
+                    "freeSpace": 0,
+                    "hidden": false,
+                    "name": "baselineProfiles",
+                    "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/main",
+                    "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/main/baselineProfiles",
+                    "totalSpace": 0,
+                    "usableSpace": 0
+                }
+            ],
+            "resDirectories": [
+                {
+                    "absolute": true,
+                    "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/main/res",
+                    "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/main/res",
+                    "directory": true,
+                    "file": false,
+                    "freeSpace": 65293172736,
+                    "hidden": false,
+                    "name": "res",
+                    "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/main",
+                    "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/main/res",
+                    "totalSpace": 494384795648,
+                    "usableSpace": 65293172736
+                }
+            ],
+            "assetsDirectories": [
+                {
+                    "absolute": true,
+                    "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/main/assets",
+                    "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/main/assets",
+                    "directory": true,
+                    "file": false,
+                    "freeSpace": 65293172736,
+                    "hidden": false,
+                    "name": "assets",
+                    "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/main",
+                    "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/main/assets",
+                    "totalSpace": 494384795648,
+                    "usableSpace": 65293172736
+                }
+            ],
+            "jniLibsDirectories": [
+                {
+                    "absolute": true,
+                    "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/main/jniLibs",
+                    "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/main/jniLibs",
+                    "directory": true,
+                    "file": false,
+                    "freeSpace": 65293172736,
+                    "hidden": false,
+                    "name": "jniLibs",
+                    "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/main",
+                    "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/main/jniLibs",
+                    "totalSpace": 494384795648,
+                    "usableSpace": 65293172736
+                }
+            ],
+            "shadersDirectories": null,
+            "mlModelsDirectories": null,
+            "customDirectories": [
+                
+            ]
+        },
+        "deviceTestSourceProviders": {
+            "_android_test_": {
+                "name": "androidTest",
+                "manifestFile": {
+                    "absolute": true,
+                    "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest/AndroidManifest.xml",
+                    "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest/AndroidManifest.xml",
+                    "directory": false,
+                    "file": false,
+                    "freeSpace": 0,
+                    "hidden": false,
+                    "name": "AndroidManifest.xml",
+                    "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest",
+                    "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest/AndroidManifest.xml",
+                    "totalSpace": 0,
+                    "usableSpace": 0
+                },
+                "javaDirectories": [
+                    {
+                        "absolute": true,
+                        "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest/java",
+                        "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest/java",
+                        "directory": false,
+                        "file": false,
+                        "freeSpace": 0,
+                        "hidden": false,
+                        "name": "java",
+                        "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest",
+                        "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest/java",
+                        "totalSpace": 0,
+                        "usableSpace": 0
+                    }
+                ],
+                "kotlinDirectories": [
+                    {
+                        "absolute": true,
+                        "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest/java",
+                        "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest/java",
+                        "directory": false,
+                        "file": false,
+                        "freeSpace": 0,
+                        "hidden": false,
+                        "name": "java",
+                        "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest",
+                        "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest/java",
+                        "totalSpace": 0,
+                        "usableSpace": 0
+                    },
+                    {
+                        "absolute": true,
+                        "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest/kotlin",
+                        "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest/kotlin",
+                        "directory": false,
+                        "file": false,
+                        "freeSpace": 0,
+                        "hidden": false,
+                        "name": "kotlin",
+                        "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest",
+                        "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest/kotlin",
+                        "totalSpace": 0,
+                        "usableSpace": 0
+                    }
+                ],
+                "resourcesDirectories": [
+                    {
+                        "absolute": true,
+                        "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest/resources",
+                        "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest/resources",
+                        "directory": false,
+                        "file": false,
+                        "freeSpace": 0,
+                        "hidden": false,
+                        "name": "resources",
+                        "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest",
+                        "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest/resources",
+                        "totalSpace": 0,
+                        "usableSpace": 0
+                    }
+                ],
+                "aidlDirectories": null,
+                "renderscriptDirectories": null,
+                "baselineProfileDirectories": [
+                    {
+                        "absolute": true,
+                        "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest/baselineProfiles",
+                        "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest/baselineProfiles",
+                        "directory": false,
+                        "file": false,
+                        "freeSpace": 0,
+                        "hidden": false,
+                        "name": "baselineProfiles",
+                        "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest",
+                        "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest/baselineProfiles",
+                        "totalSpace": 0,
+                        "usableSpace": 0
+                    }
+                ],
+                "resDirectories": [
+                    {
+                        "absolute": true,
+                        "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest/res",
+                        "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest/res",
+                        "directory": false,
+                        "file": false,
+                        "freeSpace": 0,
+                        "hidden": false,
+                        "name": "res",
+                        "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest",
+                        "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest/res",
+                        "totalSpace": 0,
+                        "usableSpace": 0
+                    }
+                ],
+                "assetsDirectories": [
+                    {
+                        "absolute": true,
+                        "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest/assets",
+                        "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest/assets",
+                        "directory": false,
+                        "file": false,
+                        "freeSpace": 0,
+                        "hidden": false,
+                        "name": "assets",
+                        "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest",
+                        "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest/assets",
+                        "totalSpace": 0,
+                        "usableSpace": 0
+                    }
+                ],
+                "jniLibsDirectories": [
+                    {
+                        "absolute": true,
+                        "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest/jniLibs",
+                        "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest/jniLibs",
+                        "directory": false,
+                        "file": false,
+                        "freeSpace": 0,
+                        "hidden": false,
+                        "name": "jniLibs",
+                        "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest",
+                        "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest/jniLibs",
+                        "totalSpace": 0,
+                        "usableSpace": 0
+                    }
+                ],
+                "shadersDirectories": null,
+                "mlModelsDirectories": null,
+                "customDirectories": [
+                    
+                ]
+            }
+        },
+        "hostTestSourceProviders": {
+            "_unit_test_": {
+                "name": "test",
+                "manifestFile": {
+                    "absolute": true,
+                    "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test/AndroidManifest.xml",
+                    "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test/AndroidManifest.xml",
+                    "directory": false,
+                    "file": false,
+                    "freeSpace": 0,
+                    "hidden": false,
+                    "name": "AndroidManifest.xml",
+                    "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test",
+                    "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test/AndroidManifest.xml",
+                    "totalSpace": 0,
+                    "usableSpace": 0
+                },
+                "javaDirectories": [
+                    {
+                        "absolute": true,
+                        "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test/java",
+                        "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test/java",
+                        "directory": false,
+                        "file": false,
+                        "freeSpace": 0,
+                        "hidden": false,
+                        "name": "java",
+                        "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test",
+                        "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test/java",
+                        "totalSpace": 0,
+                        "usableSpace": 0
+                    }
+                ],
+                "kotlinDirectories": [
+                    {
+                        "absolute": true,
+                        "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test/java",
+                        "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test/java",
+                        "directory": false,
+                        "file": false,
+                        "freeSpace": 0,
+                        "hidden": false,
+                        "name": "java",
+                        "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test",
+                        "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test/java",
+                        "totalSpace": 0,
+                        "usableSpace": 0
+                    },
+                    {
+                        "absolute": true,
+                        "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test/kotlin",
+                        "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test/kotlin",
+                        "directory": false,
+                        "file": false,
+                        "freeSpace": 0,
+                        "hidden": false,
+                        "name": "kotlin",
+                        "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test",
+                        "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test/kotlin",
+                        "totalSpace": 0,
+                        "usableSpace": 0
+                    }
+                ],
+                "resourcesDirectories": [
+                    {
+                        "absolute": true,
+                        "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test/resources",
+                        "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test/resources",
+                        "directory": false,
+                        "file": false,
+                        "freeSpace": 0,
+                        "hidden": false,
+                        "name": "resources",
+                        "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test",
+                        "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test/resources",
+                        "totalSpace": 0,
+                        "usableSpace": 0
+                    }
+                ],
+                "aidlDirectories": null,
+                "renderscriptDirectories": null,
+                "baselineProfileDirectories": [
+                    {
+                        "absolute": true,
+                        "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test/baselineProfiles",
+                        "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test/baselineProfiles",
+                        "directory": false,
+                        "file": false,
+                        "freeSpace": 0,
+                        "hidden": false,
+                        "name": "baselineProfiles",
+                        "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test",
+                        "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test/baselineProfiles",
+                        "totalSpace": 0,
+                        "usableSpace": 0
+                    }
+                ],
+                "resDirectories": [
+                    {
+                        "absolute": true,
+                        "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test/res",
+                        "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test/res",
+                        "directory": false,
+                        "file": false,
+                        "freeSpace": 0,
+                        "hidden": false,
+                        "name": "res",
+                        "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test",
+                        "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test/res",
+                        "totalSpace": 0,
+                        "usableSpace": 0
+                    }
+                ],
+                "assetsDirectories": [
+                    {
+                        "absolute": true,
+                        "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test/assets",
+                        "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test/assets",
+                        "directory": false,
+                        "file": false,
+                        "freeSpace": 0,
+                        "hidden": false,
+                        "name": "assets",
+                        "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test",
+                        "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test/assets",
+                        "totalSpace": 0,
+                        "usableSpace": 0
+                    }
+                ],
+                "jniLibsDirectories": [
+                    {
+                        "absolute": true,
+                        "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test/jniLibs",
+                        "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test/jniLibs",
+                        "directory": false,
+                        "file": false,
+                        "freeSpace": 0,
+                        "hidden": false,
+                        "name": "jniLibs",
+                        "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test",
+                        "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test/jniLibs",
+                        "totalSpace": 0,
+                        "usableSpace": 0
+                    }
+                ],
+                "shadersDirectories": null,
+                "mlModelsDirectories": null,
+                "customDirectories": [
+                    
+                ]
+            }
+        },
+        "testFixturesSourceProvider": null,
+        "androidTestSourceProvider": {
+            "name": "androidTest",
+            "manifestFile": {
+                "absolute": true,
+                "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest/AndroidManifest.xml",
+                "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest/AndroidManifest.xml",
+                "directory": false,
+                "file": false,
+                "freeSpace": 0,
+                "hidden": false,
+                "name": "AndroidManifest.xml",
+                "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest",
+                "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest/AndroidManifest.xml",
+                "totalSpace": 0,
+                "usableSpace": 0
+            },
+            "javaDirectories": [
+                {
+                    "absolute": true,
+                    "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest/java",
+                    "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest/java",
+                    "directory": false,
+                    "file": false,
+                    "freeSpace": 0,
+                    "hidden": false,
+                    "name": "java",
+                    "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest",
+                    "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest/java",
+                    "totalSpace": 0,
+                    "usableSpace": 0
+                }
+            ],
+            "kotlinDirectories": [
+                {
+                    "absolute": true,
+                    "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest/java",
+                    "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest/java",
+                    "directory": false,
+                    "file": false,
+                    "freeSpace": 0,
+                    "hidden": false,
+                    "name": "java",
+                    "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest",
+                    "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest/java",
+                    "totalSpace": 0,
+                    "usableSpace": 0
+                },
+                {
+                    "absolute": true,
+                    "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest/kotlin",
+                    "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest/kotlin",
+                    "directory": false,
+                    "file": false,
+                    "freeSpace": 0,
+                    "hidden": false,
+                    "name": "kotlin",
+                    "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest",
+                    "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest/kotlin",
+                    "totalSpace": 0,
+                    "usableSpace": 0
+                }
+            ],
+            "resourcesDirectories": [
+                {
+                    "absolute": true,
+                    "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest/resources",
+                    "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest/resources",
+                    "directory": false,
+                    "file": false,
+                    "freeSpace": 0,
+                    "hidden": false,
+                    "name": "resources",
+                    "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest",
+                    "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest/resources",
+                    "totalSpace": 0,
+                    "usableSpace": 0
+                }
+            ],
+            "aidlDirectories": null,
+            "renderscriptDirectories": null,
+            "baselineProfileDirectories": [
+                {
+                    "absolute": true,
+                    "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest/baselineProfiles",
+                    "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest/baselineProfiles",
+                    "directory": false,
+                    "file": false,
+                    "freeSpace": 0,
+                    "hidden": false,
+                    "name": "baselineProfiles",
+                    "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest",
+                    "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest/baselineProfiles",
+                    "totalSpace": 0,
+                    "usableSpace": 0
+                }
+            ],
+            "resDirectories": [
+                {
+                    "absolute": true,
+                    "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest/res",
+                    "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest/res",
+                    "directory": false,
+                    "file": false,
+                    "freeSpace": 0,
+                    "hidden": false,
+                    "name": "res",
+                    "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest",
+                    "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest/res",
+                    "totalSpace": 0,
+                    "usableSpace": 0
+                }
+            ],
+            "assetsDirectories": [
+                {
+                    "absolute": true,
+                    "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest/assets",
+                    "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest/assets",
+                    "directory": false,
+                    "file": false,
+                    "freeSpace": 0,
+                    "hidden": false,
+                    "name": "assets",
+                    "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest",
+                    "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest/assets",
+                    "totalSpace": 0,
+                    "usableSpace": 0
+                }
+            ],
+            "jniLibsDirectories": [
+                {
+                    "absolute": true,
+                    "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest/jniLibs",
+                    "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest/jniLibs",
+                    "directory": false,
+                    "file": false,
+                    "freeSpace": 0,
+                    "hidden": false,
+                    "name": "jniLibs",
+                    "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest",
+                    "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTest/jniLibs",
+                    "totalSpace": 0,
+                    "usableSpace": 0
+                }
+            ],
+            "shadersDirectories": null,
+            "mlModelsDirectories": null,
+            "customDirectories": [
+                
+            ]
+        },
+        "unitTestSourceProvider": {
+            "name": "test",
+            "manifestFile": {
+                "absolute": true,
+                "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test/AndroidManifest.xml",
+                "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test/AndroidManifest.xml",
+                "directory": false,
+                "file": false,
+                "freeSpace": 0,
+                "hidden": false,
+                "name": "AndroidManifest.xml",
+                "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test",
+                "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test/AndroidManifest.xml",
+                "totalSpace": 0,
+                "usableSpace": 0
+            },
+            "javaDirectories": [
+                {
+                    "absolute": true,
+                    "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test/java",
+                    "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test/java",
+                    "directory": false,
+                    "file": false,
+                    "freeSpace": 0,
+                    "hidden": false,
+                    "name": "java",
+                    "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test",
+                    "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test/java",
+                    "totalSpace": 0,
+                    "usableSpace": 0
+                }
+            ],
+            "kotlinDirectories": [
+                {
+                    "absolute": true,
+                    "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test/java",
+                    "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test/java",
+                    "directory": false,
+                    "file": false,
+                    "freeSpace": 0,
+                    "hidden": false,
+                    "name": "java",
+                    "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test",
+                    "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test/java",
+                    "totalSpace": 0,
+                    "usableSpace": 0
+                },
+                {
+                    "absolute": true,
+                    "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test/kotlin",
+                    "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test/kotlin",
+                    "directory": false,
+                    "file": false,
+                    "freeSpace": 0,
+                    "hidden": false,
+                    "name": "kotlin",
+                    "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test",
+                    "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test/kotlin",
+                    "totalSpace": 0,
+                    "usableSpace": 0
+                }
+            ],
+            "resourcesDirectories": [
+                {
+                    "absolute": true,
+                    "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test/resources",
+                    "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test/resources",
+                    "directory": false,
+                    "file": false,
+                    "freeSpace": 0,
+                    "hidden": false,
+                    "name": "resources",
+                    "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test",
+                    "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test/resources",
+                    "totalSpace": 0,
+                    "usableSpace": 0
+                }
+            ],
+            "aidlDirectories": null,
+            "renderscriptDirectories": null,
+            "baselineProfileDirectories": [
+                {
+                    "absolute": true,
+                    "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test/baselineProfiles",
+                    "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test/baselineProfiles",
+                    "directory": false,
+                    "file": false,
+                    "freeSpace": 0,
+                    "hidden": false,
+                    "name": "baselineProfiles",
+                    "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test",
+                    "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test/baselineProfiles",
+                    "totalSpace": 0,
+                    "usableSpace": 0
+                }
+            ],
+            "resDirectories": [
+                {
+                    "absolute": true,
+                    "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test/res",
+                    "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test/res",
+                    "directory": false,
+                    "file": false,
+                    "freeSpace": 0,
+                    "hidden": false,
+                    "name": "res",
+                    "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test",
+                    "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test/res",
+                    "totalSpace": 0,
+                    "usableSpace": 0
+                }
+            ],
+            "assetsDirectories": [
+                {
+                    "absolute": true,
+                    "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test/assets",
+                    "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test/assets",
+                    "directory": false,
+                    "file": false,
+                    "freeSpace": 0,
+                    "hidden": false,
+                    "name": "assets",
+                    "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test",
+                    "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test/assets",
+                    "totalSpace": 0,
+                    "usableSpace": 0
+                }
+            ],
+            "jniLibsDirectories": [
+                {
+                    "absolute": true,
+                    "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test/jniLibs",
+                    "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test/jniLibs",
+                    "directory": false,
+                    "file": false,
+                    "freeSpace": 0,
+                    "hidden": false,
+                    "name": "jniLibs",
+                    "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test",
+                    "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/test/jniLibs",
+                    "totalSpace": 0,
+                    "usableSpace": 0
+                }
+            ],
+            "shadersDirectories": null,
+            "mlModelsDirectories": null,
+            "customDirectories": [
+                
+            ]
+        }
+    },
+    "buildTypeSourceSets": [
+        {
+            "sourceProvider": {
+                "name": "debug",
+                "manifestFile": {
+                    "absolute": true,
+                    "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/debug/AndroidManifest.xml",
+                    "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/debug/AndroidManifest.xml",
+                    "directory": false,
+                    "file": false,
+                    "freeSpace": 0,
+                    "hidden": false,
+                    "name": "AndroidManifest.xml",
+                    "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/debug",
+                    "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/debug/AndroidManifest.xml",
+                    "totalSpace": 0,
+                    "usableSpace": 0
+                },
+                "javaDirectories": [
+                    {
+                        "absolute": true,
+                        "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/debug/java",
+                        "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/debug/java",
+                        "directory": false,
+                        "file": false,
+                        "freeSpace": 0,
+                        "hidden": false,
+                        "name": "java",
+                        "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/debug",
+                        "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/debug/java",
+                        "totalSpace": 0,
+                        "usableSpace": 0
+                    }
+                ],
+                "kotlinDirectories": [
+                    {
+                        "absolute": true,
+                        "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/debug/java",
+                        "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/debug/java",
+                        "directory": false,
+                        "file": false,
+                        "freeSpace": 0,
+                        "hidden": false,
+                        "name": "java",
+                        "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/debug",
+                        "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/debug/java",
+                        "totalSpace": 0,
+                        "usableSpace": 0
+                    },
+                    {
+                        "absolute": true,
+                        "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/debug/kotlin",
+                        "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/debug/kotlin",
+                        "directory": false,
+                        "file": false,
+                        "freeSpace": 0,
+                        "hidden": false,
+                        "name": "kotlin",
+                        "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/debug",
+                        "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/debug/kotlin",
+                        "totalSpace": 0,
+                        "usableSpace": 0
+                    }
+                ],
+                "resourcesDirectories": [
+                    {
+                        "absolute": true,
+                        "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/debug/resources",
+                        "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/debug/resources",
+                        "directory": false,
+                        "file": false,
+                        "freeSpace": 0,
+                        "hidden": false,
+                        "name": "resources",
+                        "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/debug",
+                        "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/debug/resources",
+                        "totalSpace": 0,
+                        "usableSpace": 0
+                    }
+                ],
+                "aidlDirectories": null,
+                "renderscriptDirectories": null,
+                "baselineProfileDirectories": [
+                    {
+                        "absolute": true,
+                        "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/debug/baselineProfiles",
+                        "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/debug/baselineProfiles",
+                        "directory": false,
+                        "file": false,
+                        "freeSpace": 0,
+                        "hidden": false,
+                        "name": "baselineProfiles",
+                        "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/debug",
+                        "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/debug/baselineProfiles",
+                        "totalSpace": 0,
+                        "usableSpace": 0
+                    }
+                ],
+                "resDirectories": [
+                    {
+                        "absolute": true,
+                        "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/debug/res",
+                        "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/debug/res",
+                        "directory": false,
+                        "file": false,
+                        "freeSpace": 0,
+                        "hidden": false,
+                        "name": "res",
+                        "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/debug",
+                        "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/debug/res",
+                        "totalSpace": 0,
+                        "usableSpace": 0
+                    }
+                ],
+                "assetsDirectories": [
+                    {
+                        "absolute": true,
+                        "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/debug/assets",
+                        "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/debug/assets",
+                        "directory": false,
+                        "file": false,
+                        "freeSpace": 0,
+                        "hidden": false,
+                        "name": "assets",
+                        "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/debug",
+                        "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/debug/assets",
+                        "totalSpace": 0,
+                        "usableSpace": 0
+                    }
+                ],
+                "jniLibsDirectories": [
+                    {
+                        "absolute": true,
+                        "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/debug/jniLibs",
+                        "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/debug/jniLibs",
+                        "directory": false,
+                        "file": false,
+                        "freeSpace": 0,
+                        "hidden": false,
+                        "name": "jniLibs",
+                        "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/debug",
+                        "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/debug/jniLibs",
+                        "totalSpace": 0,
+                        "usableSpace": 0
+                    }
+                ],
+                "shadersDirectories": null,
+                "mlModelsDirectories": null,
+                "customDirectories": [
+                    
+                ]
+            },
+            "deviceTestSourceProviders": {
+                "_android_test_": {
+                    "name": "androidTestDebug",
+                    "manifestFile": {
+                        "absolute": true,
+                        "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug/AndroidManifest.xml",
+                        "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug/AndroidManifest.xml",
+                        "directory": false,
+                        "file": false,
+                        "freeSpace": 0,
+                        "hidden": false,
+                        "name": "AndroidManifest.xml",
+                        "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug",
+                        "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug/AndroidManifest.xml",
+                        "totalSpace": 0,
+                        "usableSpace": 0
+                    },
+                    "javaDirectories": [
+                        {
+                            "absolute": true,
+                            "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug/java",
+                            "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug/java",
+                            "directory": false,
+                            "file": false,
+                            "freeSpace": 0,
+                            "hidden": false,
+                            "name": "java",
+                            "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug",
+                            "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug/java",
+                            "totalSpace": 0,
+                            "usableSpace": 0
+                        }
+                    ],
+                    "kotlinDirectories": [
+                        {
+                            "absolute": true,
+                            "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug/java",
+                            "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug/java",
+                            "directory": false,
+                            "file": false,
+                            "freeSpace": 0,
+                            "hidden": false,
+                            "name": "java",
+                            "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug",
+                            "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug/java",
+                            "totalSpace": 0,
+                            "usableSpace": 0
+                        },
+                        {
+                            "absolute": true,
+                            "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug/kotlin",
+                            "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug/kotlin",
+                            "directory": false,
+                            "file": false,
+                            "freeSpace": 0,
+                            "hidden": false,
+                            "name": "kotlin",
+                            "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug",
+                            "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug/kotlin",
+                            "totalSpace": 0,
+                            "usableSpace": 0
+                        }
+                    ],
+                    "resourcesDirectories": [
+                        {
+                            "absolute": true,
+                            "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug/resources",
+                            "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug/resources",
+                            "directory": false,
+                            "file": false,
+                            "freeSpace": 0,
+                            "hidden": false,
+                            "name": "resources",
+                            "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug",
+                            "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug/resources",
+                            "totalSpace": 0,
+                            "usableSpace": 0
+                        }
+                    ],
+                    "aidlDirectories": null,
+                    "renderscriptDirectories": null,
+                    "baselineProfileDirectories": [
+                        {
+                            "absolute": true,
+                            "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug/baselineProfiles",
+                            "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug/baselineProfiles",
+                            "directory": false,
+                            "file": false,
+                            "freeSpace": 0,
+                            "hidden": false,
+                            "name": "baselineProfiles",
+                            "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug",
+                            "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug/baselineProfiles",
+                            "totalSpace": 0,
+                            "usableSpace": 0
+                        }
+                    ],
+                    "resDirectories": [
+                        {
+                            "absolute": true,
+                            "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug/res",
+                            "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug/res",
+                            "directory": false,
+                            "file": false,
+                            "freeSpace": 0,
+                            "hidden": false,
+                            "name": "res",
+                            "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug",
+                            "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug/res",
+                            "totalSpace": 0,
+                            "usableSpace": 0
+                        }
+                    ],
+                    "assetsDirectories": [
+                        {
+                            "absolute": true,
+                            "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug/assets",
+                            "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug/assets",
+                            "directory": false,
+                            "file": false,
+                            "freeSpace": 0,
+                            "hidden": false,
+                            "name": "assets",
+                            "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug",
+                            "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug/assets",
+                            "totalSpace": 0,
+                            "usableSpace": 0
+                        }
+                    ],
+                    "jniLibsDirectories": [
+                        {
+                            "absolute": true,
+                            "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug/jniLibs",
+                            "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug/jniLibs",
+                            "directory": false,
+                            "file": false,
+                            "freeSpace": 0,
+                            "hidden": false,
+                            "name": "jniLibs",
+                            "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug",
+                            "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug/jniLibs",
+                            "totalSpace": 0,
+                            "usableSpace": 0
+                        }
+                    ],
+                    "shadersDirectories": null,
+                    "mlModelsDirectories": null,
+                    "customDirectories": [
+                        
+                    ]
+                }
+            },
+            "hostTestSourceProviders": {
+                "_unit_test_": {
+                    "name": "testDebug",
+                    "manifestFile": {
+                        "absolute": true,
+                        "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug/AndroidManifest.xml",
+                        "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug/AndroidManifest.xml",
+                        "directory": false,
+                        "file": false,
+                        "freeSpace": 0,
+                        "hidden": false,
+                        "name": "AndroidManifest.xml",
+                        "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug",
+                        "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug/AndroidManifest.xml",
+                        "totalSpace": 0,
+                        "usableSpace": 0
+                    },
+                    "javaDirectories": [
+                        {
+                            "absolute": true,
+                            "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug/java",
+                            "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug/java",
+                            "directory": false,
+                            "file": false,
+                            "freeSpace": 0,
+                            "hidden": false,
+                            "name": "java",
+                            "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug",
+                            "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug/java",
+                            "totalSpace": 0,
+                            "usableSpace": 0
+                        }
+                    ],
+                    "kotlinDirectories": [
+                        {
+                            "absolute": true,
+                            "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug/java",
+                            "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug/java",
+                            "directory": false,
+                            "file": false,
+                            "freeSpace": 0,
+                            "hidden": false,
+                            "name": "java",
+                            "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug",
+                            "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug/java",
+                            "totalSpace": 0,
+                            "usableSpace": 0
+                        },
+                        {
+                            "absolute": true,
+                            "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug/kotlin",
+                            "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug/kotlin",
+                            "directory": false,
+                            "file": false,
+                            "freeSpace": 0,
+                            "hidden": false,
+                            "name": "kotlin",
+                            "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug",
+                            "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug/kotlin",
+                            "totalSpace": 0,
+                            "usableSpace": 0
+                        }
+                    ],
+                    "resourcesDirectories": [
+                        {
+                            "absolute": true,
+                            "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug/resources",
+                            "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug/resources",
+                            "directory": false,
+                            "file": false,
+                            "freeSpace": 0,
+                            "hidden": false,
+                            "name": "resources",
+                            "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug",
+                            "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug/resources",
+                            "totalSpace": 0,
+                            "usableSpace": 0
+                        }
+                    ],
+                    "aidlDirectories": null,
+                    "renderscriptDirectories": null,
+                    "baselineProfileDirectories": [
+                        {
+                            "absolute": true,
+                            "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug/baselineProfiles",
+                            "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug/baselineProfiles",
+                            "directory": false,
+                            "file": false,
+                            "freeSpace": 0,
+                            "hidden": false,
+                            "name": "baselineProfiles",
+                            "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug",
+                            "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug/baselineProfiles",
+                            "totalSpace": 0,
+                            "usableSpace": 0
+                        }
+                    ],
+                    "resDirectories": [
+                        {
+                            "absolute": true,
+                            "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug/res",
+                            "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug/res",
+                            "directory": false,
+                            "file": false,
+                            "freeSpace": 0,
+                            "hidden": false,
+                            "name": "res",
+                            "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug",
+                            "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug/res",
+                            "totalSpace": 0,
+                            "usableSpace": 0
+                        }
+                    ],
+                    "assetsDirectories": [
+                        {
+                            "absolute": true,
+                            "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug/assets",
+                            "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug/assets",
+                            "directory": false,
+                            "file": false,
+                            "freeSpace": 0,
+                            "hidden": false,
+                            "name": "assets",
+                            "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug",
+                            "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug/assets",
+                            "totalSpace": 0,
+                            "usableSpace": 0
+                        }
+                    ],
+                    "jniLibsDirectories": [
+                        {
+                            "absolute": true,
+                            "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug/jniLibs",
+                            "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug/jniLibs",
+                            "directory": false,
+                            "file": false,
+                            "freeSpace": 0,
+                            "hidden": false,
+                            "name": "jniLibs",
+                            "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug",
+                            "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug/jniLibs",
+                            "totalSpace": 0,
+                            "usableSpace": 0
+                        }
+                    ],
+                    "shadersDirectories": null,
+                    "mlModelsDirectories": null,
+                    "customDirectories": [
+                        
+                    ]
+                }
+            },
+            "testFixturesSourceProvider": null,
+            "androidTestSourceProvider": {
+                "name": "androidTestDebug",
+                "manifestFile": {
+                    "absolute": true,
+                    "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug/AndroidManifest.xml",
+                    "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug/AndroidManifest.xml",
+                    "directory": false,
+                    "file": false,
+                    "freeSpace": 0,
+                    "hidden": false,
+                    "name": "AndroidManifest.xml",
+                    "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug",
+                    "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug/AndroidManifest.xml",
+                    "totalSpace": 0,
+                    "usableSpace": 0
+                },
+                "javaDirectories": [
+                    {
+                        "absolute": true,
+                        "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug/java",
+                        "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug/java",
+                        "directory": false,
+                        "file": false,
+                        "freeSpace": 0,
+                        "hidden": false,
+                        "name": "java",
+                        "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug",
+                        "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug/java",
+                        "totalSpace": 0,
+                        "usableSpace": 0
+                    }
+                ],
+                "kotlinDirectories": [
+                    {
+                        "absolute": true,
+                        "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug/java",
+                        "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug/java",
+                        "directory": false,
+                        "file": false,
+                        "freeSpace": 0,
+                        "hidden": false,
+                        "name": "java",
+                        "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug",
+                        "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug/java",
+                        "totalSpace": 0,
+                        "usableSpace": 0
+                    },
+                    {
+                        "absolute": true,
+                        "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug/kotlin",
+                        "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug/kotlin",
+                        "directory": false,
+                        "file": false,
+                        "freeSpace": 0,
+                        "hidden": false,
+                        "name": "kotlin",
+                        "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug",
+                        "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug/kotlin",
+                        "totalSpace": 0,
+                        "usableSpace": 0
+                    }
+                ],
+                "resourcesDirectories": [
+                    {
+                        "absolute": true,
+                        "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug/resources",
+                        "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug/resources",
+                        "directory": false,
+                        "file": false,
+                        "freeSpace": 0,
+                        "hidden": false,
+                        "name": "resources",
+                        "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug",
+                        "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug/resources",
+                        "totalSpace": 0,
+                        "usableSpace": 0
+                    }
+                ],
+                "aidlDirectories": null,
+                "renderscriptDirectories": null,
+                "baselineProfileDirectories": [
+                    {
+                        "absolute": true,
+                        "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug/baselineProfiles",
+                        "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug/baselineProfiles",
+                        "directory": false,
+                        "file": false,
+                        "freeSpace": 0,
+                        "hidden": false,
+                        "name": "baselineProfiles",
+                        "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug",
+                        "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug/baselineProfiles",
+                        "totalSpace": 0,
+                        "usableSpace": 0
+                    }
+                ],
+                "resDirectories": [
+                    {
+                        "absolute": true,
+                        "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug/res",
+                        "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug/res",
+                        "directory": false,
+                        "file": false,
+                        "freeSpace": 0,
+                        "hidden": false,
+                        "name": "res",
+                        "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug",
+                        "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug/res",
+                        "totalSpace": 0,
+                        "usableSpace": 0
+                    }
+                ],
+                "assetsDirectories": [
+                    {
+                        "absolute": true,
+                        "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug/assets",
+                        "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug/assets",
+                        "directory": false,
+                        "file": false,
+                        "freeSpace": 0,
+                        "hidden": false,
+                        "name": "assets",
+                        "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug",
+                        "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug/assets",
+                        "totalSpace": 0,
+                        "usableSpace": 0
+                    }
+                ],
+                "jniLibsDirectories": [
+                    {
+                        "absolute": true,
+                        "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug/jniLibs",
+                        "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug/jniLibs",
+                        "directory": false,
+                        "file": false,
+                        "freeSpace": 0,
+                        "hidden": false,
+                        "name": "jniLibs",
+                        "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug",
+                        "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/androidTestDebug/jniLibs",
+                        "totalSpace": 0,
+                        "usableSpace": 0
+                    }
+                ],
+                "shadersDirectories": null,
+                "mlModelsDirectories": null,
+                "customDirectories": [
+                    
+                ]
+            },
+            "unitTestSourceProvider": {
+                "name": "testDebug",
+                "manifestFile": {
+                    "absolute": true,
+                    "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug/AndroidManifest.xml",
+                    "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug/AndroidManifest.xml",
+                    "directory": false,
+                    "file": false,
+                    "freeSpace": 0,
+                    "hidden": false,
+                    "name": "AndroidManifest.xml",
+                    "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug",
+                    "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug/AndroidManifest.xml",
+                    "totalSpace": 0,
+                    "usableSpace": 0
+                },
+                "javaDirectories": [
+                    {
+                        "absolute": true,
+                        "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug/java",
+                        "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug/java",
+                        "directory": false,
+                        "file": false,
+                        "freeSpace": 0,
+                        "hidden": false,
+                        "name": "java",
+                        "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug",
+                        "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug/java",
+                        "totalSpace": 0,
+                        "usableSpace": 0
+                    }
+                ],
+                "kotlinDirectories": [
+                    {
+                        "absolute": true,
+                        "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug/java",
+                        "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug/java",
+                        "directory": false,
+                        "file": false,
+                        "freeSpace": 0,
+                        "hidden": false,
+                        "name": "java",
+                        "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug",
+                        "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug/java",
+                        "totalSpace": 0,
+                        "usableSpace": 0
+                    },
+                    {
+                        "absolute": true,
+                        "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug/kotlin",
+                        "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug/kotlin",
+                        "directory": false,
+                        "file": false,
+                        "freeSpace": 0,
+                        "hidden": false,
+                        "name": "kotlin",
+                        "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug",
+                        "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug/kotlin",
+                        "totalSpace": 0,
+                        "usableSpace": 0
+                    }
+                ],
+                "resourcesDirectories": [
+                    {
+                        "absolute": true,
+                        "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug/resources",
+                        "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug/resources",
+                        "directory": false,
+                        "file": false,
+                        "freeSpace": 0,
+                        "hidden": false,
+                        "name": "resources",
+                        "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug",
+                        "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug/resources",
+                        "totalSpace": 0,
+                        "usableSpace": 0
+                    }
+                ],
+                "aidlDirectories": null,
+                "renderscriptDirectories": null,
+                "baselineProfileDirectories": [
+                    {
+                        "absolute": true,
+                        "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug/baselineProfiles",
+                        "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug/baselineProfiles",
+                        "directory": false,
+                        "file": false,
+                        "freeSpace": 0,
+                        "hidden": false,
+                        "name": "baselineProfiles",
+                        "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug",
+                        "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug/baselineProfiles",
+                        "totalSpace": 0,
+                        "usableSpace": 0
+                    }
+                ],
+                "resDirectories": [
+                    {
+                        "absolute": true,
+                        "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug/res",
+                        "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug/res",
+                        "directory": false,
+                        "file": false,
+                        "freeSpace": 0,
+                        "hidden": false,
+                        "name": "res",
+                        "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug",
+                        "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug/res",
+                        "totalSpace": 0,
+                        "usableSpace": 0
+                    }
+                ],
+                "assetsDirectories": [
+                    {
+                        "absolute": true,
+                        "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug/assets",
+                        "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug/assets",
+                        "directory": false,
+                        "file": false,
+                        "freeSpace": 0,
+                        "hidden": false,
+                        "name": "assets",
+                        "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug",
+                        "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug/assets",
+                        "totalSpace": 0,
+                        "usableSpace": 0
+                    }
+                ],
+                "jniLibsDirectories": [
+                    {
+                        "absolute": true,
+                        "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug/jniLibs",
+                        "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug/jniLibs",
+                        "directory": false,
+                        "file": false,
+                        "freeSpace": 0,
+                        "hidden": false,
+                        "name": "jniLibs",
+                        "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug",
+                        "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/testDebug/jniLibs",
+                        "totalSpace": 0,
+                        "usableSpace": 0
+                    }
+                ],
+                "shadersDirectories": null,
+                "mlModelsDirectories": null,
+                "customDirectories": [
+                    
+                ]
+            }
+        },
+        {
+            "sourceProvider": {
+                "name": "release",
+                "manifestFile": {
+                    "absolute": true,
+                    "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/release/AndroidManifest.xml",
+                    "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/release/AndroidManifest.xml",
+                    "directory": false,
+                    "file": false,
+                    "freeSpace": 0,
+                    "hidden": false,
+                    "name": "AndroidManifest.xml",
+                    "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/release",
+                    "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/release/AndroidManifest.xml",
+                    "totalSpace": 0,
+                    "usableSpace": 0
+                },
+                "javaDirectories": [
+                    {
+                        "absolute": true,
+                        "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/release/java",
+                        "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/release/java",
+                        "directory": false,
+                        "file": false,
+                        "freeSpace": 0,
+                        "hidden": false,
+                        "name": "java",
+                        "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/release",
+                        "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/release/java",
+                        "totalSpace": 0,
+                        "usableSpace": 0
+                    }
+                ],
+                "kotlinDirectories": [
+                    {
+                        "absolute": true,
+                        "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/release/java",
+                        "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/release/java",
+                        "directory": false,
+                        "file": false,
+                        "freeSpace": 0,
+                        "hidden": false,
+                        "name": "java",
+                        "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/release",
+                        "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/release/java",
+                        "totalSpace": 0,
+                        "usableSpace": 0
+                    },
+                    {
+                        "absolute": true,
+                        "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/release/kotlin",
+                        "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/release/kotlin",
+                        "directory": false,
+                        "file": false,
+                        "freeSpace": 0,
+                        "hidden": false,
+                        "name": "kotlin",
+                        "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/release",
+                        "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/release/kotlin",
+                        "totalSpace": 0,
+                        "usableSpace": 0
+                    }
+                ],
+                "resourcesDirectories": [
+                    {
+                        "absolute": true,
+                        "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/release/resources",
+                        "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/release/resources",
+                        "directory": false,
+                        "file": false,
+                        "freeSpace": 0,
+                        "hidden": false,
+                        "name": "resources",
+                        "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/release",
+                        "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/release/resources",
+                        "totalSpace": 0,
+                        "usableSpace": 0
+                    }
+                ],
+                "aidlDirectories": null,
+                "renderscriptDirectories": null,
+                "baselineProfileDirectories": [
+                    {
+                        "absolute": true,
+                        "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/release/baselineProfiles",
+                        "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/release/baselineProfiles",
+                        "directory": false,
+                        "file": false,
+                        "freeSpace": 0,
+                        "hidden": false,
+                        "name": "baselineProfiles",
+                        "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/release",
+                        "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/release/baselineProfiles",
+                        "totalSpace": 0,
+                        "usableSpace": 0
+                    }
+                ],
+                "resDirectories": [
+                    {
+                        "absolute": true,
+                        "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/release/res",
+                        "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/release/res",
+                        "directory": false,
+                        "file": false,
+                        "freeSpace": 0,
+                        "hidden": false,
+                        "name": "res",
+                        "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/release",
+                        "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/release/res",
+                        "totalSpace": 0,
+                        "usableSpace": 0
+                    }
+                ],
+                "assetsDirectories": [
+                    {
+                        "absolute": true,
+                        "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/release/assets",
+                        "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/release/assets",
+                        "directory": false,
+                        "file": false,
+                        "freeSpace": 0,
+                        "hidden": false,
+                        "name": "assets",
+                        "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/release",
+                        "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/release/assets",
+                        "totalSpace": 0,
+                        "usableSpace": 0
+                    }
+                ],
+                "jniLibsDirectories": [
+                    {
+                        "absolute": true,
+                        "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/release/jniLibs",
+                        "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/src/release/jniLibs",
+                        "directory": false,
+                        "file": false,
+                        "freeSpace": 0,
+                        "hidden": false,
+                        "name": "jniLibs",
+                        "parent": "/Users/weiss/opencode/rma/TyranorNext/engine/src/release",
+                        "path": "/Users/weiss/opencode/rma/TyranorNext/engine/src/release/jniLibs",
+                        "totalSpace": 0,
+                        "usableSpace": 0
+                    }
+                ],
+                "shadersDirectories": null,
+                "mlModelsDirectories": null,
+                "customDirectories": [
+                    
+                ]
+            },
+            "deviceTestSourceProviders": {
+                
+            },
+            "hostTestSourceProviders": {
+                
+            },
+            "testFixturesSourceProvider": null,
+            "androidTestSourceProvider": null,
+            "unitTestSourceProvider": null
+        }
+    ],
+    "productFlavorSourceSets": [
+        
+    ],
+    "testSuites": [
+        
+    ],
+    "variants": [
+        {
+            "name": "debug",
+            "mainArtifact": {
+                "variantSourceProvider": null,
+                "multiFlavorSourceProvider": null
+            },
+            "deviceTestArtifacts": {
+                "_android_test_": {
+                    "variantSourceProvider": null,
+                    "multiFlavorSourceProvider": null
+                }
+            },
+            "hostTestArtifacts": {
+                "_unit_test_": {
+                    "variantSourceProvider": null,
+                    "multiFlavorSourceProvider": null
+                }
+            },
+            "testSuiteArtifacts": {
+                
+            },
+            "testFixturesArtifact": null,
+            "buildType": "debug",
+            "productFlavors": [
+                
+            ],
+            "androidTestArtifact": {
+                "variantSourceProvider": null,
+                "multiFlavorSourceProvider": null
+            },
+            "unitTestArtifact": {
+                "variantSourceProvider": null,
+                "multiFlavorSourceProvider": null
+            }
+        },
+        {
+            "name": "release",
+            "mainArtifact": {
+                "variantSourceProvider": null,
+                "multiFlavorSourceProvider": null
+            },
+            "deviceTestArtifacts": {
+                
+            },
+            "hostTestArtifacts": {
+                
+            },
+            "testSuiteArtifacts": {
+                
+            },
+            "testFixturesArtifact": null,
+            "buildType": "release",
+            "productFlavors": [
+                
+            ],
+            "androidTestArtifact": null,
+            "unitTestArtifact": null
+        }
+    ],
+    "bootClasspath": [
+        {
+            "absolute": true,
+            "absolutePath": "/Users/weiss/Library/Android/sdk/platforms/android-36/android.jar",
+            "canonicalPath": "/Users/weiss/Library/Android/sdk/platforms/android-36/android.jar",
+            "directory": false,
+            "file": true,
+            "freeSpace": 65293172736,
+            "hidden": false,
+            "name": "android.jar",
+            "parent": "/Users/weiss/Library/Android/sdk/platforms/android-36",
+            "path": "/Users/weiss/Library/Android/sdk/platforms/android-36/android.jar",
+            "totalSpace": 494384795648,
+            "usableSpace": 65293172736
+        }
+    ],
+    "buildFolder": {
+        "absolute": true,
+        "absolutePath": "/Users/weiss/opencode/rma/TyranorNext/engine/build",
+        "canonicalPath": "/Users/weiss/opencode/rma/TyranorNext/engine/build",
+        "directory": true,
+        "file": false,
+        "freeSpace": 65293172736,
+        "hidden": false,
+        "name": "build",
+        "parent": "/Users/weiss/opencode/rma/TyranorNext/engine",
+        "path": "/Users/weiss/opencode/rma/TyranorNext/engine/build",
+        "totalSpace": 494384795648,
+        "usableSpace": 65293172736
+    },
+    "buildName": "n/a"
+}

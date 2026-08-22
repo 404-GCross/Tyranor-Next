@@ -3,6 +3,9 @@ package com.example.tyranornext.scanner
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import android.provider.Settings
 import androidx.documentfile.provider.DocumentFile
 import com.akira.tyranoemu.remote.ArtemisActivityV1
 import com.akira.tyranoemu.remote.ArtemisActivityV2
@@ -16,6 +19,7 @@ import com.example.tyranornext.settings.EngineSettingsStore
 import com.example.tyranornext.settings.PerGameSettingsStore
 import com.yuri.onscripter.ONScripter
 import java.io.File
+import kotlin.math.abs
 
 /**
  * 游戏引擎启动器：根据 [EngineType] 把扫描到的游戏目录交给对应引擎宿主 Activity。
@@ -38,14 +42,54 @@ object EngineLauncher {
         if (path == null) {
             return "无法解析游戏目录（仅支持本地文件路径）"
         }
+        requestAllFilesAccessIfNeeded(context, path)?.let { return it }
         return try {
             val intent = buildIntent(context, game.engine, path, game)
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             context.startActivity(intent)
+            EngineScanner.recordRecentGame(context, game)
             null
         } catch (e: Exception) {
             e.message ?: "启动失败"
         }
+    }
+
+    /**
+     * Native engines receive a real /storage path, so SAF tree grants are not enough on Android 11+.
+     * Match RinneMobile's requirement: ask the user to enable "Manage all files" before launching.
+     */
+    private fun requestAllFilesAccessIfNeeded(context: Context, path: String): String? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return null
+        if (Environment.isExternalStorageManager()) return null
+        if (!needsAllFilesAccess(path)) return null
+
+        val app = context.applicationContext
+        val packageUri = Uri.parse("package:${app.packageName}")
+        val opened = runCatching {
+            app.startActivity(
+                Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, packageUri)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            )
+        }.recoverCatching {
+            app.startActivity(
+                Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            )
+        }.isSuccess
+
+        return if (opened) {
+            "请在系统页面允许“管理所有文件”，返回后再次启动游戏"
+        } else {
+            "缺少“管理所有文件”权限，无法让原生引擎读取游戏目录"
+        }
+    }
+
+    private fun needsAllFilesAccess(path: String): Boolean {
+        val normalized = path.replace('\\', '/')
+        return normalized == "/sdcard" ||
+            normalized.startsWith("/sdcard/") ||
+            normalized == "/storage/emulated/0" ||
+            normalized.startsWith("/storage/emulated/0/")
     }
 
     /** 构建引擎 Intent；path 为真实文件路径。 */
@@ -99,20 +143,7 @@ object EngineLauncher {
                 }
             }
 
-            EngineType.TYRANO -> Intent(context, TyranoActivity::class.java).apply {
-                putExtra("path", path)
-                putExtra("gamePath", path)
-                putExtra("projectRoot", path)
-                putExtra("gamedir", path)
-                putExtra("rootUri", game.uri)
-                putExtra("launchTarget", game.launchTarget)
-                putExtra("type", "Tyrano")
-                putExtra("launchMode", "internal.tyrano")
-                putExtra("orientation", 6)
-                // 独立存档要求 scopedSaveRoot extra；未提供时引擎会判定不可写而退出。
-                // 直接写 gamedir/savedata（已获“所有文件访问”，可写）。
-                putExtra("scopedSaveDir", false)
-            }
+            EngineType.TYRANO -> buildTyranoIntent(context, path, game)
 
             EngineType.ARTEMIS -> buildArtemisIntent(context, path, game)
 
@@ -195,6 +226,7 @@ object EngineLauncher {
         var version = or(PerGameSettingsStore.getStr(context, gid, PerGameSettingsStore.F_ART_VERSION), EngineSettingsStore.getArtEngineVersion(context))
         val rotate = or(PerGameSettingsStore.getBool(context, gid, PerGameSettingsStore.F_ART_ROTATE), EngineSettingsStore.isArtRotateScreen(context))
         val autoPatch = or(PerGameSettingsStore.getStr(context, gid, PerGameSettingsStore.F_ART_PATCH), EngineSettingsStore.getArtAutoPatch(context))
+        applyArtemisBasePatchIfNeeded(path, autoPatch)
         // 自动补丁=off 时禁用自动回退；否则 auto 版本启用兼容回退
         val auto = version == EngineSettingsStore.ART_ENGINE_AUTO &&
             autoPatch != EngineSettingsStore.AUTO_PATCH_OFF
@@ -242,6 +274,41 @@ object EngineLauncher {
         }
     }
 
+    private fun buildTyranoIntent(context: Context, path: String, game: ScanGame): Intent {
+        val scoped = PerGameSettingsStore.getBool(context, game.uri, "ty_scoped")
+            ?: EngineSettingsStore.isTyranoScopedSaveDir(context)
+        val scopedSaveRoot = if (scoped) {
+            context.getExternalFilesDir(null)?.let { external ->
+                File(File(File(external, "save"), "tyrano"), safeSaveName(path)).absolutePath
+            }
+        } else {
+            null
+        }
+        return Intent(context, TyranoActivity::class.java).apply {
+            putExtra("path", path)
+            putExtra("gamePath", path)
+            putExtra("projectRoot", path)
+            putExtra("gamedir", path)
+            putExtra("rootUri", game.uri)
+            putExtra("launchTarget", game.launchTarget)
+            putExtra("type", "Tyrano")
+            putExtra("launchMode", "internal.tyrano")
+            putExtra("orientation", 6)
+            putExtra("scopedSaveDir", scoped)
+            scopedSaveRoot?.let { putExtra("scopedSaveRoot", it) }
+        }
+    }
+
+    /**
+     * RinneMobile 的 Artemis 启动链路会在启动前补齐部分 PFS 打包游戏所需的基础文件。
+     * TyranorNext 目前没有确认弹窗，所以“启动时询问”按幂等自动补丁处理；“关闭”仍跳过。
+     */
+    private fun applyArtemisBasePatchIfNeeded(path: String, strategy: String) {
+        if (strategy == EngineSettingsStore.AUTO_PATCH_OFF) return
+        if (!ArtemisPfsUnpacker.needsBasePatch(path)) return
+        ArtemisPfsUnpacker.applyBasePatch(path)
+    }
+
     /**
      * 为 KR2 挑选“启动条目”路径（让 gamedir = path 的父目录 = 游戏目录）。优先：launchTarget
      * 指定的 xp3 → 目录内 data.xp3/startup.tjs 等常见启动条目 → 任意一个 xp3 → 目录本身。
@@ -277,12 +344,18 @@ object EngineLauncher {
         return path
     }
 
+    private fun safeSaveName(rootPath: String): String {
+        val name = runCatching { File(rootPath).name.takeIf { it.isNotBlank() } }.getOrNull()
+            ?: abs(rootPath.hashCode()).toString()
+        return name.replace(Regex("[\\\\/:*?\"<>|]"), "_").trim().ifEmpty { "default" }
+    }
+
     /**
      * 将游戏 URI 解析为真实文件路径。优先按 SAF documentId 映射（主存储→/storage/emulated/0），
      * 映射失败再用 _data 查询兜底。引擎 native 需要真实文件路径。
      */
     private fun resolveGameDirectory(context: Context, game: ScanGame): String? {
-        val uriText = game.uri ?: return null
+        val uriText = game.uri
 
         // 1) 首选 SAF documentId → 文件路径映射（兼容 child 子目录 document uri）
         EngineScanner.safUriToPath(uriText)?.let { mapped ->

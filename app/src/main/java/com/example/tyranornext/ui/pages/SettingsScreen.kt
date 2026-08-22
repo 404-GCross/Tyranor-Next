@@ -1,5 +1,9 @@
 package com.example.tyranornext.ui.pages
 
+import android.app.Activity
+import android.app.ActivityOptions
+import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -22,11 +26,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Save
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -45,11 +49,43 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.tyranornext.settings.EngineSettingsStore
+import com.example.tyranornext.theme.NavWhite
 import java.io.File
 
-/** 设置页：统一配置各引擎（KRKR / ONS / Artemis / Tyrano）的全局默认设置。 */
+/** 设置页：只展示各引擎全局设置入口，具体设置内容由独立 Activity 承载。 */
 @Composable
 fun SettingsScreen(modifier: Modifier = Modifier) {
+    val ctx = LocalContext.current
+
+    Column(modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxWidth().statusBarsPadding()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("设置", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+            }
+        }
+
+        androidx.compose.foundation.lazy.LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+            contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            EngineSettingsKind.entries.forEach { kind ->
+                item {
+                    SettingsEntryCard(kind.title) {
+                        startActivityWithFade(ctx, EngineSettingsActivity.createIntent(ctx, kind))
+                    }
+                }
+            }
+            item { Box(Modifier.fillMaxWidth().height(WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding())) }
+        }
+    }
+}
+
+@Composable
+internal fun EngineSettingsDetailScreen(kind: EngineSettingsKind, onBack: () -> Unit) {
     val ctx = LocalContext.current
 
     var krVersion by remember { mutableStateOf(EngineSettingsStore.getKrEngineVersion(ctx)) }
@@ -110,14 +146,16 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
         EngineSettingsStore.setTyranoScopedSaveDir(ctx, tyScoped)
     }
 
-    Column(modifier.fillMaxSize()) {
-        // 顶部栏：标题居左 + 右侧保存按钮
+    Column(Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxWidth().statusBarsPadding()) {
             Row(
-                modifier = Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 16.dp),
+                modifier = Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("设置", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+                IconButton(onClick = onBack) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回", tint = MaterialTheme.colorScheme.onSurface)
+                }
+                Text(kind.title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 IconButton(onClick = {
                     saveAll()
                     android.widget.Toast.makeText(ctx, "引擎设置已保存", android.widget.Toast.LENGTH_SHORT).show()
@@ -128,6 +166,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
         }
 
         LazyListPlaceholder(
+            kind,
             krVersion, krKernel, krScoped, krFont, krForceFont, krRenderer, krDrawThread,
             krSwCompress, krOglCompress, krMem, krTexsize, krAccurate, krFps, isSdl3, krIs134126,
             ons, artVersion, artRotate, artPatch, tyExternal, tyScoped, fontLauncher,
@@ -154,11 +193,55 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
     }
 }
 
+enum class EngineSettingsKind(val title: String) {
+    KRKR("KRKR引擎设置"),
+    ONS("ONS引擎设置"),
+    ARTEMIS("Artemis引擎设置"),
+    TYRANO("Tyrano引擎设置"),
+}
+
+@Composable
+private fun SettingsEntryCard(title: String, onClick: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        colors = CardDefaults.cardColors(containerColor = NavWhite),
+        shape = RoundedCornerShape(8.dp),
+    ) {
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 18.5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(title, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+            Icon(
+                Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+private fun startActivityWithFade(context: Context, intent: Intent) {
+    if (context is Activity) {
+        val options = ActivityOptions.makeCustomAnimation(
+            context,
+            android.R.anim.fade_in,
+            android.R.anim.fade_out,
+        )
+        context.startActivity(intent, options.toBundle())
+    } else {
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        context.startActivity(intent)
+    }
+}
+
 // 占位，实际列表在下方 LazyListPlaceholder 中
 private typealias FontPickerLauncher = androidx.activity.compose.ManagedActivityResultLauncher<String, Uri?>
 
 @Composable
 private fun LazyListPlaceholder(
+    kind: EngineSettingsKind,
     krVersion: String, krKernel: String, krScoped: Boolean, krFont: String, krForceFont: Boolean,
     krRenderer: String, krDrawThread: String, krSwCompress: String, krOglCompress: String,
     krMem: String, krTexsize: String, krAccurate: String, krFps: String, isSdl3: Boolean, krIs134126: Boolean,
@@ -177,8 +260,8 @@ private fun LazyListPlaceholder(
         contentPadding = PaddingValues(top = 4.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        item {
-            EngineCard("KRKR", "KRKR", "Kirikiri2 · 吉里吉里") {
+        if (kind == EngineSettingsKind.KRKR) item {
+            EngineCard("KRKR") {
                 ListSwitch("独立存档目录", krScoped, onKrScoped)
                 SingleChoiceRow("引擎版本", optionLabel(krVersion, KR_SELECT_MAP), KR_SELECT_MAP, krVersion, onKrVersion)
                 SingleChoiceRow(
@@ -219,8 +302,8 @@ private fun LazyListPlaceholder(
             }
         }
 
-        item {
-            EngineCard("ONS", "ONS", "ONScripter · Yuri") {
+        if (kind == EngineSettingsKind.ONS) item {
+            EngineCard("ONS") {
                 ListSwitch("独立存档目录", ons.scopedSaveDir) { b -> onOns(ons.copy(scopedSaveDir = b)) }
                 ListSwitch("全屏拉伸", ons.stretchFull) { b -> onOns(ons.copy(stretchFull = b)) }
                 ListSwitch("忽略刘海", ons.ignoreCutout) { b -> onOns(ons.copy(ignoreCutout = b)) }
@@ -240,49 +323,39 @@ private fun LazyListPlaceholder(
             }
         }
 
-        item {
-            EngineCard("Artemis", "Artemis", "Artemis · 红茶") {
+        if (kind == EngineSettingsKind.ARTEMIS) item {
+            EngineCard("Artemis") {
                 SingleChoiceRow("引擎版本", artVersionLabel(artVersion), ART_VERSION_MAP, artVersion, onArtVersion)
                 ListSwitch("画面反转", artRotate, onArtRotate)
                 SingleChoiceRow("自动补丁", artPatchLabel(artPatch), ART_PATCH_MAP, artPatch, onArtPatch)
             }
         }
 
-        item {
-            EngineCard("Tyrano", "Tyrano", "TyranoScript · 网页脚本") {
+        if (kind == EngineSettingsKind.TYRANO) item {
+            EngineCard("Tyrano") {
                 ListSwitch("允许加载外部网络资源", tyExternal, onTyExternal)
                 ListSwitch("独立存档目录", tyScoped, onTyScoped)
             }
         }
 
-        item {
-            Text(
-                "引擎设置保存后，启动对应引擎的游戏时自动生效。",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp),
-            )
-        }
         item { Box(Modifier.fillMaxWidth().height(WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding())) }
     }
 }
 
 @Composable
-private fun EngineCard(title: String, header: String, subtitle: String, content: @Composable () -> Unit) {
+private fun EngineCard(header: String, content: @Composable () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        colors = CardDefaults.cardColors(containerColor = NavWhite),
+        shape = RoundedCornerShape(8.dp),
     ) {
         Column(Modifier.padding(vertical = 6.dp)) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(header, style = MaterialTheme.typography.titleMedium)
-                    Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-            HorizontalDivider(Modifier.padding(start = 16.dp), thickness = 0.5.dp)
             content()
         }
     }
@@ -324,14 +397,14 @@ private fun SingleChoiceRow(
         )
     }
     if (open) {
-        AlertDialog(
+        AppAlertDialog(
             onDismissRequest = { open = false },
-            title = { Text(label) },
+            title = { Text(label, style = MaterialTheme.typography.titleMedium) },
             text = {
                 Column(Modifier.verticalScroll(rememberScrollState())) {
                     options.forEach { (k, optionLabel) ->
                         Row(
-                            Modifier.fillMaxWidth().clickable { onSelect(k); open = false }.padding(vertical = 8.dp),
+                            Modifier.fillMaxWidth().clickable { onSelect(k); open = false }.padding(vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             RadioButton(selected = k == current, onClick = { onSelect(k); open = false })
@@ -364,15 +437,15 @@ private fun FontRow(label: String, value: String, onReset: () -> Unit, onPick: (
         )
     }
     if (open) {
-        AlertDialog(
+        AppAlertDialog(
             onDismissRequest = { open = false },
-            title = { Text(label) },
+            title = { Text(label, style = MaterialTheme.typography.titleMedium) },
             text = {
                 Column {
-                    Row(Modifier.fillMaxWidth().clickable { onReset(); open = false }.padding(vertical = 10.dp)) {
+                    Row(Modifier.fillMaxWidth().clickable { onReset(); open = false }.padding(vertical = 8.dp)) {
                         Text("使用内置字体", style = MaterialTheme.typography.bodyLarge)
                     }
-                    Row(Modifier.fillMaxWidth().clickable { open = false; onPick() }.padding(vertical = 10.dp)) {
+                    Row(Modifier.fillMaxWidth().clickable { open = false; onPick() }.padding(vertical = 8.dp)) {
                         Text("选择字体文件…", style = MaterialTheme.typography.bodyLarge)
                     }
                 }

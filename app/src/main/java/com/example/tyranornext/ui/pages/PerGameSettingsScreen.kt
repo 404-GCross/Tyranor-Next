@@ -11,20 +11,16 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Save
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -46,6 +42,7 @@ import com.example.tyranornext.scanner.EngineType
 import com.example.tyranornext.scanner.ScanGame
 import com.example.tyranornext.settings.EngineSettingsStore
 import com.example.tyranornext.settings.PerGameSettingsStore
+import com.example.tyranornext.theme.NavWhite
 import org.json.JSONObject
 
 /**
@@ -96,6 +93,12 @@ fun PerGameSettingsScreen(game: ScanGame, onBack: () -> Unit) {
     val globalKrFont = EngineSettingsStore.getKrDefaultFont(ctx)
     val globalForce = EngineSettingsStore.isKrForceDefaultFont(ctx)
     val globalRenderer = EngineSettingsStore.getKrRenderer(ctx)
+    val globalOns = remember { EngineSettingsStore.loadOns(ctx) }
+    val globalArtVersion = EngineSettingsStore.getArtEngineVersion(ctx)
+    val globalArtRotate = EngineSettingsStore.isArtRotateScreen(ctx)
+    val globalArtPatch = EngineSettingsStore.getArtAutoPatch(ctx)
+    val globalTyExternal = EngineSettingsStore.isTyranoExternalNetwork(ctx)
+    val globalTyScoped = EngineSettingsStore.isTyranoScopedSaveDir(ctx)
 
     val isSdl3 = (krKernel ?: globalKrKernel) == EngineSettingsStore.KERNEL_KRKRSDL3
     val effVersion = krVersion ?: globalKrVersion
@@ -130,7 +133,7 @@ fun PerGameSettingsScreen(game: ScanGame, onBack: () -> Unit) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.Filled.ArrowBack, contentDescription = "返回", tint = MaterialTheme.colorScheme.onSurface)
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回", tint = MaterialTheme.colorScheme.onSurface)
                 }
                 Text(game.title, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                 IconButton(onClick = { save(); android.widget.Toast.makeText(ctx, "已保存", android.widget.Toast.LENGTH_SHORT).show() }) {
@@ -139,9 +142,13 @@ fun PerGameSettingsScreen(game: ScanGame, onBack: () -> Unit) {
             }
         }
 
-        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+            contentPadding = PaddingValues(top = 16.dp, bottom = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
             when (game.engine) {
-                EngineType.KIRIKIRI -> {
+                EngineType.KIRIKIRI -> item {
                     SectionCard("KRKR") {
                         OverrideSwitch("独立存档目录", globalKrScoped, krScoped) { krScoped = it }
                         OverrideChoice("引擎版本", KR_VERSION_MAP2, globalKrVersion, krVersion) { krVersion = it }
@@ -155,34 +162,32 @@ fun PerGameSettingsScreen(game: ScanGame, onBack: () -> Unit) {
                         }
                     }
                 }
-                EngineType.ONS -> {
+                EngineType.ONS -> item {
                     SectionCard("ONS") {
-                        OverrideSwitch("独立存档目录", EngineSettingsStore.loadOns(ctx).scopedSaveDir, onsScoped) { onsScoped = it }
-                        OverrideSwitch("全屏拉伸", EngineSettingsStore.loadOns(ctx).stretchFull, onsStretch) { onsStretch = it }
-                        OverrideSwitch("忽略刘海", EngineSettingsStore.loadOns(ctx).ignoreCutout, onsCutout) { onsCutout = it }
-                        OverrideSwitch("禁用视频", EngineSettingsStore.loadOns(ctx).disableVideo, onsNoVideo) { onsNoVideo = it }
-                        OverrideSwitch("画面锐化", EngineSettingsStore.loadOns(ctx).sharpness, onsSharp) { onsSharp = it }
-                        OverrideChoice("文本编码", mapOf("gbk" to "GBK", "sjis" to "Shift-JIS", "utf8" to "UTF-8"), EngineSettingsStore.loadOns(ctx).encoding.decode(), onsEnc) { onsEnc = it }
+                        OverrideSwitch("独立存档目录", globalOns.scopedSaveDir, onsScoped) { onsScoped = it }
+                        OverrideSwitch("全屏拉伸", globalOns.stretchFull, onsStretch) { onsStretch = it }
+                        OverrideSwitch("忽略刘海", globalOns.ignoreCutout, onsCutout) { onsCutout = it }
+                        OverrideSwitch("禁用视频", globalOns.disableVideo, onsNoVideo) { onsNoVideo = it }
+                        OverrideSwitch("画面锐化", globalOns.sharpness, onsSharp) { onsSharp = it }
+                        OverrideChoice("文本编码", ONS_ENCODING_MAP2, globalOns.encoding.decode(), onsEnc) { onsEnc = it }
                     }
                 }
-                EngineType.ARTEMIS -> {
+                EngineType.ARTEMIS -> item {
                     SectionCard("Artemis") {
-                        OverrideChoice("引擎版本", ART_VERSION_MAP2, EngineSettingsStore.getArtEngineVersion(ctx), artVersion) { artVersion = it }
-                        OverrideSwitch("画面反转", EngineSettingsStore.isArtRotateScreen(ctx), artRotate) { artRotate = it }
-                        OverrideChoice("自动补丁", ART_PATCH_MAP2, EngineSettingsStore.getArtAutoPatch(ctx), artPatch) { artPatch = it }
+                        OverrideChoice("引擎版本", ART_VERSION_MAP2, globalArtVersion, artVersion) { artVersion = it }
+                        OverrideSwitch("画面反转", globalArtRotate, artRotate) { artRotate = it }
+                        OverrideChoice("自动补丁", ART_PATCH_MAP2, globalArtPatch, artPatch) { artPatch = it }
                     }
                 }
-                EngineType.TYRANO, EngineType.UNKNOWN -> {
+                EngineType.TYRANO, EngineType.UNKNOWN -> item {
                     SectionCard("Tyrano") {
-                        OverrideSwitch("允许外部网络", EngineSettingsStore.isTyranoExternalNetwork(ctx), tyExternal) { tyExternal = it }
-                        OverrideSwitch("独立存档目录", EngineSettingsStore.isTyranoScopedSaveDir(ctx), tyScoped) { tyScoped = it }
+                        OverrideSwitch("允许外部网络", globalTyExternal, tyExternal) { tyExternal = it }
+                        OverrideSwitch("独立存档目录", globalTyScoped, tyScoped) { tyScoped = it }
                     }
                 }
             }
 
-            CountdownFooter("覆盖配置与全局默认合并生效。")
-
-            Box(Modifier.fillMaxWidth().navigationBarsPadding().height(12.dp))
+            item { Box(Modifier.fillMaxWidth().navigationBarsPadding().height(12.dp)) }
         }
     }
 }
@@ -195,15 +200,14 @@ private fun navigationBarsPadding(): Int = 24
 private fun SectionCard(title: String, content: @Composable () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        colors = CardDefaults.cardColors(containerColor = NavWhite),
+        shape = RoundedCornerShape(8.dp),
     ) {
         Column(Modifier.padding(vertical = 6.dp)) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)) {
                 Text(title, style = MaterialTheme.typography.titleMedium)
             }
-            HorizontalDivider(Modifier.padding(start = 16.dp), thickness = 0.5.dp)
             content()
         }
     }
@@ -232,19 +236,23 @@ private fun OverrideChoice(label: String, options: Map<String, String>, global: 
         )
     }
     if (open) {
-        AlertDialog(
+        AppAlertDialog(
             onDismissRequest = { open = false },
-            title = { Text(label) },
+            title = { Text(label, style = MaterialTheme.typography.titleMedium) },
             text = {
-                Column(Modifier.verticalScroll(rememberScrollState())) {
-                    Row(Modifier.fillMaxWidth().clickable { onSet(null); open = false }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        RadioButton(selected = following, onClick = { onSet(null); open = false })
-                        Text("跟随全局 · ${labelOf(global, options)}", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(start = 8.dp))
+                LazyColumn {
+                    item {
+                        Row(Modifier.fillMaxWidth().clickable { onSet(null); open = false }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(selected = following, onClick = { onSet(null); open = false })
+                            Text("跟随全局 · ${labelOf(global, options)}", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(start = 8.dp))
+                        }
                     }
                     options.forEach { (k, text) ->
-                        Row(Modifier.fillMaxWidth().clickable { onSet(k); open = false }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                            RadioButton(selected = !following && override == k, onClick = { onSet(k); open = false })
-                            Text(text, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(start = 8.dp))
+                        item(key = k) {
+                            Row(Modifier.fillMaxWidth().clickable { onSet(k); open = false }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                RadioButton(selected = !following && override == k, onClick = { onSet(k); open = false })
+                                Text(text, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(start = 8.dp))
+                            }
                         }
                     }
                 }
@@ -277,9 +285,9 @@ private fun OverrideSwitch(label: String, global: Boolean, override: Boolean?, o
         )
     }
     if (open) {
-        AlertDialog(
+        AppAlertDialog(
             onDismissRequest = { open = false },
-            title = { Text(label) },
+            title = { Text(label, style = MaterialTheme.typography.titleMedium) },
             text = {
                 Column {
                     OverrideRadio("跟随全局（${if (global) "开" else "关"}）", override == null) { onSet(null); open = false }
@@ -310,7 +318,7 @@ private fun OverrideFont(label: String, global: String, override: String?, onRes
     ) {
         Column(Modifier.weight(1f)) { Text(label, style = MaterialTheme.typography.bodyLarge) }
         Text(
-            if (following) "跟随全局（${global.ifEmpty { "内置字体" }}）" else override!!.ifEmpty { "内置字体" },
+            if (following) "跟随全局（${global.ifEmpty { "内置字体" }}）" else override.ifEmpty { "内置字体" },
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
@@ -319,23 +327,18 @@ private fun OverrideFont(label: String, global: String, override: String?, onRes
         )
     }
     if (open) {
-        AlertDialog(
+        AppAlertDialog(
             onDismissRequest = { open = false },
-            title = { Text(label) },
+            title = { Text(label, style = MaterialTheme.typography.titleMedium) },
             text = {
                 Column {
-                    Row(Modifier.fillMaxWidth().clickable { onReset(); open = false }.padding(vertical = 10.dp)) { Text("跟随全局", style = MaterialTheme.typography.bodyLarge) }
-                    Row(Modifier.fillMaxWidth().clickable { open = false; onPick() }.padding(vertical = 10.dp)) { Text("选择字体文件…", style = MaterialTheme.typography.bodyLarge) }
+                    Row(Modifier.fillMaxWidth().clickable { onReset(); open = false }.padding(vertical = 8.dp)) { Text("跟随全局", style = MaterialTheme.typography.bodyLarge) }
+                    Row(Modifier.fillMaxWidth().clickable { open = false; onPick() }.padding(vertical = 8.dp)) { Text("选择字体文件…", style = MaterialTheme.typography.bodyLarge) }
                 }
             },
             confirmButton = { TextButton(onClick = { open = false }) { Text("取消") } },
         )
     }
-}
-
-@Composable
-private fun CountdownFooter(text: String) {
-    Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
 private fun labelOf(v: String, map: Map<String, String>): String = map[v] ?: v.ifEmpty { "内置字体" }
@@ -370,6 +373,7 @@ private val KR_RENDERER_MAP2 = mapOf(
     EngineSettingsStore.RENDERER_SOFTWARE to "软件渲染",
     EngineSettingsStore.RENDERER_OPENGL to "OpenGL",
 )
+private val ONS_ENCODING_MAP2 = mapOf("gbk" to "GBK", "sjis" to "Shift-JIS", "utf8" to "UTF-8")
 private val ART_VERSION_MAP2 = mapOf(
     EngineSettingsStore.ART_ENGINE_AUTO to "自动",
     EngineSettingsStore.ART_ENGINE_V1 to "V1",

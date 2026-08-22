@@ -3,7 +3,7 @@ package com.example.tyranornext.theme
 import androidx.compose.ui.graphics.Color
 
 // 主色
-val Blue40 = Color(0xFF2F5E9E)
+val Blue40 = Color(0xFF307DEF)
 val Teal40 = Color(0xFF2E7D78)
 val Amber40 = Color(0xFF9A6C1A)
 

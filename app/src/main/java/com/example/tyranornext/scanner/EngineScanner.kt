@@ -17,6 +17,7 @@ object EngineScanner {
     private const val PREFS = "game_scanner"
     private const val KEY_ROOTS = "scan_roots"      // uri 按换行分隔
     private const val KEY_GAMES = "scan_games"      // 已有游戏 entry，按行；每行字段用 \u0001 分隔
+    private const val KEY_RECENT_GAMES = "recent_games"
 
     /**
      * 将 SAF tree/document URI 映射为真实文件路径（用于引擎 native 启动）。
@@ -66,11 +67,7 @@ object EngineScanner {
     // ============ 游戏结果持久化 ============
 
     fun saveGames(context: Context, games: List<ScanGame>) {
-        val str = games.joinToString("\n") { g ->
-            listOf(
-                g.title, g.uri, g.engine.name, g.launchTarget, g.coverUri.orEmpty(),
-            ).joinToString("\u0001")
-        }
+        val str = games.joinToString("\n") { serializeGame(it) }
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit().putString(KEY_GAMES, str).apply()
     }
@@ -78,17 +75,50 @@ object EngineScanner {
     fun loadGames(context: Context): List<ScanGame> {
         val raw = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .getString(KEY_GAMES, null) ?: return emptyList()
-        return raw.split("\n").mapNotNull { line ->
-            val p = line.split("\u0001")
-            if (p.size < 3) return@mapNotNull null
-            ScanGame(
-                title = p[0],
-                uri = p[1],
-                engine = runCatching { EngineType.valueOf(p[2]) }.getOrDefault(EngineType.UNKNOWN),
-                launchTarget = p.getOrElse(3) { "" },
-                coverUri = p.getOrElse(4) { "" }.takeIf { it.isNotBlank() },
-            )
-        }
+        return raw.split("\n").mapNotNull { parseGame(it) }
+    }
+
+    fun recordRecentGame(context: Context, game: ScanGame) {
+        val next = (listOf(game) + loadRecentGames(context).filterNot { it.uri == game.uri }).take(20)
+        saveRecentGames(context, next)
+    }
+
+    fun loadRecentGames(context: Context): List<ScanGame> {
+        val raw = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getString(KEY_RECENT_GAMES, null) ?: return emptyList()
+        return raw.split("\n").mapNotNull { parseGame(it) }
+    }
+
+    private fun saveRecentGames(context: Context, games: List<ScanGame>) {
+        val str = games.joinToString("\n") { serializeGame(it) }
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit().putString(KEY_RECENT_GAMES, str).apply()
+    }
+
+    private fun serializeGame(g: ScanGame): String {
+        return listOf(
+            g.title,
+            g.uri,
+            g.engine.name,
+            g.launchTarget,
+            g.coverUri.orEmpty(),
+            g.vndbId.orEmpty(),
+            g.metadataTitle.orEmpty(),
+        ).joinToString("\u0001")
+    }
+
+    private fun parseGame(line: String): ScanGame? {
+        val p = line.split("\u0001")
+        if (p.size < 3) return null
+        return ScanGame(
+            title = p[0],
+            uri = p[1],
+            engine = runCatching { EngineType.valueOf(p[2]) }.getOrDefault(EngineType.UNKNOWN),
+            launchTarget = p.getOrElse(3) { "" },
+            coverUri = p.getOrElse(4) { "" }.takeIf { it.isNotBlank() },
+            vndbId = p.getOrElse(5) { "" }.takeIf { it.isNotBlank() },
+            metadataTitle = p.getOrElse(6) { "" }.takeIf { it.isNotBlank() },
+        )
     }
 
     // ============ 扫描根目录持久化 ============
