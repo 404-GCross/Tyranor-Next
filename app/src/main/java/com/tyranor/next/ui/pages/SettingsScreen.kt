@@ -22,8 +22,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -198,7 +196,7 @@ internal fun EngineSettingsDetailScreen(kind: EngineSettingsKind) {
                                 saveAll()
                                 android.widget.Toast.makeText(ctx, "引擎设置已保存", android.widget.Toast.LENGTH_SHORT).show()
                             }) {
-                                Icon(Icons.Filled.Save, contentDescription = "保存设置", tint = MiuixTheme.colorScheme.primary)
+                                Icon(painterResource(R.drawable.ic_save), contentDescription = "保存设置", tint = MiuixTheme.colorScheme.primary)
                             }
                         }
                     }
