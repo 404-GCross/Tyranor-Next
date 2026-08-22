@@ -14,7 +14,7 @@
 ## 页面顶部栏统一规范
 
 所有页面（首页 / 游戏 / 书库 / 设置）的顶部栏必须统一，规则如下。当前已由统一入口
-`com.example.tyranornext.ui.pages.PlaceholderPage` 实现，新页面应复用或遵循同等效果。
+`com.tyranor.next.ui.pages.PlaceholderPage` 实现，新页面应复用或遵循同等效果。
 
 ### 1. 结构
 

@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.tyranornext"
+    namespace = "com.tyranor.next"
     // miuix 0.9.2 传递依赖要求 compileSdk 37（本地平台为 android-37.0）
     compileSdk {
         version = release(37) {
@@ -13,7 +13,7 @@ android {
         }
     }
     defaultConfig {
-        applicationId = "com.example.tyranornext"
+        applicationId = "com.tyranor.next"
         minSdk = 26
         targetSdk = 36
         versionCode = 1
