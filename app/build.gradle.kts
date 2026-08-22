@@ -24,6 +24,8 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
+            // 临时：用 debug 签名，便于 R8 包直接安装实机调试；正式发布应替换为正式 keystore
+            signingConfig = signingConfigs.getByName("debug")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
