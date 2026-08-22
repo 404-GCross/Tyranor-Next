@@ -209,48 +209,51 @@ private fun GameLibraryContent(
     onGameClick: (ScanGame) -> Unit,
 ) {
     Column(modifier.fillMaxSize()) {
-        // ===== 顶部栏：标题居左 + 右侧两个图标按钮 =====
-        Column(modifier = Modifier.fillMaxWidth().statusBarsPadding()) {
-            Row(
-                modifier = Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    "游戏",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f),
-                )
-                Icon(
-                    Icons.Filled.CloudDownload,
-                    contentDescription = "自动获取封面",
-                    tint = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier
-                        .size(31.dp)
-                        .clip(RoundedCornerShape(6.dp))
-                        .clickable { syncMissingCovers() }
-                        .padding(4.dp),
-                )
-                Icon(
-                    Icons.Filled.FolderOpen,
-                    contentDescription = "添加文件夹",
-                    tint = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier
-                        .size(31.dp)
-                        .clip(RoundedCornerShape(6.dp))
-                        .clickable { dirPickerLaunch() }
-                        .padding(4.dp),
-                )
-                Icon(
-                    Icons.Filled.Refresh,
-                    contentDescription = "扫描游戏",
-                    tint = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier
-                        .size(31.dp)
-                        .clip(RoundedCornerShape(6.dp))
-                        .clickable { refreshGames() }
-                        .padding(4.dp),
-                )
+        // ===== 顶部栏：页面背景色，标题居左 + 右侧三个图标按钮 =====
+        Column(modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background)) {
+            Column(modifier = Modifier.fillMaxWidth().statusBarsPadding()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        "游戏",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Icon(
+                        Icons.Filled.CloudDownload,
+                        contentDescription = "自动获取封面",
+                        tint = MaterialTheme.colorScheme.onBackground,
+                        modifier = Modifier
+                            .size(31.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .clickable { syncMissingCovers() }
+                            .padding(4.dp),
+                    )
+                    Icon(
+                        Icons.Filled.FolderOpen,
+                        contentDescription = "添加文件夹",
+                        tint = MaterialTheme.colorScheme.onBackground,
+                        modifier = Modifier
+                            .size(31.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .clickable { dirPickerLaunch() }
+                            .padding(4.dp),
+                    )
+                    Icon(
+                        Icons.Filled.Refresh,
+                        contentDescription = "扫描游戏",
+                        tint = MaterialTheme.colorScheme.onBackground,
+                        modifier = Modifier
+                            .size(31.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .clickable { refreshGames() }
+                            .padding(4.dp),
+                    )
+                }
             }
         }
 

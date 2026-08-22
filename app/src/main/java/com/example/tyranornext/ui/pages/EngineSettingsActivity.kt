@@ -18,14 +18,8 @@ class EngineSettingsActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         enableEdgeToEdge(
-            statusBarStyle = androidx.activity.SystemBarStyle.light(
-                Color.TRANSPARENT,
-                Color.TRANSPARENT,
-            ),
-            navigationBarStyle = androidx.activity.SystemBarStyle.light(
-                Color.TRANSPARENT,
-                Color.TRANSPARENT,
-            ),
+            statusBarStyle = androidx.activity.SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
+            navigationBarStyle = androidx.activity.SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
         )
         @Suppress("DEPRECATION")
         window.statusBarColor = Color.TRANSPARENT

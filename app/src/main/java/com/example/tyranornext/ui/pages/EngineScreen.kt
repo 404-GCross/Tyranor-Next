@@ -1,6 +1,7 @@
 package com.example.tyranornext.ui.pages
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -39,13 +40,15 @@ fun EngineScreen(modifier: Modifier = Modifier) {
     val engines = EngineLauncher.supportedEngines
 
     Column(modifier.fillMaxSize()) {
-        // 顶部栏：标题居左
-        Column(modifier = Modifier.fillMaxWidth().statusBarsPadding()) {
-            Column(
-                modifier = Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.Center,
-            ) {
-                Text("引擎", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        // 顶部栏：页面背景色，标题居左
+        Column(modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background)) {
+            Column(modifier = Modifier.fillMaxWidth().statusBarsPadding()) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    Text("引擎", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+                }
             }
         }
 

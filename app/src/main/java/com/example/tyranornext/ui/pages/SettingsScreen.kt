@@ -9,6 +9,7 @@ import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -173,24 +174,27 @@ internal fun EngineSettingsDetailScreen(kind: EngineSettingsKind) {
             containerColor = MiuixTheme.colorScheme.background,
             contentWindowInsets = WindowInsets(0.dp),
             topBar = {
-                Column(modifier = Modifier.fillMaxWidth().statusBarsPadding()) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            kind.title,
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.weight(1f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        IconButton(onClick = {
-                            saveAll()
-                            android.widget.Toast.makeText(ctx, "引擎设置已保存", android.widget.Toast.LENGTH_SHORT).show()
-                        }) {
-                            Icon(Icons.Filled.Save, contentDescription = "保存设置", tint = MaterialTheme.colorScheme.onSurface)
+                Column(modifier = Modifier.fillMaxWidth().background(MiuixTheme.colorScheme.background)) {
+                    Column(modifier = Modifier.fillMaxWidth().statusBarsPadding()) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                kind.title,
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = MiuixTheme.colorScheme.onBackground,
+                                modifier = Modifier.weight(1f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            IconButton(onClick = {
+                                saveAll()
+                                android.widget.Toast.makeText(ctx, "引擎设置已保存", android.widget.Toast.LENGTH_SHORT).show()
+                            }) {
+                                Icon(Icons.Filled.Save, contentDescription = "保存设置", tint = MiuixTheme.colorScheme.onBackground)
+                            }
                         }
                     }
                 }
@@ -233,15 +237,17 @@ enum class EngineSettingsKind(val title: String, val icon: ImageVector) {
     TYRANO("Tyrano引擎设置", Icons.Rounded.Web),
 }
 
-/** 顶部栏：遵守全局规范（Column + statusBarsPadding + 64dp 标题区，透明背景）。 */
+/** 顶部栏：遵守全局规范（Column + 页面背景色 + statusBarsPadding + 64dp 标题区，沉浸式）。 */
 @Composable
 private fun SettingsTopBar(title: String) {
-    Column(modifier = Modifier.fillMaxWidth().statusBarsPadding()) {
-        Row(
-            modifier = Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+    Column(modifier = Modifier.fillMaxWidth().background(MiuixTheme.colorScheme.background)) {
+        Column(modifier = Modifier.fillMaxWidth().statusBarsPadding()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MiuixTheme.colorScheme.onBackground, modifier = Modifier.weight(1f))
+            }
         }
     }
 }

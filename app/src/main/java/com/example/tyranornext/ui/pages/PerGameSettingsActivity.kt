@@ -20,14 +20,8 @@ class PerGameSettingsActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         enableEdgeToEdge(
-            statusBarStyle = androidx.activity.SystemBarStyle.light(
-                Color.TRANSPARENT,
-                Color.TRANSPARENT,
-            ),
-            navigationBarStyle = androidx.activity.SystemBarStyle.light(
-                Color.TRANSPARENT,
-                Color.TRANSPARENT,
-            ),
+            statusBarStyle = androidx.activity.SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
+            navigationBarStyle = androidx.activity.SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
         )
         window.statusBarColor = Color.TRANSPARENT
         window.navigationBarColor = Color.TRANSPARENT

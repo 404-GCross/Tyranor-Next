@@ -11,6 +11,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -172,19 +173,22 @@ private fun SaveManagementScreen(game: ScanGame) {
     }
 
     Column(Modifier.fillMaxSize()) {
-        Column(modifier = Modifier.fillMaxWidth().statusBarsPadding()) {
-            Row(
-                modifier = Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    "存档管理",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+        Column(modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background)) {
+            Column(modifier = Modifier.fillMaxWidth().statusBarsPadding()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        "存档管理",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        modifier = Modifier.weight(1f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
         }
 

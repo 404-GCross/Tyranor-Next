@@ -35,25 +35,30 @@
 
 ### 4. 背景色
 
-- 顶部栏**不设置任何独立背景色**（透明），与页面背景 `colorScheme.background` 保持一致。
-- 禁止给顶部栏单独填充 `surfaceContainer` / 其他色值。
+- 顶部栏**使用页面背景色 `colorScheme.background`（不透明）**（`Modifier.background(colorScheme.background)`），标题与图标统一使用 `colorScheme.onBackground`。
+- 禁止使用主题色 `primary` 作为顶部栏背景。
 
-### 5. 状态栏沉浸
+### 5. 状态栏
 
-- 状态栏必须是**透明沉浸式**，跟随页面背景色（`MainActivity` 已通过
-  `enableEdgeToEdge(..., SystemBarStyle.light(TRANSPARENT, TRANSPARENT))` 配置）。
-- 顶部栏需使用 `Modifier.statusBarsPadding()`，使其标题内容避开状态栏但不产生异色区域。
+- 状态栏必须是**透明沉浸式**（`window.statusBarColor = Color.TRANSPARENT`），顶部栏的
+  页面背景色向上延伸覆盖状态栏区域。
+- 状态栏/导航栏图标使用**深色**（`SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)`），因为页面背景为浅色。
+- 顶部栏需使用 `Modifier.statusBarsPadding()`，使标题内容避开状态栏但背景色连续延伸。
 - 不要自行给状态栏设置非透明背景色。
 
 ### 6. 位置顺序
 
 ```
-Column(fillMaxSize)                 // 页面根
-├── 顶部栏
-│   ├── Column(statusBarsPadding)   // 避开状态栏
+Column(fillMaxSize)                                // 页面根
+├── Column(fillMaxWidth, background(background))    // 页面背景色容器（不透明）
+│   ├── Column(statusBarsPadding)                    // 避开状态栏（背景延伸至状态栏）
 │   └── Column(height 64dp, padding horizontal 16dp)  // 标题区
 └── 正文内容
 ```
+
+> 设置类页面若使用 `MiuixScaffold`，顶部栏在 `topBar` 槽中按同样规则实现：
+> `Column(background(background)) { Column(statusBarsPadding) { Row(height 64dp, padding horizontal 16dp) { ... } } }`，
+> 并设 `contentWindowInsets = WindowInsets(0.dp)` 避免系统 inset 再次叠加间距。
 
 ---
 

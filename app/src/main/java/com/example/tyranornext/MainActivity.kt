@@ -22,17 +22,11 @@ class MainActivity : ComponentActivity() {
     }.apply { isDaemon = true }.start()
 
     enableEdgeToEdge(
-      statusBarStyle = androidx.activity.SystemBarStyle.light(
-        android.graphics.Color.TRANSPARENT,
-        android.graphics.Color.TRANSPARENT,
-      ),
-      navigationBarStyle = androidx.activity.SystemBarStyle.light(
-        android.graphics.Color.TRANSPARENT,
-        android.graphics.Color.TRANSPARENT,
-      ),
+      statusBarStyle = androidx.activity.SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT),
+      navigationBarStyle = androidx.activity.SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT),
     )
 
-    // 状态栏/导航栏透明，让顶部栏(surfaceContainer)与底部导航栏背景向上向下延伸成沉浸式
+    // 状态栏/导航栏透明沉浸，顶部栏(页面背景色)与底部导航背景向上/向下延伸
     window.statusBarColor = Color.TRANSPARENT
     window.navigationBarColor = Color.TRANSPARENT
 

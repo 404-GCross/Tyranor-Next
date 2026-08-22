@@ -1,5 +1,6 @@
 package com.example.tyranornext.ui.pages
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,12 +41,14 @@ fun HomeScreen(modifier: Modifier = Modifier) {
     }
 
     Column(modifier.fillMaxSize()) {
-        Column(modifier = Modifier.fillMaxWidth().statusBarsPadding()) {
-            Column(
-                modifier = Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.Center,
-            ) {
-                Text("首页", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Column(modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background)) {
+            Column(modifier = Modifier.fillMaxWidth().statusBarsPadding()) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    Text("首页", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+                }
             }
         }
 

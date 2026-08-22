@@ -2,29 +2,26 @@ package com.example.tyranornext.ui.pages
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Save
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -42,8 +39,13 @@ import com.example.tyranornext.scanner.EngineType
 import com.example.tyranornext.scanner.ScanGame
 import com.example.tyranornext.settings.EngineSettingsStore
 import com.example.tyranornext.settings.PerGameSettingsStore
-import com.example.tyranornext.theme.NavWhite
+import com.example.tyranornext.theme.MiuixSettingsTheme
 import org.json.JSONObject
+import top.yukonga.miuix.kmp.basic.Card as MiuixCard
+import top.yukonga.miuix.kmp.basic.Scaffold as MiuixScaffold
+import top.yukonga.miuix.kmp.preference.ArrowPreference
+import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
  * 单游戏（应用级）引擎设置页。每项基于「覆盖 ?: 全局」，可单独切回“跟随全局”。
@@ -126,80 +128,85 @@ fun PerGameSettingsScreen(game: ScanGame) {
         PerGameSettingsStore.setBool(ctx, gid, "ty_scoped", tyScoped)
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        Column(modifier = Modifier.fillMaxWidth().statusBarsPadding()) {
-            Row(
-                modifier = Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(game.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                IconButton(onClick = { save(); android.widget.Toast.makeText(ctx, "已保存", android.widget.Toast.LENGTH_SHORT).show() }) {
-                    Icon(Icons.Filled.Save, contentDescription = "保存", tint = MaterialTheme.colorScheme.onSurface)
-                }
-            }
-        }
-
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
-            contentPadding = PaddingValues(top = 16.dp, bottom = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            when (game.engine) {
-                EngineType.KIRIKIRI -> item {
-                    SectionCard("KRKR") {
-                        OverrideSwitch("独立存档目录", globalKrScoped, krScoped) { krScoped = it }
-                        OverrideChoice("引擎版本", KR_VERSION_MAP2, globalKrVersion, krVersion) { krVersion = it }
-                        OverrideChoice("引擎内核", KR_KERNEL_MAP2, globalKrKernel, krKernel) { krKernel = it }
-                        if (!isSdl3) {
-                            OverrideFont("默认字体", globalKrFont, krFont, onReset = { krFont = "" }, onPick = { fontLauncher.launch("*/*") })
-                            OverrideSwitch("强制默认字体", globalForce, krForceFont) { krForceFont = it }
-                            OverrideChoice("渲染器", KR_RENDERER_MAP2, globalRenderer, krRender[PerGameSettingsStore.F_RENDERER]!!.value) {
-                                krRender[PerGameSettingsStore.F_RENDERER]!!.value = it
+    MiuixSettingsTheme {
+        MiuixScaffold(
+            modifier = Modifier.fillMaxSize(),
+            containerColor = MiuixTheme.colorScheme.background,
+            contentWindowInsets = WindowInsets(0.dp),
+            topBar = {
+                Column(modifier = Modifier.fillMaxWidth().background(MiuixTheme.colorScheme.background)) {
+                    Column(modifier = Modifier.fillMaxWidth().statusBarsPadding()) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(game.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MiuixTheme.colorScheme.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                            IconButton(onClick = { save(); android.widget.Toast.makeText(ctx, "已保存", android.widget.Toast.LENGTH_SHORT).show() }) {
+                                Icon(Icons.Filled.Save, contentDescription = "保存", tint = MiuixTheme.colorScheme.onBackground)
                             }
                         }
                     }
                 }
-                EngineType.ONS -> item {
-                    SectionCard("ONS") {
-                        OverrideSwitch("独立存档目录", globalOns.scopedSaveDir, onsScoped) { onsScoped = it }
-                        OverrideSwitch("全屏拉伸", globalOns.stretchFull, onsStretch) { onsStretch = it }
-                        OverrideSwitch("忽略刘海", globalOns.ignoreCutout, onsCutout) { onsCutout = it }
-                        OverrideSwitch("禁用视频", globalOns.disableVideo, onsNoVideo) { onsNoVideo = it }
-                        OverrideSwitch("画面锐化", globalOns.sharpness, onsSharp) { onsSharp = it }
-                        OverrideChoice("文本编码", ONS_ENCODING_MAP2, globalOns.encoding.decode(), onsEnc) { onsEnc = it }
+            },
+        ) { innerPadding ->
+            LazyColumn(
+                modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
+                contentPadding = PaddingValues(top = innerPadding.calculateTopPadding() + 12.dp, bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                when (game.engine) {
+                    EngineType.KIRIKIRI -> item {
+                        SectionCard("KRKR") {
+                            OverrideSwitch("独立存档目录", globalKrScoped, krScoped) { krScoped = it }
+                            OverrideChoice("引擎版本", KR_VERSION_MAP2, globalKrVersion, krVersion) { krVersion = it }
+                            OverrideChoice("引擎内核", KR_KERNEL_MAP2, globalKrKernel, krKernel) { krKernel = it }
+                            if (!isSdl3) {
+                                OverrideFont("默认字体", globalKrFont, krFont, onReset = { krFont = "" }, onPick = { fontLauncher.launch("*/*") })
+                                OverrideSwitch("强制默认字体", globalForce, krForceFont) { krForceFont = it }
+                                OverrideChoice("渲染器", KR_RENDERER_MAP2, globalRenderer, krRender[PerGameSettingsStore.F_RENDERER]!!.value) {
+                                    krRender[PerGameSettingsStore.F_RENDERER]!!.value = it
+                                }
+                            }
+                        }
+                    }
+                    EngineType.ONS -> item {
+                        SectionCard("ONS") {
+                            OverrideSwitch("独立存档目录", globalOns.scopedSaveDir, onsScoped) { onsScoped = it }
+                            OverrideSwitch("全屏拉伸", globalOns.stretchFull, onsStretch) { onsStretch = it }
+                            OverrideSwitch("忽略刘海", globalOns.ignoreCutout, onsCutout) { onsCutout = it }
+                            OverrideSwitch("禁用视频", globalOns.disableVideo, onsNoVideo) { onsNoVideo = it }
+                            OverrideSwitch("画面锐化", globalOns.sharpness, onsSharp) { onsSharp = it }
+                            OverrideChoice("文本编码", ONS_ENCODING_MAP2, globalOns.encoding.decode(), onsEnc) { onsEnc = it }
+                        }
+                    }
+                    EngineType.ARTEMIS -> item {
+                        SectionCard("Artemis") {
+                            OverrideChoice("引擎版本", ART_VERSION_MAP2, globalArtVersion, artVersion) { artVersion = it }
+                            OverrideSwitch("画面反转", globalArtRotate, artRotate) { artRotate = it }
+                            OverrideChoice("自动补丁", ART_PATCH_MAP2, globalArtPatch, artPatch) { artPatch = it }
+                        }
+                    }
+                    EngineType.TYRANO, EngineType.UNKNOWN -> item {
+                        SectionCard("Tyrano") {
+                            OverrideSwitch("允许外部网络", globalTyExternal, tyExternal) { tyExternal = it }
+                            OverrideSwitch("独立存档目录", globalTyScoped, tyScoped) { tyScoped = it }
+                        }
                     }
                 }
-                EngineType.ARTEMIS -> item {
-                    SectionCard("Artemis") {
-                        OverrideChoice("引擎版本", ART_VERSION_MAP2, globalArtVersion, artVersion) { artVersion = it }
-                        OverrideSwitch("画面反转", globalArtRotate, artRotate) { artRotate = it }
-                        OverrideChoice("自动补丁", ART_PATCH_MAP2, globalArtPatch, artPatch) { artPatch = it }
-                    }
-                }
-                EngineType.TYRANO, EngineType.UNKNOWN -> item {
-                    SectionCard("Tyrano") {
-                        OverrideSwitch("允许外部网络", globalTyExternal, tyExternal) { tyExternal = it }
-                        OverrideSwitch("独立存档目录", globalTyScoped, tyScoped) { tyScoped = it }
-                    }
-                }
-            }
 
-            item { Box(Modifier.fillMaxWidth().navigationBarsPadding().height(12.dp)) }
+                item { Box(Modifier.fillMaxWidth().navigationBarsPadding().height(12.dp)) }
+            }
         }
     }
 }
-
-private fun navigationBarsPadding(): Int = 24
 
 // ───────────────────────── 覆盖行组件 ─────────────────────────
 
 @Composable
 private fun SectionCard(title: String, content: @Composable () -> Unit) {
-    Card(
+    MiuixCard(
         modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        colors = CardDefaults.cardColors(containerColor = NavWhite),
-        shape = RoundedCornerShape(8.dp),
+        cornerRadius = 8.dp,
     ) {
         Column(Modifier.padding(vertical = 6.dp)) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)) {
@@ -210,119 +217,42 @@ private fun SectionCard(title: String, content: @Composable () -> Unit) {
     }
 }
 
-/** 覆盖版单选行：值为未覆盖时显示“跟随全局(…)”。 */
+/** 覆盖版下拉行：Miuix OverlayDropdownPreference，选项首位为“跟随全局”。 */
 @Composable
 private fun OverrideChoice(label: String, options: Map<String, String>, global: String, override: String?, onSet: (String?) -> Unit) {
-    var open by remember { mutableStateOf(false) }
     val following = override == null
     val effValue = override ?: global
-    Row(
-        Modifier.fillMaxWidth().clickable { open = true }.padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(label, style = MaterialTheme.typography.bodyLarge)
-        }
-        Text(
-            if (following) "跟随全局 · ${labelOf(effValue, options)}" else labelOf(effValue, options),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(start = 8.dp),
-        )
-    }
-    if (open) {
-        AppAlertDialog(
-            onDismissRequest = { open = false },
-            title = { Text(label, style = MaterialTheme.typography.titleMedium) },
-            text = {
-                LazyColumn {
-                    item {
-                        Row(Modifier.fillMaxWidth().clickable { onSet(null); open = false }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                            RadioButton(selected = following, onClick = { onSet(null); open = false })
-                            Text("跟随全局 · ${labelOf(global, options)}", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(start = 8.dp))
-                        }
-                    }
-                    options.forEach { (k, text) ->
-                        item(key = k) {
-                            Row(Modifier.fillMaxWidth().clickable { onSet(k); open = false }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                                RadioButton(selected = !following && override == k, onClick = { onSet(k); open = false })
-                                Text(text, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(start = 8.dp))
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = { TextButton(onClick = { open = false }) { Text("取消") } },
-        )
-    }
+    val keys = options.keys.toList()
+    val labels = listOf("跟随全局 · ${labelOf(effValue, options)}") + keys.map { options[it] ?: it }
+    val index = if (following) 0 else (keys.indexOf(override).takeIf { it >= 0 } ?: -1) + 1
+    OverlayDropdownPreference(
+        title = label,
+        items = labels,
+        selectedIndex = index,
+        onSelectedIndexChange = { i -> onSet(if (i == 0) null else keys[i - 1]) },
+    )
 }
 
-/** 覆盖版开关行：三态（跟随全局 / 开 / 关）。 */
+/** 覆盖版开关行：Miuix OverlayDropdownPreference，三态（跟随全局 / 开 / 关）。 */
 @Composable
 private fun OverrideSwitch(label: String, global: Boolean, override: Boolean?, onSet: (Boolean?) -> Unit) {
-    var open by remember { mutableStateOf(false) }
-    Row(
-        Modifier.fillMaxWidth().clickable { open = true }.padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(label, style = MaterialTheme.typography.bodyLarge)
-        }
-        Text(
-            when {
-                override == null -> "跟随全局（${if (global) "开" else "关"}）"
-                override == true -> "开"
-                else -> "关"
-            },
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(start = 8.dp),
-        )
-    }
-    if (open) {
-        AppAlertDialog(
-            onDismissRequest = { open = false },
-            title = { Text(label, style = MaterialTheme.typography.titleMedium) },
-            text = {
-                Column {
-                    OverrideRadio("跟随全局（${if (global) "开" else "关"}）", override == null) { onSet(null); open = false }
-                    OverrideRadio("开", override == true) { onSet(true); open = false }
-                    OverrideRadio("关", override == false) { onSet(false); open = false }
-                }
-            },
-            confirmButton = { TextButton(onClick = { open = false }) { Text("取消") } },
-        )
-    }
+    val labels = listOf("跟随全局（${if (global) "开" else "关"}）", "开", "关")
+    val index = when { override == null -> 0; override -> 1; else -> 2 }
+    OverlayDropdownPreference(
+        title = label,
+        items = labels,
+        selectedIndex = index,
+        onSelectedIndexChange = { i -> onSet(if (i == 0) null else i == 1) },
+    )
 }
 
-@Composable
-private fun OverrideRadio(text: String, selected: Boolean, onSelect: () -> Unit) {
-    Row(Modifier.fillMaxWidth().clickable(onClick = onSelect).padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-        RadioButton(selected = selected, onClick = onSelect)
-        Text(text, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(start = 8.dp))
-    }
-}
-
+/** 覆盖版字体行：Miuix ArrowPreference，点击弹窗选择（跟随全局 / 选择字体文件）。 */
 @Composable
 private fun OverrideFont(label: String, global: String, override: String?, onReset: () -> Unit, onPick: () -> Unit) {
     var open by remember { mutableStateOf(false) }
     val following = override == null
-    Row(
-        Modifier.fillMaxWidth().clickable { open = true }.padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f)) { Text(label, style = MaterialTheme.typography.bodyLarge) }
-        Text(
-            if (following) "跟随全局（${global.ifEmpty { "内置字体" }}）" else override.ifEmpty { "内置字体" },
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(start = 8.dp),
-        )
-    }
+    val summary = if (following) "跟随全局（${global.ifEmpty { "内置字体" }}）" else override.ifEmpty { "内置字体" }
+    ArrowPreference(title = label, summary = summary, onClick = { open = true })
     if (open) {
         AppAlertDialog(
             onDismissRequest = { open = false },
