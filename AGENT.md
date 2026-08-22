@@ -82,6 +82,41 @@ Column(fillMaxSize)                                // 页面根
 - Miuix preference 组件标题默认用 `headline1`(17sp)，已在 `MiuixSettingsTheme` 中全局覆盖为 16sp（`defaultTextStyles(headline1 = TextStyle(fontSize = 16.sp))`），使其严格落入两档；不要自行在单行上改字号。
 - 顶部栏标题不受此限制，仍用 `MaterialTheme.typography.titleLarge` Bold。
 
+---
+
+## 主题色调统一使用规范
+
+应用主题色（primary）由用户通过 **应用设置 → 色调轮盘** 修改，必须全局统一生效。规范如下：
+
+### 1. 主题色的唯一定义与入口
+
+- 全局主题色唯一状态：`com.tyranor.next.theme.AppThemeColors.primary`（`mutableStateOf`，变化即触发全 App 重组）。
+- 持久化：`com.tyranor.next.settings.AppSettingsStore`（独立 prefs 文件 `app_settings`，key `theme_color`，默认 `#307DEF`）。
+- 修改主题色的唯一入口：持久化后调用 `AppThemeColors.refresh(context)`；任何页面不得自行修改 `primary`。
+- `TyranorNextTheme`（Material 页面）与 `MiuixSettingsTheme`（Miuix 页面）的 `primaryColor` 参数**必须为 `Color? = null`**，并在**函数体内**以 `val primary = primaryColor ?: AppThemeColors.primary` 读取全局主题色；两个主题函数都必须标注 `@NonSkippableComposable`（配合函数体内读取，保证轮盘切换时主题必然重组、全局同步变色，不依赖调用点对默认参数表达式的订阅）。内部均会先 `ensureLoaded` 从存储加载，禁止传入写死颜色。
+
+### 2. 页面如何获取主题色
+
+- **Material 页面**（首页/游戏/引擎等 Tab、存档管理、在线补丁等 Activity）：统一使用 `MaterialTheme.colorScheme.primary`（选中态图标/文字、按钮、开关、输入框聚焦指示等）。
+- **Miuix 页面**（设置页/引擎设置/单游戏设置/应用设置等）：统一使用 `MiuixTheme.colorScheme.primary`（Preference 图标、Slider、Switch、下拉选中等）。
+- 图标 tint、高亮文字、选中态等一切"强调色"位置只能从上述 colorScheme 获取，**禁止**在页面里硬编码 `Color(0x...)`、`#307DEF`、`Blue40` 或任何品牌蓝。
+
+### 3. 中性色与语义色（固定，不属于主题色）
+
+以下颜色固定不变，从 `theme/Color.kt` 常量引用，**禁止**在页面中直接写 `Color(0x...)`：
+
+- `PageGrey` 页面背景灰、`NavWhite` 卡片/导航栏白、`TextColor` 正文深灰、`UnselectedGrey` 导航栏未选中灰。
+- 语义色：`colorScheme.error`（错误/删除）、引擎封面色（`EngineType.coverColor()`）、封面占位白字等。
+- 新增任何颜色先检查 `Color.kt` 是否已有现成常量；中性色必须统一收口到 `Color.kt`，不在页面内散落硬编码。
+
+### 4. 层级要求
+
+- 任何页面根组件必须包在 `TyranorNextTheme {}` 或 `MiuixSettingsTheme {}` 内，且主题必须最外层（Activity `setContent` 中包裹）。
+- `MiuixSettingsTheme` 只提供 Miuix 主题，页面内部若用到 `MaterialTheme.*`（如弹窗、typography），外层仍须有 `TyranorNextTheme`（所有现有 Activity 均已满足，新增页面须遵循）。
+- XML / drawable 资源中**禁止**出现主题色（启动图标等除外）。
+
+---
+
 ## 构建
 
 - 构建命令：`./gradlew assembleDebug --no-daemon`

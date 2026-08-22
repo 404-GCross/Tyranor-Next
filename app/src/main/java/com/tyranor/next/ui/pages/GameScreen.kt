@@ -81,6 +81,8 @@ import com.tyranor.next.scanner.ScanGame
 import com.tyranor.next.scanner.VndbCandidate
 import com.tyranor.next.scanner.VndbCoverService
 import com.tyranor.next.settings.PerGameSettingsStore
+import com.tyranor.next.theme.NavWhite
+import com.tyranor.next.theme.PageGrey
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -583,7 +585,7 @@ private fun VndbSearchDialog(
                                 Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(8.dp))
-                                    .background(Color(0xFFF2F3F5))
+                                    .background(PageGrey)
                                     .clickable { onBind(candidate) }
                                     .padding(10.dp),
                             ) {
@@ -697,7 +699,7 @@ private fun GameActionRow(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(8.dp))
-            .background(Color.White)
+            .background(NavWhite)
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 16.5.dp),
         verticalAlignment = Alignment.CenterVertically,

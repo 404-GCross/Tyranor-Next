@@ -1,6 +1,7 @@
 package com.tyranor.next.theme
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.NonSkippableComposable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
@@ -24,14 +25,19 @@ private val TyranorMiuixTextStyles = defaultTextStyles(
  * primaryColor 由应用设置「色调轮盘」提供，默认蓝与 TyranorNextTheme 一致。
  */
 @Composable
+@NonSkippableComposable
 fun MiuixSettingsTheme(
-    primaryColor: Color = AppThemeColors.primary,
+    primaryColor: Color? = null,
     content: @Composable () -> Unit,
 ) {
     AppThemeColors.ensureLoaded(LocalContext.current)
+    // 与 TyranorNextTheme 同理：在函数体内直接读取全局主题色，
+    // 配合 @NonSkippableComposable 保证轮盘切换主题色时本主题必然重组，
+    // 使设置类页面与其余页面同步跟随主题色。
+    val primary = primaryColor ?: AppThemeColors.primary
     MiuixTheme(
         colors = lightColorScheme(
-            primary = primaryColor,
+            primary = primary,
             background = PageGrey,
             surface = PageGrey,
             surfaceContainer = NavWhite,

@@ -13,3 +13,5 @@ val PageGrey = Color(0xFFF2F3F5)
 val NavWhite = Color(0xFFFFFFFF)
 // 正文/标题文字色：深灰黑
 val TextColor = Color(0xFF1F2329)
+// 导航栏未选中图标/文字色：中性灰
+val UnselectedGrey = Color(0xFF8A8F98)

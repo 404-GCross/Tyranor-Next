@@ -23,6 +23,7 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.tyranor.next.R
+import com.tyranor.next.theme.UnselectedGrey
 import com.tyranor.next.ui.pages.EngineScreen
 import com.tyranor.next.ui.pages.GameScreen
 import com.tyranor.next.ui.pages.HomeScreen
@@ -44,7 +45,7 @@ private val tabItems = listOf(
 @Composable
 fun MainScreen(modifier: Modifier = Modifier) {
   var selectedIndex by rememberSaveable { mutableStateOf(0) }
-  val unselectedColor = Color(0xFF8A8F98)
+  val unselectedColor = UnselectedGrey
 
   // 外层只负责布局：内容区 + 底部导航栏（不用 Scaffold，避免与子页顶部栏的 inset 冲突）
   Column(modifier.fillMaxSize()) {
