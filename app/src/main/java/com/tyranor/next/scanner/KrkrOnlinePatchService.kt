@@ -64,10 +64,14 @@ object KrkrOnlinePatchService {
             val fileName = fileNameFromUrl(url)
             progress("正在下载 $fileName")
             val tempFile = File(downloadDir, fileName)
-            downloadToFile(url, tempFile)
-            progress("正在写入 $fileName")
-            copyIntoGameDir(context, game, tempFile, fileName)
-            installed += fileName
+            try {
+                downloadToFile(url, tempFile)
+                progress("正在写入 $fileName")
+                copyIntoGameDir(context, game, tempFile, fileName)
+                installed += fileName
+            } finally {
+                tempFile.delete()
+            }
         }
 
         KrkrPatchInstallResult(installed = installed, target = targetDescription)

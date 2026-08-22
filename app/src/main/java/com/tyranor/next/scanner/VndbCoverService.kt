@@ -11,7 +11,6 @@ import java.net.URL
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 import java.util.Locale
-import kotlin.math.abs
 
 data class VndbCandidate(
     val id: String,
@@ -159,7 +158,7 @@ object VndbCoverService {
         if (imageUrl.isBlank()) return null
         val dir = File(context.filesDir, "covers_remote")
         if (!dir.exists() && !dir.mkdirs()) return null
-        val target = File(dir, "${prefix}_${abs(imageUrl.hashCode())}.jpg")
+        val target = File(dir, "${prefix}_${stableKey(imageUrl)}.jpg")
         if (target.isFile && target.length() > 0) return Uri.fromFile(target).toString()
 
         var conn: HttpURLConnection? = null

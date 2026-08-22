@@ -119,8 +119,9 @@ object EngineSettingsStore {
     fun buildKrEnginePrefsJson(c: Context, overrideGetter: (String) -> String? = { null }): String {
         val json = JSONObject()
         KR_RENDER_PREF_KEYS.forEach { key ->
-            val value = overrideGetter(key) ?: prefs(c).getString(key, null).orEmpty()
-            json.put(key, JSONObject().put("v", value).put("s", if (overrideGetter(key) != null) "game" else "global"))
+            val override = overrideGetter(key)
+            val value = override ?: prefs(c).getString(key, null).orEmpty()
+            json.put(key, JSONObject().put("v", value).put("s", if (override != null) "game" else "global"))
         }
         return json.toString()
     }
@@ -181,16 +182,16 @@ object EngineSettingsStore {
     }
 
     // ---------- Artemis ----------
-    fun getArtEngineVersion(c: Context): String = when (prefs(c).getString(KEY_ARTEMIS_ENGINE_VERSION, ART_ENGINE_AUTO)) {
-        ART_ENGINE_V1, ART_ENGINE_V2, ART_ENGINE_V3 -> prefs(c).getString(KEY_ARTEMIS_ENGINE_VERSION, ART_ENGINE_AUTO)!!
-        else -> ART_ENGINE_AUTO
+    fun getArtEngineVersion(c: Context): String {
+        val v = prefs(c).getString(KEY_ARTEMIS_ENGINE_VERSION, ART_ENGINE_AUTO)
+        return if (v == ART_ENGINE_V1 || v == ART_ENGINE_V2 || v == ART_ENGINE_V3) v else ART_ENGINE_AUTO
     }
     fun setArtEngineVersion(c: Context, v: String) = prefs(c).edit().putString(KEY_ARTEMIS_ENGINE_VERSION, v).apply()
     fun isArtRotateScreen(c: Context): Boolean = prefs(c).getBoolean(KEY_ARTEMIS_ROTATE_SCREEN, false)
     fun setArtRotateScreen(c: Context, b: Boolean) = prefs(c).edit().putBoolean(KEY_ARTEMIS_ROTATE_SCREEN, b).apply()
-    fun getArtAutoPatch(c: Context): String = when (prefs(c).getString(KEY_ARTEMIS_AUTO_PATCH, AUTO_PATCH_ASK)) {
-        AUTO_PATCH_AUTO, AUTO_PATCH_OFF -> prefs(c).getString(KEY_ARTEMIS_AUTO_PATCH, AUTO_PATCH_ASK)!!
-        else -> AUTO_PATCH_ASK
+    fun getArtAutoPatch(c: Context): String {
+        val v = prefs(c).getString(KEY_ARTEMIS_AUTO_PATCH, AUTO_PATCH_ASK)
+        return if (v == AUTO_PATCH_AUTO || v == AUTO_PATCH_OFF) v else AUTO_PATCH_ASK
     }
     fun setArtAutoPatch(c: Context, v: String) = prefs(c).edit().putString(KEY_ARTEMIS_AUTO_PATCH, v).apply()
 

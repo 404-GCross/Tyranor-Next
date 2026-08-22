@@ -101,6 +101,25 @@ object EngineScanner {
         saveGames(context, loadGames(context).filterNot { it.uri == uri })
     }
 
+    /**
+     * 将新扫描结果与既有游戏库按 uri 合并：保留封面/VNDB 绑定/启动文件/打开时间等
+     * 非扫描字段，避免每次重新扫描清空用户手动数据。
+     */
+    fun mergeScannedGames(existing: List<ScanGame>, fresh: List<ScanGame>): List<ScanGame> {
+        val oldByUri = existing.associateBy { it.uri }
+        return fresh.map { scanned ->
+            val old = oldByUri[scanned.uri]
+            if (old == null) scanned
+            else scanned.copy(
+                coverUri = old.coverUri,
+                vndbId = old.vndbId,
+                metadataTitle = old.metadataTitle,
+                launchFile = old.launchFile,
+                openTime = old.openTime,
+            )
+        }
+    }
+
     internal fun saveRecentGames(context: Context, games: List<ScanGame>) {
         val str = games.joinToString("\n") { serializeGame(it) }
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -150,14 +169,16 @@ object EngineScanner {
     }
 
     private fun serializeGame(g: ScanGame): String {
+        // 标题/元数据可能来自 VNDB，含 \n 或 \u0001 会把整个持久化文件解析错乱，需清洗。
+        fun clean(s: String): String = s.replace("\n", " ").replace("\u0001", " ")
         return listOf(
-            g.title,
+            clean(g.title),
             g.uri,
             g.engine.name,
             g.launchTarget,
             g.coverUri.orEmpty(),
             g.vndbId.orEmpty(),
-            g.metadataTitle.orEmpty(),
+            clean(g.metadataTitle.orEmpty()),
             g.launchFile.orEmpty(),
             g.openTime.toString(),
         ).joinToString("\u0001")

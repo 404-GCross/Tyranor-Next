@@ -20,7 +20,7 @@ object GitHubUpdateChecker {
             val currentVersion = packageInfo.versionName ?: "0"
             val releases = fetchReleases()
 
-            val latest = (0 until releases.length())
+            val available = (0 until releases.length())
                 .asSequence()
                 .mapNotNull { index -> releases.optJSONObject(index) }
                 .filterNot { it.optBoolean("draft", false) }
@@ -32,10 +32,15 @@ object GitHubUpdateChecker {
                         prerelease = it.optBoolean("prerelease", false),
                     )
                 }
-                .firstOrNull { release ->
-                    release.htmlUrl.isNotBlank() &&
-                        compareVersions(versionFromRelease(release), currentVersion) > 0
-                }
+                .filter { it.htmlUrl.isNotBlank() }
+                .toList()
+
+            // 优先正式版；仅当没有更新的正式版时才考虑 prerelease（beta）。
+            val latest = available.firstOrNull { release ->
+                !release.prerelease && compareVersions(versionFromRelease(release), currentVersion) > 0
+            } ?: available.firstOrNull { release ->
+                release.prerelease && compareVersions(versionFromRelease(release), currentVersion) > 0
+            }
 
             if (latest == null) {
                 UpdateCheckResult.UpToDate(currentVersion)
@@ -70,17 +75,21 @@ object GitHubUpdateChecker {
             setRequestProperty("Accept", "application/vnd.github+json")
             setRequestProperty("User-Agent", "TyranorNext")
         }
-        val stream = if (connection.responseCode in 200..299) {
-            connection.inputStream
-        } else {
-            connection.errorStream ?: connection.inputStream
-        }
-        return stream.bufferedReader().use { reader ->
-            val body = reader.readText()
-            if (connection.responseCode !in 200..299) {
-                error("GitHub Releases 请求失败：HTTP ${connection.responseCode}")
+        return try {
+            val stream = if (connection.responseCode in 200..299) {
+                connection.inputStream
+            } else {
+                connection.errorStream ?: connection.inputStream
             }
-            JSONArray(body)
+            stream.bufferedReader().use { reader ->
+                val body = reader.readText()
+                if (connection.responseCode !in 200..299) {
+                    error("GitHub Releases 请求失败：HTTP ${connection.responseCode}")
+                }
+                JSONArray(body)
+            }
+        } finally {
+            connection.disconnect()
         }
     }
 
