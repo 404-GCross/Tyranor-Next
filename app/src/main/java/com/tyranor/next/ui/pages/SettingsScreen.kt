@@ -226,7 +226,7 @@ internal fun EngineSettingsDetailScreen(kind: EngineSettingsKind) {
     }
 }
 
-enum class EngineSettingsKind(val title: String, @DrawableRes val iconRes: Int) {
+enum class EngineSettingsKind(val title: String, @param:DrawableRes val iconRes: Int) {
     KRKR("KRKR引擎设置", R.drawable.ic_engine_item),
     ONS("ONS引擎设置", R.drawable.ic_engine_item),
     ARTEMIS("Artemis引擎设置", R.drawable.ic_engine_item),

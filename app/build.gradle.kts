@@ -46,7 +46,7 @@ android {
     // 引擎原生插件作为 assets 打包，首次启动自动安装到 app 私有目录
     sourceSets {
       getByName("main") {
-        assets.srcDir("src/main/nativeplugins")
+        assets.srcDirs("src/main/nativeplugins")
       }
     }
 }

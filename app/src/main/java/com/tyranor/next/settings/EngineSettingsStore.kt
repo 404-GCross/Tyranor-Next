@@ -80,7 +80,7 @@ object EngineSettingsStore {
 
     fun getKrKernel(c: Context): String {
         val v = prefs(c).getString(KEY_KR_ENGINE_KERNEL, KR_AUTO)
-        return when (v) { KERNEL_KIRIKIRI2, KERNEL_KRKRSDL3 -> v!!; else -> KR_AUTO }
+        return when (v) { KERNEL_KIRIKIRI2, KERNEL_KRKRSDL3 -> v; else -> KR_AUTO }
     }
     fun setKrKernel(c: Context, v: String) = prefs(c).edit().putString(KEY_KR_ENGINE_KERNEL, v).apply()
 
@@ -174,7 +174,7 @@ object EngineSettingsStore {
 
     fun saveOns(c: Context, o: Ons) = onsPrefs(c).edit().putString("gameargs", o.toJson()).apply()
 
-    fun normalizeEncoding(v: String): String = when (v?.trim()?.lowercase()) {
+    fun normalizeEncoding(v: String): String = when (v.trim().lowercase()) {
         "utf8", "utf-8" -> "utf8"
         "sjis", "shift-jis", "shift_jis" -> "sjis"
         else -> "gbk"
