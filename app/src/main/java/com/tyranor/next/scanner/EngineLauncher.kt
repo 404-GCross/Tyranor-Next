@@ -7,6 +7,7 @@ import android.os.Build
 import android.os.Environment
 import android.provider.Settings
 import androidx.documentfile.provider.DocumentFile
+import androidx.compose.ui.graphics.toArgb
 import com.akira.tyranoemu.remote.ArtemisActivityV1
 import com.akira.tyranoemu.remote.ArtemisActivityV2
 import com.akira.tyranoemu.remote.ArtemisActivityV3
@@ -17,6 +18,7 @@ import com.core.krkrsdl3.Krkrsdl3Activity
 import com.core.tyrano.TyranoActivity
 import com.tyranor.next.settings.EngineSettingsStore
 import com.tyranor.next.settings.PerGameSettingsStore
+import com.tyranor.next.theme.AppThemeColors
 import com.yuri.onscripter.ONScripter
 import java.io.File
 
@@ -94,7 +96,7 @@ object EngineLauncher {
 
     /** 构建引擎 Intent；path 为真实文件路径。 */
     private fun buildIntent(context: Context, engine: EngineType, path: String, game: ScanGame): Intent {
-        return when (engine) {
+        val intent = when (engine) {
             EngineType.KIRIKIRI ->
                 buildKirikiriIntent(context, path, game)
 
@@ -155,6 +157,17 @@ object EngineLauncher {
                 putExtra("type", "Tyrano")
             }
         }
+        // 注入 App 统一主题色：引擎壳自绘 UI（确认/输入弹窗按钮等）经
+        // EngineThemeColors.fromIntent / KrDialogStyle 读取，缺失时回落默认绿，
+        // 这里同时写 primaryColor（EngineThemeColors）与 themeColorPrimary（KrDialogStyle）两套 key。
+        intent.putExtra("primaryColor", AppThemeColors.primary.toArgb())
+        intent.putExtra("themeColorPrimary", AppThemeColors.primary.toArgb())
+        intent.putExtra("themeColorOnPrimary", 0xFFFFFFFF.toInt())
+        intent.putExtra("themeColorCard", 0xFFFFFFFF.toInt())
+        intent.putExtra("themeColorText", 0xFF14221B.toInt())
+        intent.putExtra("themeColorTextMuted", 0xFF82908A.toInt())
+        intent.putExtra("darkMode", false)
+        return intent
     }
 
     /**
