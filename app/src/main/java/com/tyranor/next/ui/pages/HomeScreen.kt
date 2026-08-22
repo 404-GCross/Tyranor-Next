@@ -79,7 +79,9 @@ fun HomeScreen(modifier: Modifier = Modifier) {
         quickLaunch = quickLaunch.filterNot { it.uri == target.uri }
         recentGames = recentGames.filterNot { it.uri == target.uri }
         selectedGame = null
-        // 仅清理应用内数据（每游戏设置、最近记录、快捷启动、封面缓存、应用内存档镜像）；不触碰游戏文件
+        // 从持久游戏库一并移除，避免首页删了但「游戏」页仍显示（复活）
+        EngineScanner.removeGame(context, target.uri)
+        // 仅清理应用内数据（每游戏设置、最近记录、封面缓存、应用内存档镜像）；不触碰游戏文件
         scope.launch(Dispatchers.IO) {
             cleanupDeletedGame(context, target)
         }
