@@ -56,6 +56,7 @@ import top.yukonga.miuix.kmp.basic.Scaffold as MiuixScaffold
 import top.yukonga.miuix.kmp.basic.Slider
 import top.yukonga.miuix.kmp.basic.SliderDefaults
 import top.yukonga.miuix.kmp.preference.ArrowPreference
+import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
@@ -64,9 +65,10 @@ class AppSettingsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        val darkMode = AppSettingsStore.getThemeMode(this) == AppSettingsStore.THEME_MODE_DARK
         enableEdgeToEdge(
-            statusBarStyle = androidx.activity.SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
-            navigationBarStyle = androidx.activity.SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
+            statusBarStyle = if (darkMode) androidx.activity.SystemBarStyle.dark(Color.TRANSPARENT) else androidx.activity.SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
+            navigationBarStyle = if (darkMode) androidx.activity.SystemBarStyle.dark(Color.TRANSPARENT) else androidx.activity.SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
         )
         @Suppress("DEPRECATION")
         window.statusBarColor = Color.TRANSPARENT
@@ -168,6 +170,23 @@ internal fun AppSettingsScreen() {
                                     )
                                 },
                                 onClick = { showColorPicker = true },
+                            )
+                        }
+                    }
+                }
+                item {
+                    MiuixCard(modifier = Modifier.fillMaxWidth(), cornerRadius = 8.dp) {
+                        Column(Modifier.padding(vertical = 4.dp)) {
+                            val modeIndex = if (AppSettingsStore.getThemeMode(ctx) == AppSettingsStore.THEME_MODE_DARK) 1 else 0
+                            OverlayDropdownPreference(
+                                title = "外观模式",
+                                items = listOf("浅色", "深色"),
+                                selectedIndex = modeIndex,
+                                onSelectedIndexChange = { index ->
+                                    val mode = if (index == 1) AppSettingsStore.THEME_MODE_DARK else AppSettingsStore.THEME_MODE_LIGHT
+                                    AppSettingsStore.setThemeMode(ctx, mode)
+                                    AppThemeColors.refresh(ctx)
+                                },
                             )
                         }
                     }

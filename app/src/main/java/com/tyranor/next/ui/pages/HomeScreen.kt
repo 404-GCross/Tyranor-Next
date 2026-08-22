@@ -46,6 +46,7 @@ import com.tyranor.next.scanner.EngineScanner
 import com.tyranor.next.scanner.ScanGame
 import com.tyranor.next.theme.NavWhite
 import com.tyranor.next.ui.common.TimeFormats
+import com.tyranor.next.ui.common.glassNavBottomInset
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
@@ -133,7 +134,7 @@ fun HomeScreen(modifier: Modifier = Modifier) {
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
-                contentPadding = PaddingValues(top = 8.dp, bottom = 16.dp),
+                contentPadding = PaddingValues(top = 8.dp, bottom = 16.dp + glassNavBottomInset()),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 items(recentGames, key = { it.uri }) { game ->

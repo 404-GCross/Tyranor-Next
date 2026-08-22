@@ -16,6 +16,10 @@ object AppThemeColors {
     var primary by mutableStateOf(Blue40)
         private set
 
+    /** 深色模式（应用设置「外观模式」）；变化时全 App 重组。 */
+    var isDark by mutableStateOf(false)
+        private set
+
     /** 首次组合时从存储加载（幂等，避免每次重组都读 prefs）。 */
     fun ensureLoaded(context: Context) {
         if (!loaded) {
@@ -24,9 +28,10 @@ object AppThemeColors {
         }
     }
 
-    /** 从存储重读主题色并广播变更。 */
+    /** 从存储重读主题色与外观模式并广播变更。 */
     fun refresh(context: Context) {
         primary = parseColorHex(AppSettingsStore.getThemeColorHex(context))
+        isDark = AppSettingsStore.getThemeMode(context) == AppSettingsStore.THEME_MODE_DARK
     }
 }
 

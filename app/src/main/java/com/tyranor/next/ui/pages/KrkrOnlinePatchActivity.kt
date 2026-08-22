@@ -58,6 +58,7 @@ import com.tyranor.next.scanner.KrkrOnlinePatchService
 import com.tyranor.next.scanner.KrkrPatchEntry
 import com.tyranor.next.scanner.ScanGame
 import com.tyranor.next.scanner.ScanGameIntents
+import com.tyranor.next.settings.AppSettingsStore
 import com.tyranor.next.theme.NavWhite
 import com.tyranor.next.theme.TyranorNextTheme
 import com.tyranor.next.ui.common.TimeFormats
@@ -70,9 +71,10 @@ class KrkrOnlinePatchActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        val darkMode = AppSettingsStore.getThemeMode(this) == AppSettingsStore.THEME_MODE_DARK
         enableEdgeToEdge(
-            statusBarStyle = androidx.activity.SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
-            navigationBarStyle = androidx.activity.SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
+            statusBarStyle = if (darkMode) androidx.activity.SystemBarStyle.dark(Color.TRANSPARENT) else androidx.activity.SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
+            navigationBarStyle = if (darkMode) androidx.activity.SystemBarStyle.dark(Color.TRANSPARENT) else androidx.activity.SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
         )
 
         val game = intent.readScanGame()

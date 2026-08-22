@@ -157,16 +157,17 @@ object EngineLauncher {
                 putExtra("type", "Tyrano")
             }
         }
-        // 注入 App 统一主题色：引擎壳自绘 UI（确认/输入弹窗按钮等）经
+        // 注入 App 统一主题色与深浅色：引擎壳自绘 UI（确认/输入弹窗按钮等）经
         // EngineThemeColors.fromIntent / KrDialogStyle 读取，缺失时回落默认绿，
         // 这里同时写 primaryColor（EngineThemeColors）与 themeColorPrimary（KrDialogStyle）两套 key。
+        val dark = AppThemeColors.isDark
+        intent.putExtra("darkMode", dark)
         intent.putExtra("primaryColor", AppThemeColors.primary.toArgb())
         intent.putExtra("themeColorPrimary", AppThemeColors.primary.toArgb())
         intent.putExtra("themeColorOnPrimary", 0xFFFFFFFF.toInt())
-        intent.putExtra("themeColorCard", 0xFFFFFFFF.toInt())
-        intent.putExtra("themeColorText", 0xFF14221B.toInt())
-        intent.putExtra("themeColorTextMuted", 0xFF82908A.toInt())
-        intent.putExtra("darkMode", false)
+        intent.putExtra("themeColorCard", if (dark) 0xFF1E1F1F else 0xFFFFFFFF)
+        intent.putExtra("themeColorText", if (dark) 0xFFF0F0F0 else 0xFF14221B)
+        intent.putExtra("themeColorTextMuted", if (dark) 0xFF9A9A9A else 0xFF82908A)
         return intent
     }
 

@@ -7,6 +7,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.sp
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.theme.darkColorScheme
 import top.yukonga.miuix.kmp.theme.defaultTextStyles
 import top.yukonga.miuix.kmp.theme.lightColorScheme
 
@@ -20,8 +21,8 @@ private val TyranorMiuixTextStyles = defaultTextStyles(
 )
 
 /**
- * 设置页专用 Miuix 主题：固定浅色，配色与 TyranorNextTheme 对齐
- * （浅灰页面背景 + 白色卡片），不随系统深色模式变化。
+ * 设置页专用 Miuix 主题：配色与 TyranorNextTheme 对齐，深/浅色由应用设置「外观模式」控制
+ * （深灰页面背景 + 深色卡片 或 浅灰背景 + 白色卡片）。
  * primaryColor 由应用设置「色调轮盘」提供，默认蓝与 TyranorNextTheme 一致。
  */
 @Composable
@@ -35,8 +36,9 @@ fun MiuixSettingsTheme(
     // 配合 @NonSkippableComposable 保证轮盘切换主题色时本主题必然重组，
     // 使设置类页面与其余页面同步跟随主题色。
     val primary = primaryColor ?: AppThemeColors.primary
-    MiuixTheme(
-        colors = lightColorScheme(
+    val dark = AppThemeColors.isDark
+    val colors = if (dark) {
+        darkColorScheme(
             primary = primary,
             background = PageGrey,
             surface = PageGrey,
@@ -44,7 +46,20 @@ fun MiuixSettingsTheme(
             onBackground = TextColor,
             onSurface = TextColor,
             onSurfaceContainer = TextColor,
-        ),
+        )
+    } else {
+        lightColorScheme(
+            primary = primary,
+            background = PageGrey,
+            surface = PageGrey,
+            surfaceContainer = NavWhite,
+            onBackground = TextColor,
+            onSurface = TextColor,
+            onSurfaceContainer = TextColor,
+        )
+    }
+    MiuixTheme(
+        colors = colors,
         textStyles = TyranorMiuixTextStyles,
         content = content,
     )

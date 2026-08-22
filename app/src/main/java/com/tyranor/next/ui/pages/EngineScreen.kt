@@ -4,6 +4,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -33,6 +34,7 @@ import com.tyranor.next.R
 import com.tyranor.next.scanner.EngineLauncher
 import com.tyranor.next.scanner.EngineType
 import com.tyranor.next.theme.NavWhite
+import com.tyranor.next.ui.common.glassNavBottomInset
 
 /** 引擎页：列表行展示已集成的游戏引擎。 */
 @Composable
@@ -55,7 +57,7 @@ fun EngineScreen(modifier: Modifier = Modifier) {
         // 引擎列表
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 16.dp + glassNavBottomInset()),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             items(engines, key = { it.name }) { engine ->

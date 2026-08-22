@@ -48,6 +48,7 @@ import com.tyranor.next.R
 import com.tyranor.next.settings.EngineSettingsStore
 import com.tyranor.next.theme.MiuixSettingsTheme
 import com.tyranor.next.ui.common.TopBarIcon
+import com.tyranor.next.ui.common.glassNavBottomInset
 import com.tyranor.next.updater.GitHubUpdateChecker
 import com.tyranor.next.updater.UpdateCheckResult
 import java.io.File
@@ -96,7 +97,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
         ) { innerPadding ->
             LazyColumn(
                 modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
-                contentPadding = PaddingValues(top = innerPadding.calculateTopPadding() + 12.dp, bottom = 24.dp),
+                contentPadding = PaddingValues(top = innerPadding.calculateTopPadding() + 12.dp, bottom = 24.dp + glassNavBottomInset()),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 EngineSettingsKind.entries.forEach { kind ->

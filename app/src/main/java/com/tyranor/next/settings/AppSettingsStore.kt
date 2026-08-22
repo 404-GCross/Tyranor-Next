@@ -13,9 +13,16 @@ object AppSettingsStore {
     const val KEY_THEME_COLOR = "theme_color"
     const val KEY_NAV_STYLE = "nav_style"
     const val KEY_SCAN_DEPTH = "scan_depth"
+    const val KEY_THEME_MODE = "theme_mode"
 
     /** 默认主题色：#307DEF，与 theme/Color.kt 的 Blue40 一致。 */
     const val DEFAULT_THEME_COLOR = "#307DEF"
+
+    /** 外观模式：浅色。 */
+    const val THEME_MODE_LIGHT = "light"
+
+    /** 外观模式：深色。 */
+    const val THEME_MODE_DARK = "dark"
 
     /** 文件夹扫描深度默认值（层级，1..5）。 */
     const val DEFAULT_SCAN_DEPTH = 3
@@ -59,4 +66,11 @@ object AppSettingsStore {
 
     fun setScanDepth(c: Context, depth: Int) =
         prefs(c).edit().putInt(KEY_SCAN_DEPTH, depth.coerceIn(1, 5)).apply()
+
+    /** 外观模式（浅色/深色）。 */
+    fun getThemeMode(c: Context): String =
+        prefs(c).getString(KEY_THEME_MODE, THEME_MODE_LIGHT) ?: THEME_MODE_LIGHT
+
+    fun setThemeMode(c: Context, mode: String) =
+        prefs(c).edit().putString(KEY_THEME_MODE, mode).apply()
 }

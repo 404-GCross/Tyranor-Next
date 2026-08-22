@@ -13,7 +13,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -40,6 +43,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.kyant.backdrop.Backdrop
@@ -49,6 +53,8 @@ import com.kyant.backdrop.effects.lens
 import com.kyant.backdrop.effects.vibrancy
 import com.kyant.backdrop.highlight.Highlight
 import com.kyant.backdrop.shadow.Shadow
+import com.tyranor.next.settings.AppSettingsStore
+import com.tyranor.next.theme.AppThemeColors
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -75,7 +81,8 @@ fun LiquidGlassNavigationBar(
     modifier: Modifier = Modifier,
 ) {
     val density = LocalDensity.current
-    val surfaceColor = Color.White
+    // 玻璃表面色随外观模式：深色模式用深色表面
+    val surfaceColor = if (AppThemeColors.isDark) Color(0xFF17191C) else Color.White
     val mutedColor = unselectedColor
     // 统一圆角（AGENT.md）：圆角组件一律 8dp；液态玻璃导航在 8dp 基础上加大 8dp，视觉更圆润
     val shape = RoundedCornerShape(16.dp)
@@ -269,5 +276,19 @@ private fun LiquidGlassNavItemView(
             contentScale = ContentScale.Fit,
             colorFilter = ColorFilter.tint(contentColor),
         )
+    }
+}
+
+/**
+ * 液态玻璃导航悬浮时的列表底部滚动留白：
+ * 内容可滚动经过玻璃后面（沉浸），但列表尾部预留导航高度（64+12*2+系统导航条），
+ * 保证滚动到底时最后一项完全露出不被遮挡。非液态玻璃模式返回 0。
+ */
+@Composable
+fun glassNavBottomInset(): Dp {
+    return if (AppSettingsStore.navStyleState.value == AppSettingsStore.NAV_STYLE_LIQUID_GLASS) {
+        WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 88.dp
+    } else {
+        0.dp
     }
 }

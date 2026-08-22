@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import com.tyranor.next.scanner.GameSaveManager
 import com.tyranor.next.scanner.ScanGame
 import com.tyranor.next.scanner.ScanGameIntents
+import com.tyranor.next.settings.AppSettingsStore
 import com.tyranor.next.theme.NavWhite
 import com.tyranor.next.theme.TyranorNextTheme
 import kotlinx.coroutines.Dispatchers
@@ -60,9 +61,10 @@ class SaveManagementActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        val darkMode = AppSettingsStore.getThemeMode(this) == AppSettingsStore.THEME_MODE_DARK
         enableEdgeToEdge(
-            statusBarStyle = androidx.activity.SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
-            navigationBarStyle = androidx.activity.SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
+            statusBarStyle = if (darkMode) androidx.activity.SystemBarStyle.dark(Color.TRANSPARENT) else androidx.activity.SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
+            navigationBarStyle = if (darkMode) androidx.activity.SystemBarStyle.dark(Color.TRANSPARENT) else androidx.activity.SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
         )
 
         val game = intent.readScanGame()
