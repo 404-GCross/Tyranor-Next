@@ -101,25 +101,6 @@ object EngineScanner {
         saveGames(context, loadGames(context).filterNot { it.uri == uri })
     }
 
-    /**
-     * 将新扫描结果与既有游戏库按 uri 合并：保留封面/VNDB 绑定/启动文件/打开时间等
-     * 非扫描字段，避免每次重新扫描清空用户手动数据。
-     */
-    fun mergeScannedGames(existing: List<ScanGame>, fresh: List<ScanGame>): List<ScanGame> {
-        val oldByUri = existing.associateBy { it.uri }
-        return fresh.map { scanned ->
-            val old = oldByUri[scanned.uri]
-            if (old == null) scanned
-            else scanned.copy(
-                coverUri = old.coverUri,
-                vndbId = old.vndbId,
-                metadataTitle = old.metadataTitle,
-                launchFile = old.launchFile,
-                openTime = old.openTime,
-            )
-        }
-    }
-
     internal fun saveRecentGames(context: Context, games: List<ScanGame>) {
         val str = games.joinToString("\n") { serializeGame(it) }
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -225,6 +206,67 @@ object EngineScanner {
             ?: emptyList()
 
     // ============ 扫描游戏 ============
+
+    /** 全量扫描所有根目录（结果以本次扫描为准，用于首次/无数据场景）。 */
+    suspend fun scanAll(context: Context): List<ScanGame> = withContext(Dispatchers.IO) {
+        val all = mutableListOf<ScanGame>()
+        loadRoots(context).forEach { root ->
+            all += scanRoot(context, root)
+        }
+        val seen = mutableSetOf<String>()
+        all.filter { seen.add(it.uri) }
+    }
+
+    /**
+     * 增量扫描（游戏库已有数据时调用）：遍历根目录时对已识别游戏目录剪枝跳过，
+     * 只发现新游戏；返回 现有游戏 + 新发现游戏（已删除游戏保留，不主动移除）。
+     */
+    suspend fun incrementalScan(context: Context): List<ScanGame> = withContext(Dispatchers.IO) {
+        val existing = loadGames(context)
+        val known = existing.mapTo(HashSet()) { it.uri }
+        val seen = HashSet<String>()
+        val found = mutableListOf<ScanGame>()
+        loadRoots(context).forEach { root ->
+            val rootUri = Uri.parse(root)
+            val rootDir = DocumentFile.fromTreeUri(context.applicationContext, rootUri)
+            if (rootDir != null) {
+                scanRootIncremental(context.applicationContext, rootDir, 0, known, found)
+            }
+        }
+        existing + found.filter { seen.add(it.uri) }
+    }
+
+    /** 增量遍历：目录已在库中（已知游戏）→ 剪枝；识别为新游戏 → 记录并停止下钻。 */
+    private fun scanRootIncremental(
+        context: Context,
+        dir: DocumentFile,
+        level: Int,
+        known: HashSet<String>,
+        out: MutableList<ScanGame>,
+    ) {
+        if (level > 3) return
+        if (dir.uri.toString() in known) return
+        val children = dir.listFiles() ?: return
+
+        val detected = detectEngine(dir)
+        if (detected.engine != EngineType.UNKNOWN) {
+            out.add(
+                ScanGame(
+                    title = dir.name?.takeIf { it.isNotBlank() } ?: "未命名游戏",
+                    uri = dir.uri.toString(),
+                    engine = detected.engine,
+                    launchTarget = detected.launchTarget,
+                    coverUri = null,
+                )
+            )
+            return
+        }
+        for (child in children) {
+            if (child.isDirectory) {
+                scanRootIncremental(context, child, level + 1, known, out)
+            }
+        }
+    }
 
     suspend fun scanRoot(context: Context, rootUriStr: String): List<ScanGame> = withContext(Dispatchers.IO) {
         val rootUri = Uri.parse(rootUriStr)

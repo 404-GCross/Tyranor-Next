@@ -135,6 +135,26 @@ fun GameScreen(modifier: Modifier = Modifier) {
         }
     }
 
+    // 扫描游戏库：无数据时全量扫描；已有数据时增量扫描（保留现有游戏，
+    // 遍历时剪枝跳过已识别游戏目录，只发现新游戏），避免每次全量重扫。
+    fun scanLibrary() {
+        if (scanning) return
+        scope.launch {
+            scanning = true
+            val roots = EngineScanner.loadRoots(context)
+            if (roots.isNotEmpty()) {
+                val updated = if (games.isEmpty()) {
+                    EngineScanner.scanAll(context)
+                } else {
+                    EngineScanner.incrementalScan(context)
+                }
+                EngineScanner.saveGames(context, updated)
+                games = updated
+            }
+            scanning = false
+        }
+    }
+
     val dirPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         uri?.let { u ->
             runCatching {
@@ -144,22 +164,9 @@ fun GameScreen(modifier: Modifier = Modifier) {
                         android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
                 )
             }
-            // 添加后立即扫描该目录
-            scope.launch {
-                scanning = true
-                EngineScanner.saveRoot(context, u)
-                val existing = EngineScanner.loadGames(context)
-                val all = mutableListOf<ScanGame>()
-                EngineScanner.loadRoots(context).forEach { root ->
-                    all += EngineScanner.scanRoot(context, root)
-                }
-                val seen = mutableSetOf<String>()
-                val dedup = all.filter { seen.add(it.uri) }
-                val merged = EngineScanner.mergeScannedGames(existing, dedup)
-                EngineScanner.saveGames(context, merged)
-                games = merged
-                scanning = false
-            }
+            // 保存根目录后立即扫描（有数据时增量）
+            EngineScanner.saveRoot(context, u)
+            scanLibrary()
         }
     }
 
@@ -170,27 +177,7 @@ fun GameScreen(modifier: Modifier = Modifier) {
         gridState = gridState,
         dirPickerLaunch = { dirPicker.launch(null) },
         syncMissingCovers = { syncMissingCovers() },
-        refreshGames = {
-            if (!scanning) {
-                scope.launch {
-                    scanning = true
-                    val roots = EngineScanner.loadRoots(context)
-                    if (roots.isNotEmpty()) {
-                        val existing = EngineScanner.loadGames(context)
-                        val all = mutableListOf<ScanGame>()
-                        roots.forEach { root ->
-                            all += EngineScanner.scanRoot(context, root)
-                        }
-                        val seen = mutableSetOf<String>()
-                        val dedup = all.filter { seen.add(it.uri) }
-                        val merged = EngineScanner.mergeScannedGames(existing, dedup)
-                        EngineScanner.saveGames(context, merged)
-                        games = merged
-                    }
-                    scanning = false
-                }
-            }
-        },
+        refreshGames = { scanLibrary() },
         onGameClick = { selectedGame = it },
         onGameLongClick = { quickLaunchTarget = it },
     )
