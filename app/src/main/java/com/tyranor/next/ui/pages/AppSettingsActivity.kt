@@ -8,25 +8,47 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color as ComposeColor
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.tyranor.next.settings.AppSettingsStore
+import com.tyranor.next.theme.AppThemeColors
 import com.tyranor.next.theme.MiuixSettingsTheme
 import com.tyranor.next.theme.TyranorNextTheme
+import kotlin.math.roundToInt
+import top.yukonga.miuix.kmp.basic.Card as MiuixCard
+import top.yukonga.miuix.kmp.basic.ColorPicker
 import top.yukonga.miuix.kmp.basic.Scaffold as MiuixScaffold
+import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /** 应用设置页 Activity：入口见设置页「应用设置」项。 */
@@ -67,9 +89,12 @@ class AppSettingsActivity : ComponentActivity() {
     }
 }
 
-/** 应用设置页骨架：暂只有标题栏，内容后续填充。 */
+/** 应用设置页：目前提供「色调轮盘」，用于切换全局主题色。 */
 @Composable
 internal fun AppSettingsScreen() {
+    val ctx = LocalContext.current
+    var showColorPicker by remember { mutableStateOf(false) }
+
     MiuixSettingsTheme {
         MiuixScaffold(
             modifier = Modifier.fillMaxSize(),
@@ -93,16 +118,110 @@ internal fun AppSettingsScreen() {
                 }
             },
         ) { innerPadding ->
-            Box(
-                modifier = Modifier.fillMaxSize().padding(top = innerPadding.calculateTopPadding()),
-                contentAlignment = Alignment.Center,
+            LazyColumn(
+                modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
+                contentPadding = PaddingValues(top = innerPadding.calculateTopPadding() + 12.dp, bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text(
-                    "暂无设置项",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MiuixTheme.colorScheme.onBackground.copy(alpha = 0.6f),
-                )
+                item {
+                    MiuixCard(modifier = Modifier.fillMaxWidth(), cornerRadius = 8.dp) {
+                        Column(Modifier.padding(vertical = 4.dp)) {
+                            ArrowPreference(
+                                title = "色调轮盘",
+                                startAction = {
+                                    Box(
+                                        modifier = Modifier
+                                            .padding(end = 6.dp)
+                                            .size(24.dp)
+                                            .clip(CircleShape)
+                                            .background(AppThemeColors.primary),
+                                    )
+                                },
+                                endActions = {
+                                    Text(
+                                        AppThemeColors.primary.toHex(),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                },
+                                onClick = { showColorPicker = true },
+                            )
+                        }
+                    }
+                }
+                item { BottomInsetSpacer() }
             }
         }
     }
+
+    if (showColorPicker) {
+        ColorPickerDialog(
+            initialColor = AppThemeColors.primary,
+            onConfirm = { newColor ->
+                AppSettingsStore.setThemeColorHex(ctx, newColor.copy(alpha = 1f).toHex())
+                AppThemeColors.refresh(ctx)
+                showColorPicker = false
+            },
+            onDismiss = { showColorPicker = false },
+        )
+    }
+}
+
+/** 色调轮盘弹窗：内嵌 Miuix ColorPicker，确认后应用并持久化主题色。
+ *  不允许透明色与黑白灰色（无色相），非法时禁用「确定」并提示。 */
+@Composable
+private fun ColorPickerDialog(
+    initialColor: ComposeColor,
+    onConfirm: (ComposeColor) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var pickerColor by remember { mutableStateOf(initialColor) }
+    val invalid = pickerColor.isTransparentOrGray()
+    AppAlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("色调轮盘", style = MaterialTheme.typography.titleMedium) },
+        text = {
+            Column {
+                ColorPicker(
+                    color = pickerColor,
+                    onColorChanged = { pickerColor = it },
+                )
+                if (invalid) {
+                    Text(
+                        "不支持透明色或黑白灰色",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(top = 10.dp),
+                    )
+                }
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+        confirmButton = {
+            TextButton(enabled = !invalid, onClick = { onConfirm(pickerColor) }) { Text("确定") }
+        },
+    )
+}
+
+/** 透明（alpha < 1）或黑白灰（RGB 三通道差在阈值内，无色相）视为非法主题色。 */
+private fun ComposeColor.isTransparentOrGray(): Boolean {
+    if (alpha < 1f) return true
+    val maxC = maxOf(red, green, blue)
+    val minC = minOf(red, green, blue)
+    return maxC - minC <= 0.02f
+}
+
+/** Compose Color → #RRGGBB（不含透明度，主题色始终不透明）。 */
+private fun ComposeColor.toHex(): String {
+    val argb = ((alpha * 255f).roundToInt() shl 24) or
+        ((red * 255f).roundToInt() shl 16) or
+        ((green * 255f).roundToInt() shl 8) or
+        (blue * 255f).roundToInt()
+    return String.format("#%06X", argb and 0xFFFFFF)
+}
+
+/** 列表底部占位：避让系统导航栏。 */
+@Composable
+private fun BottomInsetSpacer() {
+    Box(Modifier.fillMaxWidth().height(WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()))
 }

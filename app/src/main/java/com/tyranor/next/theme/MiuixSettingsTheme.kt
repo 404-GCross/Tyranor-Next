@@ -1,25 +1,13 @@
 package com.tyranor.next.theme
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.sp
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.defaultTextStyles
 import top.yukonga.miuix.kmp.theme.lightColorScheme
-
-/**
- * 设置页专用 Miuix 主题：固定浅色，配色与 TyranorNextTheme 对齐
- * （浅灰页面背景 + 白色卡片 + 蓝色主色），不随系统深色模式变化。
- */
-private val TyranorMiuixLightColors = lightColorScheme(
-    primary = Blue40,
-    background = PageGrey,
-    surface = PageGrey,
-    surfaceContainer = NavWhite,
-    onBackground = TextColor,
-    onSurface = TextColor,
-    onSurfaceContainer = TextColor,
-)
 
 /**
  * 文字统一规范：页面内容只用 titleMedium(16sp)/bodyMedium(14sp) 两档。
@@ -30,10 +18,27 @@ private val TyranorMiuixTextStyles = defaultTextStyles(
     headline1 = TextStyle(fontSize = 16.sp),
 )
 
+/**
+ * 设置页专用 Miuix 主题：固定浅色，配色与 TyranorNextTheme 对齐
+ * （浅灰页面背景 + 白色卡片），不随系统深色模式变化。
+ * primaryColor 由应用设置「色调轮盘」提供，默认蓝与 TyranorNextTheme 一致。
+ */
 @Composable
-fun MiuixSettingsTheme(content: @Composable () -> Unit) {
+fun MiuixSettingsTheme(
+    primaryColor: Color = AppThemeColors.primary,
+    content: @Composable () -> Unit,
+) {
+    AppThemeColors.ensureLoaded(LocalContext.current)
     MiuixTheme(
-        colors = TyranorMiuixLightColors,
+        colors = lightColorScheme(
+            primary = primaryColor,
+            background = PageGrey,
+            surface = PageGrey,
+            surfaceContainer = NavWhite,
+            onBackground = TextColor,
+            onSurface = TextColor,
+            onSurfaceContainer = TextColor,
+        ),
         textStyles = TyranorMiuixTextStyles,
         content = content,
     )
