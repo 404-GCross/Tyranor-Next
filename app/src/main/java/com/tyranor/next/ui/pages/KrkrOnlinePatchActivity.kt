@@ -60,13 +60,11 @@ import com.tyranor.next.scanner.ScanGame
 import com.tyranor.next.scanner.ScanGameIntents
 import com.tyranor.next.theme.NavWhite
 import com.tyranor.next.theme.TyranorNextTheme
+import com.tyranor.next.ui.common.TimeFormats
 import com.tyranor.next.ui.common.TopBarIcon
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 class KrkrOnlinePatchActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -268,7 +266,7 @@ private fun PatchEntryCard(
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                listOf(entry.brand, formatPatchDate(entry.timestamp)).filter { it.isNotBlank() }.joinToString(" · "),
+                listOf(entry.brand, TimeFormats.formatDate(entry.timestamp)).filter { it.isNotBlank() }.joinToString(" · "),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
@@ -321,9 +319,4 @@ private fun PatchEntryCard(
             }
         }
     }
-}
-
-private fun formatPatchDate(timestamp: Long): String {
-    if (timestamp <= 0L) return ""
-    return SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date(timestamp))
 }

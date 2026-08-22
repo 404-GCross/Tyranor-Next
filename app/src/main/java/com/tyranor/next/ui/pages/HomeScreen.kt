@@ -45,11 +45,9 @@ import com.tyranor.next.R
 import com.tyranor.next.scanner.EngineScanner
 import com.tyranor.next.scanner.ScanGame
 import com.tyranor.next.theme.NavWhite
+import com.tyranor.next.ui.common.TimeFormats
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 @Composable
 fun HomeScreen(modifier: Modifier = Modifier) {
@@ -254,17 +252,10 @@ private fun RecentGameRow(game: ScanGame, onClick: () -> Unit, onLongClick: () -
             modifier = Modifier.weight(1f).padding(start = 14.dp),
         )
         Text(
-            formatOpenTime(game.openTime),
+            TimeFormats.formatDateTime(game.openTime),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(start = 12.dp),
         )
     }
-}
-
-private fun formatOpenTime(ts: Long): String {
-    if (ts <= 0) return ""
-    return runCatching {
-        SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date(ts))
-    }.getOrDefault("")
 }
