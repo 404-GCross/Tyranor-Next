@@ -37,6 +37,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -50,9 +51,12 @@ import androidx.compose.ui.unit.dp
 import com.example.tyranornext.settings.EngineSettingsStore
 import com.example.tyranornext.theme.MiuixSettingsTheme
 import java.io.File
+import kotlin.math.roundToInt
 import top.yukonga.miuix.kmp.basic.Card as MiuixCard
 import top.yukonga.miuix.kmp.basic.Icon as MiuixIcon
 import top.yukonga.miuix.kmp.basic.Scaffold as MiuixScaffold
+import top.yukonga.miuix.kmp.basic.Slider
+import top.yukonga.miuix.kmp.basic.SliderDefaults
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
@@ -76,7 +80,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 item {
-                    MiuixCard(modifier = Modifier.fillMaxWidth()) {
+                    MiuixCard(modifier = Modifier.fillMaxWidth(), cornerRadius = 8.dp) {
                         EngineSettingsKind.entries.forEach { kind ->
                             ArrowPreference(
                                 title = kind.title,
@@ -297,16 +301,16 @@ private fun LazyListPlaceholder(
                         onKrRenderer(if (it == "default") "" else it)
                     }
                     if (krRenderer == "" || krRenderer == EngineSettingsStore.RENDERER_SOFTWARE) {
-                        DropdownRow("软件渲染线程数", KR_THREAD_MAP, krDrawThread, onKrDrawThread)
-                        DropdownRow("软件纹理压缩", KR_SW_COMPRESS_MAP, krSwCompress, onKrSwCompress)
+                        EnumSliderRow("软件渲染线程数", KR_THREAD_MAP, krDrawThread, onKrDrawThread)
+                        EnumSliderRow("软件纹理压缩", KR_SW_COMPRESS_MAP, krSwCompress, onKrSwCompress)
                     }
                     if (krRenderer == "" || krRenderer == EngineSettingsStore.RENDERER_OPENGL) {
-                        DropdownRow("OpenGL 纹理压缩", KR_OGL_COMPRESS_MAP, krOglCompress, onKrOglCompress)
-                        DropdownRow("最大纹理尺寸", KR_TEXSIZE_MAP, krTexsize, onKrTexsize)
+                        EnumSliderRow("OpenGL 纹理压缩", KR_OGL_COMPRESS_MAP, krOglCompress, onKrOglCompress)
+                        EnumSliderRow("最大纹理尺寸", KR_TEXSIZE_MAP, krTexsize, onKrTexsize)
                     }
-                    DropdownRow("内存用量", KR_MEM_MAP, krMem, onKrMem)
+                    EnumSliderRow("内存用量", KR_MEM_MAP, krMem, onKrMem)
                     if (!krIs134126) {
-                        DropdownRow("FPS 限制", KR_FPS_MAP, krFps, onKrFps)
+                        EnumSliderRow("FPS 限制", KR_FPS_MAP, krFps, onKrFps)
                     }
                 }
             }
@@ -320,7 +324,7 @@ private fun LazyListPlaceholder(
                 SwitchPreference(title = "禁用视频", checked = ons.disableVideo, onCheckedChange = { b -> onOns(ons.copy(disableVideo = b)) })
                 SwitchPreference(title = "画面锐化", checked = ons.sharpness, onCheckedChange = { b -> onOns(ons.copy(sharpness = b)) })
                 if (ons.sharpness) {
-                    DropdownRow("锐化强度", ONS_SHARPNESS_MAP, ons.sharpnessValue) {
+                    EnumSliderRow("锐化强度", ONS_SHARPNESS_MAP, ons.sharpnessValue) {
                         onOns(ons.copy(sharpnessValue = it))
                     }
                 }
@@ -351,7 +355,7 @@ private fun LazyListPlaceholder(
 
 @Composable
 private fun EngineCard(header: String, content: @Composable () -> Unit) {
-    MiuixCard(modifier = Modifier.fillMaxWidth()) {
+    MiuixCard(modifier = Modifier.fillMaxWidth(), cornerRadius = 8.dp) {
         Column(Modifier.padding(vertical = 6.dp)) {
             Text(
                 header,
@@ -379,6 +383,45 @@ private fun DropdownRow(
         items = labels,
         selectedIndex = index,
         onSelectedIndexChange = { onSelect(keys[it]) },
+    )
+}
+
+/**
+ * 档次/数字滑杆行：复刻参考项目「界面缩放」交互 —— ArrowPreference 底部内嵌 Slider，
+ * 档位映射为整数索引并开启 keyPoints 磁吸 + Step 震动反馈；右侧实时显示当前档位文本。
+ * 拖拽只更新本地状态，松手（onValueChangeFinished）才回调写盘，避免拖动过程中频繁 IO。
+ */
+@Composable
+private fun EnumSliderRow(
+    label: String,
+    options: List<Pair<String, String>>,
+    current: String,
+    onSelect: (String) -> Unit,
+) {
+    val initIndex = options.indexOfFirst { it.first == current }.takeIf { it >= 0 } ?: 0
+    var sliderIndex by remember(current) { mutableIntStateOf(initIndex) }
+    ArrowPreference(
+        title = label,
+        endActions = {
+            Text(
+                options[sliderIndex].second,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        },
+        onClick = { },
+        bottomAction = {
+            Slider(
+                value = sliderIndex.toFloat(),
+                onValueChange = { sliderIndex = it.roundToInt().coerceIn(0, options.size - 1) },
+                onValueChangeFinished = { onSelect(options[sliderIndex].first) },
+                valueRange = 0f..(options.size - 1).toFloat(),
+                showKeyPoints = true,
+                keyPoints = (0 until options.size).map { it.toFloat() },
+                magnetThreshold = 0.25f,
+                hapticEffect = SliderDefaults.SliderHapticEffect.Step,
+            )
+        },
     )
 }
 
@@ -454,7 +497,7 @@ private val KR_RENDERER_MAP = listOf(
     EngineSettingsStore.RENDERER_SOFTWARE to "软件渲染",
     EngineSettingsStore.RENDERER_OPENGL to "OpenGL",
 )
-private val KR_THREAD_MAP = listOf("" to "自动", "0" to "自动") + (1..8).map { it.toString() to "$it 线程" }
+private val KR_THREAD_MAP = listOf("0" to "自动") + (1..8).map { it.toString() to "$it 线程" }
 private val KR_SW_COMPRESS_MAP = listOf(
     "" to "引擎默认", "none" to "无", "halfline" to "半行", "lz4" to "LZ4", "lz4+tlg5" to "LZ4+TLG5",
 )
@@ -468,7 +511,7 @@ private val KR_MEM_MAP = listOf(
     EngineSettingsStore.MEM_USAGE_MEDIUM to "中",
     EngineSettingsStore.MEM_USAGE_LOW to "低",
 )
-private val KR_TEXSIZE_MAP = listOf("" to "自动", "0" to "自动") +
+private val KR_TEXSIZE_MAP = listOf("0" to "自动") +
     listOf(1024, 2048, 4096, 8192, 16384).map { it.toString() to it.toString() }
 private val KR_FPS_MAP = listOf("" to "引擎默认", "60" to "60", "45" to "45", "30" to "30", "15" to "15")
 private val ONS_SHARPNESS_MAP = listOf("1" to "1.0", "2" to "2.0", "3" to "3.0", "4" to "4.0", "5" to "5.0")
