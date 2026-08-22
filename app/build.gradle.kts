@@ -6,7 +6,12 @@ plugins {
 
 android {
     namespace = "com.example.tyranornext"
-    compileSdk = 36
+    // miuix 0.9.2 传递依赖要求 compileSdk 37（本地平台为 android-37.0）
+    compileSdk {
+        version = release(37) {
+            minorApiLevel = 0
+        }
+    }
     defaultConfig {
         applicationId = "com.example.tyranornext"
         minSdk = 26
@@ -90,5 +95,9 @@ dependencies {
   implementation(libs.androidx.navigation3.runtime)
   implementation(libs.androidx.lifecycle.viewmodel.navigation3)
   implementation(libs.androidx.documentfile)
+
+  // Miuix 组件库（设置页 Card + Preference 体系）
+  implementation(libs.miuix.ui)
+  implementation(libs.miuix.preference)
   implementation(project(":engine"))
 }

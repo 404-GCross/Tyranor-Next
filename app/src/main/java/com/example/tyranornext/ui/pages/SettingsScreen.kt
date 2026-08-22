@@ -22,20 +22,17 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Save
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material.icons.rounded.Memory
+import androidx.compose.material.icons.rounded.RocketLaunch
+import androidx.compose.material.icons.rounded.VideogameAsset
+import androidx.compose.material.icons.rounded.Web
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -45,41 +42,61 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.tyranornext.settings.EngineSettingsStore
-import com.example.tyranornext.theme.NavWhite
+import com.example.tyranornext.theme.MiuixSettingsTheme
 import java.io.File
+import top.yukonga.miuix.kmp.basic.Card as MiuixCard
+import top.yukonga.miuix.kmp.basic.Icon as MiuixIcon
+import top.yukonga.miuix.kmp.basic.Scaffold as MiuixScaffold
+import top.yukonga.miuix.kmp.preference.ArrowPreference
+import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
+import top.yukonga.miuix.kmp.preference.SwitchPreference
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
-/** 设置页：只展示各引擎全局设置入口，具体设置内容由独立 Activity 承载。 */
+/** 设置页：只展示各引擎全局设置入口，具体设置内容由独立 Activity 承载。列表项采用 Miuix Card + Preference 体系。 */
 @Composable
 fun SettingsScreen(modifier: Modifier = Modifier) {
     val ctx = LocalContext.current
 
-    Column(modifier.fillMaxSize()) {
-        Column(modifier = Modifier.fillMaxWidth().statusBarsPadding()) {
-            Row(
-                modifier = Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 16.dp),
-                verticalAlignment = Alignment.CenterVertically,
+    MiuixSettingsTheme {
+        MiuixScaffold(
+            modifier = modifier,
+            containerColor = MiuixTheme.colorScheme.background,
+            contentWindowInsets = WindowInsets(0.dp),
+            topBar = { SettingsTopBar("设置") },
+        ) { innerPadding ->
+            LazyColumn(
+                modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
+                contentPadding = PaddingValues(top = innerPadding.calculateTopPadding() + 12.dp, bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text("设置", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
-            }
-        }
-
-        androidx.compose.foundation.lazy.LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
-            contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            EngineSettingsKind.entries.forEach { kind ->
                 item {
-                    SettingsEntryCard(kind.title) {
-                        startActivityWithFade(ctx, EngineSettingsActivity.createIntent(ctx, kind))
+                    MiuixCard(modifier = Modifier.fillMaxWidth()) {
+                        EngineSettingsKind.entries.forEach { kind ->
+                            ArrowPreference(
+                                title = kind.title,
+                                startAction = {
+                                    MiuixIcon(
+                                        kind.icon,
+                                        modifier = Modifier.padding(end = 6.dp),
+                                        contentDescription = kind.title,
+                                        tint = MiuixTheme.colorScheme.onBackground,
+                                    )
+                                },
+                                onClick = {
+                                    startActivityWithFade(ctx, EngineSettingsActivity.createIntent(ctx, kind))
+                                },
+                            )
+                        }
                     }
                 }
+                item { BottomInsetSpacer() }
             }
-            item { Box(Modifier.fillMaxWidth().height(WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding())) }
         }
     }
 }
@@ -146,80 +163,85 @@ internal fun EngineSettingsDetailScreen(kind: EngineSettingsKind, onBack: () -> 
         EngineSettingsStore.setTyranoScopedSaveDir(ctx, tyScoped)
     }
 
-    Column(Modifier.fillMaxSize()) {
-        Column(modifier = Modifier.fillMaxWidth().statusBarsPadding()) {
-            Row(
-                modifier = Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回", tint = MaterialTheme.colorScheme.onSurface)
+    MiuixSettingsTheme {
+        MiuixScaffold(
+            modifier = Modifier.fillMaxSize(),
+            containerColor = MiuixTheme.colorScheme.background,
+            contentWindowInsets = WindowInsets(0.dp),
+            topBar = {
+                Column(modifier = Modifier.fillMaxWidth().statusBarsPadding()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回", tint = MaterialTheme.colorScheme.onSurface)
+                        }
+                        Text(kind.title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        IconButton(onClick = {
+                            saveAll()
+                            android.widget.Toast.makeText(ctx, "引擎设置已保存", android.widget.Toast.LENGTH_SHORT).show()
+                        }) {
+                            Icon(Icons.Filled.Save, contentDescription = "保存设置", tint = MaterialTheme.colorScheme.onSurface)
+                        }
+                    }
                 }
-                Text(kind.title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                IconButton(onClick = {
-                    saveAll()
-                    android.widget.Toast.makeText(ctx, "引擎设置已保存", android.widget.Toast.LENGTH_SHORT).show()
-                }) {
-                    Icon(Icons.Filled.Save, contentDescription = "保存设置", tint = MaterialTheme.colorScheme.onSurface)
-                }
-            }
-        }
-
-        LazyListPlaceholder(
-            kind,
-            krVersion, krKernel, krScoped, krFont, krForceFont, krRenderer, krDrawThread,
-            krSwCompress, krOglCompress, krMem, krTexsize, krAccurate, krFps, isSdl3, krIs134126,
-            ons, artVersion, artRotate, artPatch, tyExternal, tyScoped, fontLauncher,
-            onKrVersion = { krVersion = it },
-            onKrKernel = { krKernel = it },
-            onKrScoped = { krScoped = it },
-            onKrForceFont = { krForceFont = it },
-            onKrRenderer = { krRenderer = it },
-            onKrDrawThread = { krDrawThread = it },
-            onKrSwCompress = { krSwCompress = it },
-            onKrOglCompress = { krOglCompress = it },
-            onKrMem = { krMem = it },
-            onKrTexsize = { krTexsize = it },
-            onKrAccurate = { krAccurate = it },
-            onKrFps = { krFps = it },
-            onResetKrFont = { krFont = "" },
-            onOns = { ons = it },
-            onArtVersion = { artVersion = it },
-            onArtRotate = { artRotate = it },
-            onArtPatch = { artPatch = it },
-            onTyExternal = { tyExternal = it },
-            onTyScoped = { tyScoped = it },
-        )
-    }
-}
-
-enum class EngineSettingsKind(val title: String) {
-    KRKR("KRKR引擎设置"),
-    ONS("ONS引擎设置"),
-    ARTEMIS("Artemis引擎设置"),
-    TYRANO("Tyrano引擎设置"),
-}
-
-@Composable
-private fun SettingsEntryCard(title: String, onClick: () -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        colors = CardDefaults.cardColors(containerColor = NavWhite),
-        shape = RoundedCornerShape(8.dp),
-    ) {
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 18.5.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(title, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-            Icon(
-                Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            },
+        ) { innerPadding ->
+            LazyListPlaceholder(
+                kind,
+                krVersion, krKernel, krScoped, krFont, krForceFont, krRenderer, krDrawThread,
+                krSwCompress, krOglCompress, krMem, krTexsize, krAccurate, krFps, isSdl3, krIs134126,
+                ons, artVersion, artRotate, artPatch, tyExternal, tyScoped, fontLauncher,
+                topInset = innerPadding.calculateTopPadding(),
+                onKrVersion = { krVersion = it },
+                onKrKernel = { krKernel = it },
+                onKrScoped = { krScoped = it },
+                onKrForceFont = { krForceFont = it },
+                onKrRenderer = { krRenderer = it },
+                onKrDrawThread = { krDrawThread = it },
+                onKrSwCompress = { krSwCompress = it },
+                onKrOglCompress = { krOglCompress = it },
+                onKrMem = { krMem = it },
+                onKrTexsize = { krTexsize = it },
+                onKrAccurate = { krAccurate = it },
+                onKrFps = { krFps = it },
+                onResetKrFont = { krFont = "" },
+                onOns = { ons = it },
+                onArtVersion = { artVersion = it },
+                onArtRotate = { artRotate = it },
+                onArtPatch = { artPatch = it },
+                onTyExternal = { tyExternal = it },
+                onTyScoped = { tyScoped = it },
             )
         }
     }
+}
+
+enum class EngineSettingsKind(val title: String, val icon: ImageVector) {
+    KRKR("KRKR引擎设置", Icons.Rounded.Memory),
+    ONS("ONS引擎设置", Icons.Rounded.VideogameAsset),
+    ARTEMIS("Artemis引擎设置", Icons.Rounded.RocketLaunch),
+    TYRANO("Tyrano引擎设置", Icons.Rounded.Web),
+}
+
+/** 顶部栏：遵守全局规范（Column + statusBarsPadding + 64dp 标题区，透明背景）。 */
+@Composable
+private fun SettingsTopBar(title: String) {
+    Column(modifier = Modifier.fillMaxWidth().statusBarsPadding()) {
+        Row(
+            modifier = Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+        }
+    }
+}
+
+/** 列表底部占位：避让系统导航栏。 */
+@Composable
+private fun BottomInsetSpacer() {
+    Box(Modifier.fillMaxWidth().height(WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()))
 }
 
 private fun startActivityWithFade(context: Context, intent: Intent) {
@@ -236,7 +258,6 @@ private fun startActivityWithFade(context: Context, intent: Intent) {
     }
 }
 
-// 占位，实际列表在下方 LazyListPlaceholder 中
 private typealias FontPickerLauncher = androidx.activity.compose.ManagedActivityResultLauncher<String, Uri?>
 
 @Composable
@@ -247,6 +268,7 @@ private fun LazyListPlaceholder(
     krMem: String, krTexsize: String, krAccurate: String, krFps: String, isSdl3: Boolean, krIs134126: Boolean,
     ons: EngineSettingsStore.Ons, artVersion: String, artRotate: Boolean, artPatch: String,
     tyExternal: Boolean, tyScoped: Boolean, fontLauncher: FontPickerLauncher,
+    topInset: Dp,
     onKrVersion: (String) -> Unit, onKrKernel: (String) -> Unit, onKrScoped: (Boolean) -> Unit,
     onKrForceFont: (Boolean) -> Unit, onKrRenderer: (String) -> Unit, onKrDrawThread: (String) -> Unit,
     onKrSwCompress: (String) -> Unit, onKrOglCompress: (String) -> Unit, onKrMem: (String) -> Unit,
@@ -255,48 +277,36 @@ private fun LazyListPlaceholder(
     onArtVersion: (String) -> Unit, onArtRotate: (Boolean) -> Unit, onArtPatch: (String) -> Unit,
     onTyExternal: (Boolean) -> Unit, onTyScoped: (Boolean) -> Unit,
 ) {
-    androidx.compose.foundation.lazy.LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
-        contentPadding = PaddingValues(top = 4.dp, bottom = 24.dp),
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
+        contentPadding = PaddingValues(top = topInset + 12.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         if (kind == EngineSettingsKind.KRKR) item {
             EngineCard("KRKR") {
-                ListSwitch("独立存档目录", krScoped, onKrScoped)
-                SingleChoiceRow("引擎版本", optionLabel(krVersion, KR_SELECT_MAP), KR_SELECT_MAP, krVersion, onKrVersion)
-                SingleChoiceRow(
-                    "引擎内核",
-                    when (krKernel) {
-                        EngineSettingsStore.KERNEL_KRKRSDL3 -> "krkrsdl3"
-                        EngineSettingsStore.KERNEL_KIRIKIRI2 -> "吉里吉里2"
-                        else -> "自动"
-                    },
-                    mapOf(
-                        EngineSettingsStore.KR_AUTO to "自动",
-                        EngineSettingsStore.KERNEL_KIRIKIRI2 to "吉里吉里2",
-                        EngineSettingsStore.KERNEL_KRKRSDL3 to "krkrsdl3",
-                    ), krKernel, onKrKernel,
-                )
+                SwitchPreference(title = "独立存档目录", checked = krScoped, onCheckedChange = onKrScoped)
+                DropdownRow("引擎版本", KR_SELECT_MAP, krVersion, onKrVersion)
+                DropdownRow("引擎内核", KR_KERNEL_MAP, krKernel, onKrKernel)
                 if (!isSdl3) {
                     FontRow("默认字体", krFont.ifEmpty { "内置字体" }, onResetKrFont, { fontLauncher.launch("*/*") })
                     if (krVersion != EngineSettingsStore.KR_126) {
-                        ListSwitch("强制使用默认字体", krForceFont, onKrForceFont)
+                        SwitchPreference(title = "强制使用默认字体", checked = krForceFont, onCheckedChange = onKrForceFont)
                     }
-                    ListSwitch("OpenGL 精确渲染", krAccurate == "1") { b -> onKrAccurate(if (b) "1" else "0") }
-                    SingleChoiceRow("渲染器", krRendererLabel(krRenderer), KR_RENDERER_MAP, krRenderer.ifEmpty { "default" }) {
+                    SwitchPreference(title = "OpenGL 精确渲染", checked = krAccurate == "1", onCheckedChange = { b -> onKrAccurate(if (b) "1" else "0") })
+                    DropdownRow("渲染器", KR_RENDERER_MAP, krRenderer.ifEmpty { "default" }) {
                         onKrRenderer(if (it == "default") "" else it)
                     }
                     if (krRenderer == "" || krRenderer == EngineSettingsStore.RENDERER_SOFTWARE) {
-                        SingleChoiceRow("软件渲染线程数", if (krDrawThread == "" || krDrawThread == "0") "自动" else krDrawThread, KR_THREAD_MAP.plus("0" to "自动"), krDrawThread, onKrDrawThread)
-                        SingleChoiceRow("软件纹理压缩", choiceLabel(krSwCompress, KR_SW_COMPRESS_MAP).ifEmpty { "引擎默认" }, KR_SW_COMPRESS_MAP, krSwCompress, onKrSwCompress)
+                        DropdownRow("软件渲染线程数", KR_THREAD_MAP, krDrawThread, onKrDrawThread)
+                        DropdownRow("软件纹理压缩", KR_SW_COMPRESS_MAP, krSwCompress, onKrSwCompress)
                     }
                     if (krRenderer == "" || krRenderer == EngineSettingsStore.RENDERER_OPENGL) {
-                        SingleChoiceRow("OpenGL 纹理压缩", choiceLabel(krOglCompress, KR_OGL_COMPRESS_MAP).ifEmpty { "引擎默认" }, KR_OGL_COMPRESS_MAP, krOglCompress, onKrOglCompress)
-                        SingleChoiceRow("最大纹理尺寸", if (krTexsize.isEmpty() || krTexsize == "0") "自动" else krTexsize, KR_TEXSIZE_MAP, krTexsize, onKrTexsize)
+                        DropdownRow("OpenGL 纹理压缩", KR_OGL_COMPRESS_MAP, krOglCompress, onKrOglCompress)
+                        DropdownRow("最大纹理尺寸", KR_TEXSIZE_MAP, krTexsize, onKrTexsize)
                     }
-                    SingleChoiceRow("内存用量", choiceLabel(krMem, KR_MEM_MAP).ifEmpty { "引擎默认" }, KR_MEM_MAP, krMem, onKrMem)
+                    DropdownRow("内存用量", KR_MEM_MAP, krMem, onKrMem)
                     if (!krIs134126) {
-                        SingleChoiceRow("FPS 限制", choiceLabel(krFps, KR_FPS_MAP).ifEmpty { "引擎默认" }, KR_FPS_MAP, krFps, onKrFps)
+                        DropdownRow("FPS 限制", KR_FPS_MAP, krFps, onKrFps)
                     }
                 }
             }
@@ -304,138 +314,91 @@ private fun LazyListPlaceholder(
 
         if (kind == EngineSettingsKind.ONS) item {
             EngineCard("ONS") {
-                ListSwitch("独立存档目录", ons.scopedSaveDir) { b -> onOns(ons.copy(scopedSaveDir = b)) }
-                ListSwitch("全屏拉伸", ons.stretchFull) { b -> onOns(ons.copy(stretchFull = b)) }
-                ListSwitch("忽略刘海", ons.ignoreCutout) { b -> onOns(ons.copy(ignoreCutout = b)) }
-                ListSwitch("禁用视频", ons.disableVideo) { b -> onOns(ons.copy(disableVideo = b)) }
-                ListSwitch("画面锐化", ons.sharpness) { b -> onOns(ons.copy(sharpness = b)) }
+                SwitchPreference(title = "独立存档目录", checked = ons.scopedSaveDir, onCheckedChange = { b -> onOns(ons.copy(scopedSaveDir = b)) })
+                SwitchPreference(title = "全屏拉伸", checked = ons.stretchFull, onCheckedChange = { b -> onOns(ons.copy(stretchFull = b)) })
+                SwitchPreference(title = "忽略刘海", checked = ons.ignoreCutout, onCheckedChange = { b -> onOns(ons.copy(ignoreCutout = b)) })
+                SwitchPreference(title = "禁用视频", checked = ons.disableVideo, onCheckedChange = { b -> onOns(ons.copy(disableVideo = b)) })
+                SwitchPreference(title = "画面锐化", checked = ons.sharpness, onCheckedChange = { b -> onOns(ons.copy(sharpness = b)) })
                 if (ons.sharpness) {
-                    SingleChoiceRow("锐化强度", ons.sharpnessValue, ONS_SHARPNESS_MAP, ons.sharpnessValue) { it ->
+                    DropdownRow("锐化强度", ONS_SHARPNESS_MAP, ons.sharpnessValue) {
                         onOns(ons.copy(sharpnessValue = it))
                     }
                 }
-                SingleChoiceRow(
-                    "文本编码",
-                    when (ons.encoding) { "sjis" -> "Shift-JIS"; "utf8" -> "UTF-8"; else -> "GBK" },
-                    mapOf("gbk" to "GBK", "sjis" to "Shift-JIS", "utf8" to "UTF-8"),
-                    ons.encoding, { it -> onOns(ons.copy(encoding = it)) },
-                )
+                DropdownRow("文本编码", ONS_ENCODING_MAP, EngineSettingsStore.normalizeEncoding(ons.encoding)) {
+                    onOns(ons.copy(encoding = it))
+                }
             }
         }
 
         if (kind == EngineSettingsKind.ARTEMIS) item {
             EngineCard("Artemis") {
-                SingleChoiceRow("引擎版本", artVersionLabel(artVersion), ART_VERSION_MAP, artVersion, onArtVersion)
-                ListSwitch("画面反转", artRotate, onArtRotate)
-                SingleChoiceRow("自动补丁", artPatchLabel(artPatch), ART_PATCH_MAP, artPatch, onArtPatch)
+                DropdownRow("引擎版本", ART_VERSION_MAP, artVersion, onArtVersion)
+                SwitchPreference(title = "画面反转", checked = artRotate, onCheckedChange = onArtRotate)
+                DropdownRow("自动补丁", ART_PATCH_MAP, artPatch, onArtPatch)
             }
         }
 
         if (kind == EngineSettingsKind.TYRANO) item {
             EngineCard("Tyrano") {
-                ListSwitch("允许加载外部网络资源", tyExternal, onTyExternal)
-                ListSwitch("独立存档目录", tyScoped, onTyScoped)
+                SwitchPreference(title = "允许加载外部网络资源", checked = tyExternal, onCheckedChange = onTyExternal)
+                SwitchPreference(title = "独立存档目录", checked = tyScoped, onCheckedChange = onTyScoped)
             }
         }
 
-        item { Box(Modifier.fillMaxWidth().height(WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding())) }
+        item { BottomInsetSpacer() }
     }
 }
 
 @Composable
 private fun EngineCard(header: String, content: @Composable () -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        colors = CardDefaults.cardColors(containerColor = NavWhite),
-        shape = RoundedCornerShape(8.dp),
-    ) {
+    MiuixCard(modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(vertical = 6.dp)) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(header, style = MaterialTheme.typography.titleMedium)
-                }
-            }
+            Text(
+                header,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+            )
             content()
         }
     }
 }
 
+/** 单选下拉行：Miuix OverlayDropdownPreference，点击展开覆盖式选项浮层，选中即回填。 */
 @Composable
-private fun ListSwitch(label: String, checked: Boolean, onCheck: (Boolean) -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().clickable { onCheck(!checked) }.padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-        Switch(checked = checked, onCheckedChange = onCheck)
-    }
-}
-
-/** 单选下拉行：点击行弹出单选对话框，选中后回调。 */
-@Composable
-private fun SingleChoiceRow(
+private fun DropdownRow(
     label: String,
-    value: String,
-    options: Map<String, String>,
+    options: List<Pair<String, String>>,
     current: String,
     onSelect: (String) -> Unit,
 ) {
-    var open by remember { mutableStateOf(false) }
-    Row(
-        Modifier.fillMaxWidth().clickable { open = true }.padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-        Text(
-            value,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(start = 8.dp),
-        )
-    }
-    if (open) {
-        AppAlertDialog(
-            onDismissRequest = { open = false },
-            title = { Text(label, style = MaterialTheme.typography.titleMedium) },
-            text = {
-                Column(Modifier.verticalScroll(rememberScrollState())) {
-                    options.forEach { (k, optionLabel) ->
-                        Row(
-                            Modifier.fillMaxWidth().clickable { onSelect(k); open = false }.padding(vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            RadioButton(selected = k == current, onClick = { onSelect(k); open = false })
-                            Text(optionLabel, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(start = 8.dp))
-                        }
-                    }
-                }
-            },
-            confirmButton = { TextButton(onClick = { open = false }) { Text("取消") } },
-        )
-    }
+    val keys = options.map { it.first }
+    val labels = options.map { it.second }
+    val index = keys.indexOf(current).takeIf { it >= 0 } ?: 0
+    OverlayDropdownPreference(
+        title = label,
+        items = labels,
+        selectedIndex = index,
+        onSelectedIndexChange = { onSelect(keys[it]) },
+    )
 }
 
-/** 字体行：点击弹出「内置字体 / 选择字体文件」，选择文件时启动系统文件选择器。 */
+/** 字体行：Miuix ArrowPreference，右侧展示当前字体；点击弹出「内置字体 / 选择字体文件」。 */
 @Composable
 private fun FontRow(label: String, value: String, onReset: () -> Unit, onPick: () -> Unit) {
     var open by remember { mutableStateOf(false) }
-    Row(
-        Modifier.fillMaxWidth().clickable { open = true }.padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-        androidx.compose.material3.Text(
-            value,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(start = 8.dp),
-        )
-    }
+    ArrowPreference(
+        title = label,
+        endActions = {
+            Text(
+                value,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        },
+        onClick = { open = true },
+    )
     if (open) {
         AppAlertDialog(
             onDismissRequest = { open = false },
@@ -474,58 +437,49 @@ private fun importFont(ctx: android.content.Context, uri: Uri): String? = try {
     null
 }
 
-private fun krRendererLabel(v: String): String = when (v) {
-    EngineSettingsStore.RENDERER_OPENGL -> "OpenGL"
-    EngineSettingsStore.RENDERER_SOFTWARE -> "软件渲染"
-    else -> "引擎默认"
-}
-
-private fun optionLabel(v: String, map: Map<String, String>): String = map[v] ?: v.ifEmpty { "引擎默认" }
-private fun choiceLabel(v: String, map: Map<String, String>): String = map[v].orEmpty()
-
-private fun artVersionLabel(v: String): String = when (v) {
-    EngineSettingsStore.ART_ENGINE_V1 -> "V1"
-    EngineSettingsStore.ART_ENGINE_V2 -> "V2"
-    EngineSettingsStore.ART_ENGINE_V3 -> "V3"
-    else -> "自动"
-}
-private fun artPatchLabel(v: String): String = when (v) {
-    EngineSettingsStore.AUTO_PATCH_AUTO -> "自动"
-    EngineSettingsStore.AUTO_PATCH_OFF -> "关闭"
-    else -> "启动时询问"
-}
-
-private val KR_SELECT_MAP = mapOf(
+// 选项表（保序；"" 表示未设置 = 引擎默认/自动，选中后写回空串，语义与旧实现一致）
+private val KR_SELECT_MAP = listOf(
     EngineSettingsStore.KR_AUTO to "自动",
     EngineSettingsStore.KR_139 to "1.3.9",
     EngineSettingsStore.KR_134 to "1.3.4",
     EngineSettingsStore.KR_126 to "1.2.6",
 )
-private val KR_RENDERER_MAP = mapOf(
+private val KR_KERNEL_MAP = listOf(
+    EngineSettingsStore.KR_AUTO to "自动",
+    EngineSettingsStore.KERNEL_KIRIKIRI2 to "吉里吉里2",
+    EngineSettingsStore.KERNEL_KRKRSDL3 to "krkrsdl3",
+)
+private val KR_RENDERER_MAP = listOf(
     "default" to "引擎默认",
     EngineSettingsStore.RENDERER_SOFTWARE to "软件渲染",
     EngineSettingsStore.RENDERER_OPENGL to "OpenGL",
 )
-private val KR_THREAD_MAP = (1..8).associate { it.toString() to "$it 线程" }
-private val KR_SW_COMPRESS_MAP = mapOf("none" to "无", "halfline" to "半行", "lz4" to "LZ4", "lz4+tlg5" to "LZ4+TLG5")
-private val KR_OGL_COMPRESS_MAP = mapOf("none" to "无", "half" to "半精度", "etc2" to "ETC2", "pvrtc" to "PVRTC")
-private val KR_MEM_MAP = mapOf(
+private val KR_THREAD_MAP = listOf("" to "自动", "0" to "自动") + (1..8).map { it.toString() to "$it 线程" }
+private val KR_SW_COMPRESS_MAP = listOf(
+    "" to "引擎默认", "none" to "无", "halfline" to "半行", "lz4" to "LZ4", "lz4+tlg5" to "LZ4+TLG5",
+)
+private val KR_OGL_COMPRESS_MAP = listOf(
+    "" to "引擎默认", "none" to "无", "half" to "半精度", "etc2" to "ETC2", "pvrtc" to "PVRTC",
+)
+private val KR_MEM_MAP = listOf(
+    "" to "引擎默认",
     EngineSettingsStore.MEM_USAGE_UNLIMITED to "不限制",
     EngineSettingsStore.MEM_USAGE_HIGH to "高",
     EngineSettingsStore.MEM_USAGE_MEDIUM to "中",
     EngineSettingsStore.MEM_USAGE_LOW to "低",
 )
-private val KR_TEXSIZE_MAP = (listOf("0") + listOf(1024, 2048, 4096, 8192, 16384).map { it.toString() })
-    .associateWith { if (it == "0") "自动" else it }
-private val KR_FPS_MAP = mapOf("60" to "60", "45" to "45", "30" to "30", "15" to "15")
-private val ONS_SHARPNESS_MAP = mapOf("1" to "1.0", "2" to "2.0", "3" to "3.0", "4" to "4.0", "5" to "5.0")
-private val ART_VERSION_MAP = mapOf(
+private val KR_TEXSIZE_MAP = listOf("" to "自动", "0" to "自动") +
+    listOf(1024, 2048, 4096, 8192, 16384).map { it.toString() to it.toString() }
+private val KR_FPS_MAP = listOf("" to "引擎默认", "60" to "60", "45" to "45", "30" to "30", "15" to "15")
+private val ONS_SHARPNESS_MAP = listOf("1" to "1.0", "2" to "2.0", "3" to "3.0", "4" to "4.0", "5" to "5.0")
+private val ONS_ENCODING_MAP = listOf("gbk" to "GBK", "sjis" to "Shift-JIS", "utf8" to "UTF-8")
+private val ART_VERSION_MAP = listOf(
     EngineSettingsStore.ART_ENGINE_AUTO to "自动",
     EngineSettingsStore.ART_ENGINE_V1 to "V1",
     EngineSettingsStore.ART_ENGINE_V2 to "V2",
     EngineSettingsStore.ART_ENGINE_V3 to "V3",
 )
-private val ART_PATCH_MAP = mapOf(
+private val ART_PATCH_MAP = listOf(
     EngineSettingsStore.AUTO_PATCH_ASK to "启动时询问",
     EngineSettingsStore.AUTO_PATCH_AUTO to "自动",
     EngineSettingsStore.AUTO_PATCH_OFF to "关闭",
