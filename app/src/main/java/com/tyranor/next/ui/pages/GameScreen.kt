@@ -102,12 +102,9 @@ fun GameScreen(modifier: Modifier = Modifier) {
         games = nextGames
         selectedGame = null
         EngineScanner.saveGames(context, nextGames)
-        // 仅清理应用内数据：每游戏设置、最近游戏记录、封面缓存、应用内存档镜像；不触碰游戏文件
+        // 仅清理应用内数据（每游戏设置、最近记录、封面缓存、应用内存档镜像）；不触碰游戏文件
         scope.launch(Dispatchers.IO) {
-            PerGameSettingsStore.clear(context, target.uri)
-            EngineScanner.removeRecentGame(context, target.uri)
-            deleteCoverFile(context, target.coverUri)
-            GameSaveManager(context).cleanupAppData(target)
+            cleanupDeletedGame(context, target)
         }
     }
 
@@ -200,6 +197,14 @@ fun GameScreen(modifier: Modifier = Modifier) {
     }
 }
 
+/** 删除游戏后清理应用内关联数据（设置/最近记录/封面/存档镜像），绝不触碰游戏文件。 */
+internal fun cleanupDeletedGame(context: android.content.Context, target: ScanGame) {
+    PerGameSettingsStore.clear(context, target.uri)
+    EngineScanner.removeRecentGame(context, target.uri)
+    deleteCoverFile(context, target.coverUri)
+    GameSaveManager(context).cleanupAppData(target)
+}
+
 private fun deleteCoverFile(context: android.content.Context, coverUri: String?) {
     if (coverUri.isNullOrBlank()) return
     val file = runCatching { File(android.net.Uri.parse(coverUri).path ?: return) }.getOrNull() ?: return
@@ -209,7 +214,7 @@ private fun deleteCoverFile(context: android.content.Context, coverUri: String?)
     }
 }
 
-private fun startActivityWithFade(context: android.content.Context, intent: android.content.Intent) {
+internal fun startActivityWithFade(context: android.content.Context, intent: android.content.Intent) {
     if (context is Activity) {
         val options = ActivityOptions.makeCustomAnimation(
             context,
@@ -311,7 +316,7 @@ private fun GameLibraryContent(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun GameActionsSheet(
+internal fun GameActionsSheet(
     game: ScanGame,
     onDismiss: () -> Unit,
     onGameUpdated: (ScanGame) -> Unit,

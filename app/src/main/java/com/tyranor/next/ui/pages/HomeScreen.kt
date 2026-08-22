@@ -19,25 +19,36 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.tyranor.next.scanner.EngineLauncher
 import com.tyranor.next.scanner.EngineScanner
 import com.tyranor.next.scanner.ScanGame
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 @Composable
 fun HomeScreen(modifier: Modifier = Modifier) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var recentGames by remember { mutableStateOf(EngineScanner.loadRecentGames(context)) }
-    var launchError by remember { mutableStateOf<String?>(null) }
+    var selectedGame by remember { mutableStateOf<ScanGame?>(null) }
 
-    fun launch(game: ScanGame) {
-        launchError = EngineLauncher.launch(context, game)
-        recentGames = EngineScanner.loadRecentGames(context)
+    fun replaceGame(updated: ScanGame) {
+        recentGames = recentGames.map { if (it.uri == updated.uri) updated else it }
+    }
+
+    fun deleteGame(target: ScanGame) {
+        recentGames = recentGames.filterNot { it.uri == target.uri }
+        selectedGame = null
+        // 仅清理应用内数据（每游戏设置、最近记录、封面缓存、应用内存档镜像）；不触碰游戏文件
+        scope.launch(Dispatchers.IO) {
+            cleanupDeletedGame(context, target)
+        }
     }
 
     Column(modifier.fillMaxSize()) {
@@ -69,19 +80,24 @@ fun HomeScreen(modifier: Modifier = Modifier) {
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     items(recentGames, key = { it.uri }) { game ->
-                        GameCard(game, onClick = { launch(game) })
+                        GameCard(game, onClick = { selectedGame = game })
                     }
                 }
             }
-
-            launchError?.let {
-                Text(
-                    it,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp),
-                )
-            }
         }
+    }
+
+    // ===== 点击游戏卡片的底部抽屉栏（与游戏页一致，不直接启动游戏） =====
+    selectedGame?.let { game ->
+        GameActionsSheet(
+            game = game,
+            onDismiss = { selectedGame = null },
+            onGameUpdated = { replaceGame(it) },
+            onDeleteGame = { deleteGame(game) },
+            onEngineSettings = {
+                startActivityWithFade(context, PerGameSettingsActivity.createIntent(context, game))
+                selectedGame = null
+            },
+        )
     }
 }

@@ -1,9 +1,5 @@
 package com.tyranor.next.ui.pages
 
-import android.app.Activity
-import android.app.ActivityOptions
-import android.content.Context
-import android.content.Intent
 import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -258,20 +254,6 @@ private fun SettingsTopBar(title: String) {
 @Composable
 private fun BottomInsetSpacer() {
     Box(Modifier.fillMaxWidth().height(WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()))
-}
-
-private fun startActivityWithFade(context: Context, intent: Intent) {
-    if (context is Activity) {
-        val options = ActivityOptions.makeCustomAnimation(
-            context,
-            android.R.anim.fade_in,
-            android.R.anim.fade_out,
-        )
-        context.startActivity(intent, options.toBundle())
-    } else {
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        context.startActivity(intent)
-    }
 }
 
 private typealias FontPickerLauncher = androidx.activity.compose.ManagedActivityResultLauncher<String, Uri?>
