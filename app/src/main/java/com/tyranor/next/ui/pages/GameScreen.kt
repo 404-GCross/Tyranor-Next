@@ -133,7 +133,9 @@ fun GameScreen(modifier: Modifier = Modifier) {
         uri?.let { u ->
             runCatching {
                 context.contentResolver.takePersistableUriPermission(
-                    u, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    u,
+                    android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                        android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
                 )
             }
             // 添加后立即扫描该目录
@@ -353,6 +355,12 @@ internal fun GameActionsSheet(
             GameActionRow(Icons.Filled.Save, "存档管理") {
                 startActivityWithFade(context, SaveManagementActivity.createIntent(context, game))
                 onDismiss()
+            }
+            if (game.engine == EngineType.KIRIKIRI) {
+                GameActionRow(Icons.Filled.CloudDownload, "在线补丁") {
+                    startActivityWithFade(context, KrkrOnlinePatchActivity.createIntent(context, game))
+                    onDismiss()
+                }
             }
             GameActionRow(Icons.Filled.Settings, "引擎设置", onClick = onEngineSettings)
             GameActionRow(Icons.Filled.Delete, "删除游戏", danger = true) { showDeleteConfirm = true }

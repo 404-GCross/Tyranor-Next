@@ -19,6 +19,9 @@
             android:name=".ui.pages.SaveManagementActivity"
             android:exported="false" />
         <activity
+            android:name=".ui.pages.KrkrOnlinePatchActivity"
+            android:exported="false" />
+        <activity
             android:name=".ui.pages.EngineSettingsActivity"
             android:exported="false" />
         <activity
