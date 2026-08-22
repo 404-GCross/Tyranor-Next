@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items as lazyItems
@@ -41,15 +42,8 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.RadioButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -449,29 +443,29 @@ internal fun GameActionsSheet(
         ) {
             if (game.engine == EngineType.KIRIKIRI) {
                 GameActionRow(
-                    icon = Icons.Filled.Description,
+                    iconRes = R.drawable.ic_sheet_launch_file,
                     label = "启动文件",
                     subtitle = game.launchFile ?: "自动",
                 ) { showLaunchFilePicker = true }
             }
-            GameActionRow(Icons.Filled.PlayArrow, "启动游戏") {
+            GameActionRow(R.drawable.ic_sheet_launch, "启动游戏") {
                 launchError = EngineLauncher.launch(context, game)
                 if (launchError == null) onDismiss()
             }
-            GameActionRow(Icons.Filled.Search, "搜索封面") { showVndbSearch = true }
-            GameActionRow(Icons.Filled.Edit, "修改封面") { imagePicker.launch("image/*") }
-            GameActionRow(Icons.Filled.Save, "存档管理") {
+            GameActionRow(R.drawable.ic_sheet_search_cover, "搜索封面") { showVndbSearch = true }
+            GameActionRow(R.drawable.ic_sheet_edit_cover, "修改封面") { imagePicker.launch("image/*") }
+            GameActionRow(R.drawable.ic_sheet_saves, "存档管理") {
                 startActivityWithFade(context, SaveManagementActivity.createIntent(context, game))
                 onDismiss()
             }
             if (game.engine == EngineType.KIRIKIRI) {
-                GameActionRow(Icons.Filled.CloudDownload, "在线补丁") {
+                GameActionRow(R.drawable.ic_sheet_patch, "在线补丁") {
                     startActivityWithFade(context, KrkrOnlinePatchActivity.createIntent(context, game))
                     onDismiss()
                 }
             }
-            GameActionRow(Icons.Filled.Settings, "引擎设置", onClick = onEngineSettings)
-            GameActionRow(Icons.Filled.Delete, "删除游戏", danger = true) { showDeleteConfirm = true }
+            GameActionRow(R.drawable.ic_sheet_settings, "引擎设置", onClick = onEngineSettings)
+            GameActionRow(R.drawable.ic_sheet_delete, "删除游戏", danger = true) { showDeleteConfirm = true }
         }
 
         launchError?.let {
@@ -713,7 +707,7 @@ private fun LaunchFileDialog(
 
 @Composable
 private fun GameActionRow(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    iconRes: Int,
     label: String,
     subtitle: String? = null,
     danger: Boolean = false,
@@ -728,10 +722,11 @@ private fun GameActionRow(
             .padding(horizontal = 16.dp, vertical = 16.5.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(
-            icon,
+        Image(
+            painter = painterResource(iconRes),
             contentDescription = null,
-            tint = if (danger) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+            colorFilter = ColorFilter.tint(if (danger) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary),
+            modifier = Modifier.size(24.dp),
         )
         Column(Modifier.padding(start = 20.dp)) {
             Text(
