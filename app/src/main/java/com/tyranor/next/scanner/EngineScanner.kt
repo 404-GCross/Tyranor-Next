@@ -94,6 +94,11 @@ object EngineScanner {
         saveRecentGames(context, loadRecentGames(context).filterNot { it.uri == uri })
     }
 
+    /** 从持久游戏库中移除指定游戏（在游戏页或首页删除游戏时调用，保证库与最近列表一致）。 */
+    fun removeGame(context: Context, uri: String) {
+        saveGames(context, loadGames(context).filterNot { it.uri == uri })
+    }
+
     private fun saveRecentGames(context: Context, games: List<ScanGame>) {
         val str = games.joinToString("\n") { serializeGame(it) }
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -165,7 +170,7 @@ object EngineScanner {
 
     private fun traverseDirectories(context: Context, dir: DocumentFile, level: Int, out: MutableList<ScanGame>) {
         if (level > 3) return
-        val children = dir.listFiles() ?: return
+        val children = dir.listFiles()
 
         // 1) 本级目录本身可能是游戏（含引擎特征文件）
         val detected = detectEngine(dir)
@@ -197,8 +202,8 @@ object EngineScanner {
 
     fun detectEngine(dir: DocumentFile): Detection {
         val r = Detection(EngineType.UNKNOWN, 0, "")
-        if (dir == null || !dir.isDirectory) return r
-        val children = dir.listFiles() ?: return r
+        if (!dir.isDirectory) return r
+        val children = dir.listFiles()
 
         val names = HashSet<String>()            // 小写名
         val xp3Files = mutableListOf<String>()
@@ -226,7 +231,7 @@ object EngineScanner {
                     lower == "system" || lower == "app" || lower == "game" || lower == "resources"
                 ) {
                     val sub = f.listFiles()
-                    sub?.forEach { collect(it, childRel) }
+                    sub.forEach { collect(it, childRel) }
                 }
                 return
             }
