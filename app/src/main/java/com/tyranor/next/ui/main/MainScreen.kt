@@ -14,9 +14,9 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -57,7 +57,7 @@ fun MainScreen(modifier: Modifier = Modifier) {
   var selectedIndex by rememberSaveable { mutableStateOf(0) }
   val unselectedColor = UnselectedGrey
   // 导航栏样式：应用设置 → 默认 / 圆角液态玻璃（内存态，设置页切换即时生效）
-  remember { AppSettingsStore.initNavStyle(context) }
+  LaunchedEffect(Unit) { AppSettingsStore.initNavStyle(context) }
   val liquidGlass = AppSettingsStore.navStyleState.value == AppSettingsStore.NAV_STYLE_LIQUID_GLASS
 
   // 外层只负责布局：内容区 + 底部导航栏（不用 Scaffold，避免与子页顶部栏的 inset 冲突）
