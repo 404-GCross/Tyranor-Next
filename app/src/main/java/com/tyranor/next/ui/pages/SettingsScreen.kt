@@ -4,6 +4,7 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -18,14 +19,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Save
-import androidx.compose.material.icons.rounded.Memory
-import androidx.compose.material.icons.rounded.RocketLaunch
-import androidx.compose.material.icons.rounded.VideogameAsset
-import androidx.compose.material.icons.rounded.Web
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -39,18 +37,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.tyranor.next.R
 import com.tyranor.next.settings.EngineSettingsStore
 import com.tyranor.next.theme.MiuixSettingsTheme
 import java.io.File
 import kotlin.math.roundToInt
 import top.yukonga.miuix.kmp.basic.Card as MiuixCard
-import top.yukonga.miuix.kmp.basic.Icon as MiuixIcon
 import top.yukonga.miuix.kmp.basic.Scaffold as MiuixScaffold
 import top.yukonga.miuix.kmp.basic.Slider
 import top.yukonga.miuix.kmp.basic.SliderDefaults
@@ -83,11 +81,11 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                                 ArrowPreference(
                                     title = kind.title,
                                     startAction = {
-                                        MiuixIcon(
-                                            kind.icon,
-                                            modifier = Modifier.padding(end = 6.dp),
+                                        Icon(
+                                            painter = painterResource(kind.iconRes),
                                             contentDescription = kind.title,
                                             tint = MiuixTheme.colorScheme.primary,
+                                            modifier = Modifier.padding(end = 6.dp).size(24.dp),
                                         )
                                     },
                                     onClick = {
@@ -228,11 +226,11 @@ internal fun EngineSettingsDetailScreen(kind: EngineSettingsKind) {
     }
 }
 
-enum class EngineSettingsKind(val title: String, val icon: ImageVector) {
-    KRKR("KRKR引擎设置", Icons.Rounded.Memory),
-    ONS("ONS引擎设置", Icons.Rounded.VideogameAsset),
-    ARTEMIS("Artemis引擎设置", Icons.Rounded.RocketLaunch),
-    TYRANO("Tyrano引擎设置", Icons.Rounded.Web),
+enum class EngineSettingsKind(val title: String, @DrawableRes val iconRes: Int) {
+    KRKR("KRKR引擎设置", R.drawable.ic_engine_item),
+    ONS("ONS引擎设置", R.drawable.ic_engine_item),
+    ARTEMIS("Artemis引擎设置", R.drawable.ic_engine_item),
+    TYRANO("Tyrano引擎设置", R.drawable.ic_engine_item),
 }
 
 /** 顶部栏：遵守全局规范（Column + 页面背景色 + statusBarsPadding + 64dp 标题区，沉浸式）。 */
