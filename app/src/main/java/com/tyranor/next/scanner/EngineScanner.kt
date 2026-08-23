@@ -363,9 +363,11 @@ internal fun saveRecentGames(context: Context, games: List<ScanGame>) =
             names.add(lower)
             if (f.isDirectory) {
                 if (lower == "tyrano") hasTyranoDir = true
-                // resources 是 Tyrano asar 打包的存放目录（resources/app.asar），需下钻识别
+                if (lower == "app.asar" || childRel.endsWith("/app.asar")) hasAppAsar = true
+                // resources/app.asar 可能是文件，也可能是已解包目录，需继续下钻识别父级游戏目录。
                 if (lower == "data" || lower == "tyrano" || lower == "scenario" ||
-                    lower == "system" || lower == "app" || lower == "game" || lower == "resources"
+                    lower == "system" || lower == "app" || lower == "game" ||
+                    lower == "resources" || lower == "app.asar"
                 ) {
                     val sub = f.listFiles()
                     sub.forEach { collect(it, childRel) }
