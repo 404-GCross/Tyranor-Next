@@ -68,6 +68,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.basic.InputField
 import top.yukonga.miuix.kmp.basic.SearchBar
+import top.yukonga.miuix.kmp.basic.SearchBarDefaults
 
 class KrkrOnlinePatchActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -180,7 +181,16 @@ private fun KrkrOnlinePatchScreen(game: ScanGame) {
                                 onSearch = { },
                                 expanded = false,
                                 onExpandedChange = { },
-                                label = "搜索游戏名或品牌",
+                                leadingIcon = {
+                                    Icon(
+                                        modifier = Modifier
+                                            .padding(start = SearchBarDefaults.LeadingIconStartPadding, end = SearchBarDefaults.LeadingIconEndPadding)
+                                            .size(26.dp),
+                                        painter = painterResource(R.drawable.ic_game_search),
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        contentDescription = "Search",
+                                    )
+                                },
                                 modifier = Modifier.fillMaxWidth(),
                             )
                         },

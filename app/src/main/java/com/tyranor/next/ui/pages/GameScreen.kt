@@ -40,6 +40,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -86,6 +87,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.basic.InputField
 import top.yukonga.miuix.kmp.basic.SearchBar
+import top.yukonga.miuix.kmp.basic.SearchBarDefaults
 import java.io.File
 
 @Composable
@@ -327,7 +329,16 @@ private fun GameLibraryContent(
                                     onSearch = { },
                                     expanded = false,
                                     onExpandedChange = { },
-                                    label = "搜索游戏",
+                                    leadingIcon = {
+                                        Icon(
+                                            modifier = Modifier
+                                                .padding(start = SearchBarDefaults.LeadingIconStartPadding, end = SearchBarDefaults.LeadingIconEndPadding)
+                                                .size(26.dp),
+                                            painter = painterResource(R.drawable.ic_game_search),
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            contentDescription = "Search",
+                                        )
+                                    },
                                     modifier = Modifier.fillMaxWidth(),
                                 )
                             },
@@ -402,6 +413,7 @@ internal fun GameActionsSheet(
     var showVndbSearch by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var showLaunchFilePicker by remember { mutableStateOf(false) }
+    var showRenameDialog by remember { mutableStateOf(false) }
     var showPatchConfirm by remember { mutableStateOf(false) }
 
     // 发起启动；Artemis 需要 PFS 基础补丁且策略为“启动时询问”时，先弹窗确认再带选择启动
@@ -460,6 +472,7 @@ internal fun GameActionsSheet(
             }
             GameActionRow(R.drawable.ic_sheet_search_cover, "搜索封面") { showVndbSearch = true }
             GameActionRow(R.drawable.ic_sheet_edit_cover, "修改封面") { imagePicker.launch("image/*") }
+            GameActionRow(R.drawable.ic_sheet_rename, "名称修改") { showRenameDialog = true }
             GameActionRow(R.drawable.ic_sheet_saves, "存档管理") {
                 startActivityWithPageTransition(context, SaveManagementActivity.createIntent(context, game))
                 onDismiss()
@@ -549,6 +562,17 @@ internal fun GameActionsSheet(
         )
     }
 
+    if (showRenameDialog) {
+        RenameGameDialog(
+            game = game,
+            onDismiss = { showRenameDialog = false },
+            onConfirm = { title ->
+                showRenameDialog = false
+                onGameUpdated(game.copy(title = title))
+            },
+        )
+    }
+
     if (showLaunchFilePicker) {
         LaunchFileDialog(
             game = game,
@@ -581,6 +605,40 @@ internal fun GameActionsSheet(
             },
         )
     }
+}
+
+@Composable
+private fun RenameGameDialog(
+    game: ScanGame,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit,
+) {
+    var title by remember(game.uri, game.title) { mutableStateOf(game.title) }
+    val normalizedTitle = title.trim()
+    val canConfirm = normalizedTitle.isNotEmpty() && normalizedTitle != game.title
+
+    AppAlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("名称修改", style = MaterialTheme.typography.titleMedium) },
+        text = {
+            OutlinedTextField(
+                value = title,
+                onValueChange = { title = it },
+                singleLine = true,
+                label = { Text("游戏名称") },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onConfirm(normalizedTitle) },
+                enabled = canConfirm,
+            ) { Text("保存") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("取消") }
+        },
+    )
 }
 
 @Composable
@@ -625,7 +683,16 @@ private fun VndbSearchDialog(
                                 onSearch = { search() },
                                 expanded = false,
                                 onExpandedChange = { },
-                                label = "游戏名称",
+                                leadingIcon = {
+                                    Icon(
+                                        modifier = Modifier
+                                            .padding(start = SearchBarDefaults.LeadingIconStartPadding, end = SearchBarDefaults.LeadingIconEndPadding)
+                                            .size(26.dp),
+                                        painter = painterResource(R.drawable.ic_game_search),
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        contentDescription = "Search",
+                                    )
+                                },
                                 modifier = Modifier.fillMaxWidth(),
                             )
                         },

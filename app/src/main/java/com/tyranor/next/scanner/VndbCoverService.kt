@@ -44,7 +44,6 @@ object VndbCoverService {
     fun bindCandidate(context: Context, game: ScanGame, candidate: VndbCandidate): ScanGame? {
         val cover = downloadCover(context, candidate.coverUrl, "vndb_${stableKey(game.uri)}") ?: return null
         return game.copy(
-            title = candidate.displayTitle().ifBlank { game.title },
             coverUri = cover,
             vndbId = candidate.id,
             metadataTitle = candidate.displayTitle(),
