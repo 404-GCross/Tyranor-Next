@@ -7,6 +7,7 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
+import android.os.Build;
 import android.os.Debug;
 import android.os.Environment;
 import android.os.Handler;
@@ -14,14 +15,18 @@ import android.os.Looper;
 import android.os.Message;
 import android.preference.PreferenceManager;
 import android.media.AudioTrack;
+import android.view.KeyEvent;
 import android.view.View;
 import android.view.inputmethod.InputMethodManager;
+import android.window.OnBackInvokedCallback;
+import android.window.OnBackInvokedDispatcher;
 import java.lang.reflect.Field;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import bridge.NativeBridge;
 import bridge.KrPathUtils;
+import com.core.engine.DoubleBackExit;
 import com.core.nativeplugin.NativeLibraryLoader;
 import java.util.Locale;
 import org.cocos2dx.lib.Cocos2dxActivity;
@@ -42,6 +47,8 @@ public class KR2Activity extends Cocos2dxActivity {
     private boolean sdlAudioPausedForBackground;
     /** Fallback for devices on which AudioTrack.pause() rejects the current stream state. */
     private boolean sdlAudioMutedForBackground;
+    private boolean suppressBackKeyUp;
+    private OnBackInvokedCallback backInvokedCallback;
 
     public static KR2Activity GetInstance() { return sInstance; }
     public static KR2Activity getInstance() { return sInstance; }
@@ -300,6 +307,7 @@ public class KR2Activity extends Cocos2dxActivity {
         msgHandler = new Handler(Looper.getMainLooper()) { @Override public void handleMessage(Message msg) { KR2Activity.this.handleMessage(msg); } };
         Sp = PreferenceManager.getDefaultSharedPreferences(this);
         super.onCreate(savedInstanceState);
+        registerPredictiveBackCallback();
         // 1.2.6 libgame126.so 缺失 initDump/nativeOnLowMemory 的 JNI 实现，
         // 此处用 try-catch 兜底以兼容该版本；1.3.4/1.3.9 的 .so 都有这两个方法，不会进入 catch。
         try {
@@ -388,6 +396,8 @@ public class KR2Activity extends Cocos2dxActivity {
     @Override public void onDestroy() {
         try {
             android.util.Log.i("KR2Activity", "destroy KR2Activity");
+            unregisterPredictiveBackCallback();
+            DoubleBackExit.clear(this);
             mTextEdit = null;
             if (msgHandler != null) msgHandler.removeCallbacksAndMessages(null);
             msgHandler = null;
@@ -400,6 +410,45 @@ public class KR2Activity extends Cocos2dxActivity {
         // 1.2.6 libgame126.so 缺失 nativeOnLowMemory JNI 实现，try-catch 兜底。
         try { nativeOnLowMemory(); } catch (UnsatisfiedLinkError ignored) { }
     }
+
+    @Override public boolean dispatchKeyEvent(KeyEvent event) {
+        if (event != null && event.getKeyCode() == KeyEvent.KEYCODE_BACK) {
+            if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
+                suppressBackKeyUp = true;
+                handleBackRequest();
+                return true;
+            }
+            if (event.getAction() == KeyEvent.ACTION_UP && suppressBackKeyUp) {
+                suppressBackKeyUp = false;
+                return true;
+            }
+        }
+        return super.dispatchKeyEvent(event);
+    }
+
+    @Override public void onBackPressed() {
+        handleBackRequest();
+    }
+
+    private void handleBackRequest() {
+        if (!DoubleBackExit.shouldExit(this)) return;
+        exit();
+    }
+
+    private void registerPredictiveBackCallback() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU || backInvokedCallback != null) return;
+        backInvokedCallback = this::handleBackRequest;
+        getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
+                OnBackInvokedDispatcher.PRIORITY_DEFAULT,
+                backInvokedCallback);
+    }
+
+    private void unregisterPredictiveBackCallback() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU || backInvokedCallback == null) return;
+        getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(backInvokedCallback);
+        backInvokedCallback = null;
+    }
+
     @Override public void onWindowFocusChanged(boolean hasFocus) {
         // 弹窗显示期间，阻止 Cocos2dx 恢复 GL 线程（super 会调用 resumeIfHasFocus），
         // 防止引擎在弹窗未确认时自动继续执行。

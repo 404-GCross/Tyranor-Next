@@ -29,6 +29,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
+import com.core.engine.DoubleBackExit
 import com.core.engine.EnginePrefs
 import com.core.engine.EngineThemeColors
 import com.core.engine.R
@@ -403,12 +404,7 @@ class TyranoActivity : Activity() {
 
     @Deprecated("Deprecated in Android")
     override fun onBackPressed() {
-        showEngineConfirm(
-            getString(R.string.engine_exit_game),
-            getString(R.string.engine_exit_game_message),
-            getString(R.string.engine_exit_game),
-            ::finish,
-        )
+        if (DoubleBackExit.shouldExit(this)) finish()
     }
 
     override fun onPause() {

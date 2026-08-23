@@ -49,6 +49,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.core.engine.DoubleBackExit;
 import com.core.engine.EngineThemeColors;
 
 import java.io.FileNotFoundException;
@@ -739,6 +740,9 @@ public class SDLActivity extends AppCompatActivity implements View.OnSystemUiVis
 
         // Default system back button behavior.
         if (!isFinishing()) {
+            if (!DoubleBackExit.shouldExit(this)) {
+                return;
+            }
             super.onBackPressed();
         }
     }
@@ -2253,4 +2257,3 @@ class SDLClipboardHandler implements
         SDLActivity.onNativeClipboardChanged();
     }
 }
-

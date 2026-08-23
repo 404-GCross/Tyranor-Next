@@ -36,6 +36,7 @@ import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
+import com.core.engine.DoubleBackExit;
 import java.util.Hashtable;
 import java.util.Locale;
 
@@ -891,6 +892,9 @@ return getContext().getApplicationInfo().nativeLibraryDir + "/" + (libraries.len
     @Override // b.AbstractActivityC0818o, android.app.Activity
     public void onBackPressed() {
         if (nativeGetHintBoolean("SDL_ANDROID_TRAP_BACK_BUTTON", false) || isFinishing()) {
+            return;
+        }
+        if (!DoubleBackExit.shouldExit(this)) {
             return;
         }
         super.onBackPressed();

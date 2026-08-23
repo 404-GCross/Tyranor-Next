@@ -5,6 +5,7 @@ import android.os.SystemClock;
 import android.util.Log;
 import android.content.Intent;
 
+import com.core.engine.DoubleBackExit;
 import com.core.engine.EnginePrefs;
 
 public abstract class ArtemisLauncherBaseActivity extends com.ies_net.artemis.ArtemisActivity {
@@ -52,6 +53,7 @@ public abstract class ArtemisLauncherBaseActivity extends com.ies_net.artemis.Ar
 
     @Override
     public void onBackPressed() {
+        if (!DoubleBackExit.shouldExit(this)) return;
         userRequestedFinish = true;
         super.onBackPressed();
     }
