@@ -251,17 +251,18 @@ internal fun saveRecentGames(context: Context, games: List<ScanGame>) =
     ) {
         if (level > maxDepth) return
         if (dir.uri.toString() in known) return
-        val children = dir.listFiles() ?: return
+        val children = dir.listFiles()
 
         val detected = detectEngine(dir)
         if (detected.engine != EngineType.UNKNOWN) {
+            val coverUri = findLocalCoverUri(children)
             out.add(
                 ScanGame(
                     title = dir.name?.takeIf { it.isNotBlank() } ?: "未命名游戏",
                     uri = dir.uri.toString(),
                     engine = detected.engine,
                     launchTarget = detected.launchTarget,
-                    coverUri = null,
+                    coverUri = coverUri,
                 )
             )
             return
@@ -297,13 +298,14 @@ internal fun saveRecentGames(context: Context, games: List<ScanGame>) =
         // 1) 本级目录本身可能是游戏（含引擎特征文件）
         val detected = detectEngine(dir)
         if (detected.engine != EngineType.UNKNOWN) {
+            val coverUri = findLocalCoverUri(children)
             out.add(
                 ScanGame(
                     title = dir.name?.takeIf { it.isNotBlank() } ?: "未命名游戏",
                     uri = dir.uri.toString(),
                     engine = detected.engine,
                     launchTarget = detected.launchTarget,
-                    coverUri = null,
+                    coverUri = coverUri,
                 )
             )
             // 已识别为游戏，其子目录多为引擎内部资源，仅扫描直接文件层，不再深挖
@@ -316,6 +318,19 @@ internal fun saveRecentGames(context: Context, games: List<ScanGame>) =
                 traverseDirectories(context, child, level + 1, maxDepth, out)
             }
         }
+    }
+
+    fun applyLocalCover(context: Context, game: ScanGame): ScanGame {
+        if (!game.coverUri.isNullOrBlank()) return game
+        val dir = DocumentFile.fromTreeUri(context.applicationContext, Uri.parse(game.uri)) ?: return game
+        val coverUri = findLocalCoverUri(dir.listFiles())
+        return if (coverUri.isNullOrBlank()) game else game.copy(coverUri = coverUri)
+    }
+
+    private fun findLocalCoverUri(children: Array<DocumentFile>): String? {
+        return children.firstOrNull { child ->
+            !child.isDirectory && child.name.equals("icon.png", ignoreCase = true)
+        }?.uri?.toString()
     }
 
     // ============ 引擎识别（移植自 EngineDetector） ============

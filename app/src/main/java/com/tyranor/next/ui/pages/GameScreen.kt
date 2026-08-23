@@ -130,9 +130,12 @@ fun GameScreen(modifier: Modifier = Modifier) {
             val current = games
             val updated = withContext(Dispatchers.IO) {
                 current.map { game ->
-                    val next = runCatching { VndbCoverService.fetchBestCover(context, game) }.getOrNull()
+                    val local = runCatching { EngineScanner.applyLocalCover(context, game) }.getOrDefault(game)
+                    val next = runCatching { VndbCoverService.fetchBestCover(context, local) }.getOrNull()
                     if (next != null && next.coverUri != game.coverUri) {
                         next
+                    } else if (local.coverUri != game.coverUri) {
+                        local
                     } else {
                         game
                     }
