@@ -47,6 +47,7 @@ fun MiuixSettingsTheme(
             onBackground = TextColor,
             onSurface = TextColor,
             onSurfaceContainer = TextColor,
+            sliderKeyPointForeground = Color.White,
         )
     } else {
         lightColorScheme(
@@ -57,6 +58,7 @@ fun MiuixSettingsTheme(
             onBackground = TextColor,
             onSurface = TextColor,
             onSurfaceContainer = TextColor,
+            sliderKeyPointForeground = Color.White,
         )
     }
     MiuixTheme(
