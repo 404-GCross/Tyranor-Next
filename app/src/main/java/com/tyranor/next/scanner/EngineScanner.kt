@@ -376,9 +376,11 @@ internal fun saveRecentGames(context: Context, games: List<ScanGame>) =
     }
 
     private fun findLocalCoverUri(children: Array<DocumentFile>): String? {
-        return children.firstOrNull { child ->
-            !child.isDirectory && child.name.equals("icon.png", ignoreCase = true)
-        }?.uri?.toString()
+        return LOCAL_COVER_NAMES.firstNotNullOfOrNull { expected ->
+            children.firstOrNull { child ->
+                !child.isDirectory && child.name.equals(expected, ignoreCase = true)
+            }?.uri?.toString()
+        }
     }
 
     private fun scanRootIncrementalFile(
@@ -438,10 +440,21 @@ internal fun saveRecentGames(context: Context, games: List<ScanGame>) =
     }
 
     private fun findLocalCoverUri(children: Array<File>): String? {
-        return children.firstOrNull { child ->
-            child.isFile && child.name.equals("icon.png", ignoreCase = true)
-        }?.let { Uri.fromFile(it).toString() }
+        return LOCAL_COVER_NAMES.firstNotNullOfOrNull { expected ->
+            children.firstOrNull { child ->
+                child.isFile && child.name.equals(expected, ignoreCase = true)
+            }?.let { Uri.fromFile(it).toString() }
+        }
     }
+
+    private val LOCAL_COVER_NAMES = listOf(
+        "cover.jpg",
+        "cover.png",
+        "cover.webp",
+        "cover.jpeg",
+        "cover.bmp",
+        "icon.png",
+    )
 
     // ============ 引擎识别（移植自 EngineDetector） ============
 

@@ -98,7 +98,8 @@ fun GameScreen(modifier: Modifier = Modifier) {
     var games by remember { mutableStateOf(EngineScanner.loadGames(context)) }
     var scanning by remember { mutableStateOf(false) }
     var selectedGame by remember { mutableStateOf<ScanGame?>(null) }
-    var quickLaunchTarget by remember { mutableStateOf<ScanGame?>(null) }
+    var launchError by remember { mutableStateOf<String?>(null) }
+    var patchLaunchTarget by remember { mutableStateOf<ScanGame?>(null) }
 
     val gridState = rememberLazyGridState()
 
@@ -191,7 +192,13 @@ fun GameScreen(modifier: Modifier = Modifier) {
         syncMissingCovers = { syncMissingCovers() },
         refreshGames = { scanLibrary() },
         onGameClick = { selectedGame = it },
-        onGameLongClick = { quickLaunchTarget = it },
+        onGameLongClick = { game ->
+            if (EngineLauncher.needsArtemisPatchConfirm(context, game)) {
+                patchLaunchTarget = game
+            } else {
+                launchError = EngineLauncher.launch(context, game)
+            }
+        },
     )
 
     // ===== 点击游戏卡片的底部抽屉栏 =====
@@ -208,37 +215,57 @@ fun GameScreen(modifier: Modifier = Modifier) {
         )
     }
 
-    // ===== 长按游戏卡片：加入/移除首页快捷启动 =====
-    quickLaunchTarget?.let { game ->
-        val already = EngineScanner.isQuickLaunched(context, game.uri)
+    // ===== 长按游戏卡片：启动游戏；Artemis 按既有策略弹出补丁确认 =====
+    patchLaunchTarget?.let { game ->
         AppAlertDialog(
-            onDismissRequest = { quickLaunchTarget = null },
+            onDismissRequest = { patchLaunchTarget = null },
             title = {
                 Text(
-                    if (already) "移除快捷启动" else "加入快捷启动",
+                    "应用自动补丁",
                     style = MaterialTheme.typography.titleMedium,
                 )
             },
             text = {
                 Text(
-                    if (already) "将「${game.title}」从首页快捷启动中移除？" else "将「${game.title}」加入首页快捷启动？",
+                    "「${game.title}」的启动文件打包在 .pfs 归档内，首次启动需要解出少量基础文件" +
+                        "（system.ini、窗口配置与视频）并适配 Android 平台。是否应用补丁？",
                     style = MaterialTheme.typography.bodyMedium,
                 )
             },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        if (already) {
-                            EngineScanner.removeQuickLaunch(context, game.uri)
-                        } else if (!EngineScanner.addQuickLaunch(context, game)) {
-                            android.widget.Toast.makeText(context, "首页快捷启动已满（最多 3 个）", android.widget.Toast.LENGTH_SHORT).show()
-                        }
-                        quickLaunchTarget = null
+                        patchLaunchTarget = null
+                        launchError = EngineLauncher.launch(context, game, EngineLauncher.ArtemisPatchChoice.ALWAYS)
                     },
-                ) { Text("确定") }
+                ) { Text("总是") }
             },
             dismissButton = {
-                TextButton(onClick = { quickLaunchTarget = null }) { Text("取消") }
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    TextButton(
+                        onClick = {
+                            patchLaunchTarget = null
+                            launchError = EngineLauncher.launch(context, game, EngineLauncher.ArtemisPatchChoice.NEVER)
+                        },
+                    ) { Text("不再") }
+                    TextButton(
+                        onClick = {
+                            patchLaunchTarget = null
+                            launchError = EngineLauncher.launch(context, game, EngineLauncher.ArtemisPatchChoice.ONCE)
+                        },
+                    ) { Text("本次") }
+                }
+            },
+        )
+    }
+
+    launchError?.let { message ->
+        AppAlertDialog(
+            onDismissRequest = { launchError = null },
+            title = { Text("启动失败", style = MaterialTheme.typography.titleMedium) },
+            text = { Text(message, style = MaterialTheme.typography.bodyMedium) },
+            confirmButton = {
+                TextButton(onClick = { launchError = null }) { Text("确定") }
             },
         )
     }
@@ -459,6 +486,13 @@ internal fun GameActionsSheet(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
+            GameActionRow(R.drawable.ic_sheet_launch, "启动游戏") {
+                if (EngineLauncher.needsArtemisPatchConfirm(context, game)) {
+                    showPatchConfirm = true
+                } else {
+                    startLaunch()
+                }
+            }
             if (game.engine == EngineType.KIRIKIRI) {
                 GameActionRow(
                     iconRes = R.drawable.ic_sheet_launch_file,
@@ -466,11 +500,18 @@ internal fun GameActionsSheet(
                     subtitle = game.launchFile ?: "自动",
                 ) { showLaunchFilePicker = true }
             }
-            GameActionRow(R.drawable.ic_sheet_launch, "启动游戏") {
-                if (EngineLauncher.needsArtemisPatchConfirm(context, game)) {
-                    showPatchConfirm = true
+            val quickLaunched = EngineScanner.isQuickLaunched(context, game.uri)
+            GameActionRow(
+                iconRes = R.drawable.ic_home,
+                label = if (quickLaunched) "移除快捷启动" else "添加快捷启动",
+            ) {
+                if (quickLaunched) {
+                    EngineScanner.removeQuickLaunch(context, game.uri)
+                    onDismiss()
+                } else if (EngineScanner.addQuickLaunch(context, game)) {
+                    onDismiss()
                 } else {
-                    startLaunch()
+                    android.widget.Toast.makeText(context, "首页快捷启动已满（最多 3 个）", android.widget.Toast.LENGTH_SHORT).show()
                 }
             }
             GameActionRow(R.drawable.ic_sheet_search_cover, "搜索封面") { showVndbSearch = true }
