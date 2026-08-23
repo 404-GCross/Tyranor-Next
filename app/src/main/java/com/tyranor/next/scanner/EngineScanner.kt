@@ -231,10 +231,14 @@ internal fun saveRecentGames(context: Context, games: List<ScanGame>) =
         val found = mutableListOf<ScanGame>()
         val maxDepth = AppSettingsStore.getScanDepth(context)
         loadRoots(context).forEach { root ->
+            val beforeCount = found.size
             val rootUri = Uri.parse(root)
             val rootDir = DocumentFile.fromTreeUri(context.applicationContext, rootUri)
             if (rootDir != null) {
                 scanRootIncremental(context.applicationContext, rootDir, 0, maxDepth, known, found)
+            }
+            if (found.size == beforeCount) safUriToPath(root)?.let { path ->
+                scanRootIncrementalFile(File(path), 0, maxDepth, known, found)
             }
         }
         existing + found.filter { seen.add(it.uri) }
@@ -277,12 +281,16 @@ internal fun saveRecentGames(context: Context, games: List<ScanGame>) =
     suspend fun scanRoot(context: Context, rootUriStr: String, maxDepth: Int = 3): List<ScanGame> = withContext(Dispatchers.IO) {
         val rootUri = Uri.parse(rootUriStr)
         val root = DocumentFile.fromTreeUri(context.applicationContext, rootUri)
-        if (root == null || !root.isDirectory) return@withContext emptyList()
-
         val results = mutableListOf<ScanGame>()
-        // 深度优先遍历子目录，识别每个候选游戏目录（深度由应用设置「扫描深度」控制）
-        traverseDirectories(context.applicationContext, root, 0, maxDepth, results)
-        results
+        if (root != null && root.isDirectory) {
+            // 深度优先遍历子目录，识别每个候选游戏目录（深度由应用设置「扫描深度」控制）
+            traverseDirectories(context.applicationContext, root, 0, maxDepth, results)
+        }
+        if (results.isEmpty()) safUriToPath(rootUriStr)?.let { path ->
+            traverseFileDirectories(File(path), 0, maxDepth, results)
+        }
+        val seen = HashSet<String>()
+        results.filter { seen.add(it.uri) }
     }
 
     private fun traverseDirectories(
@@ -331,6 +339,68 @@ internal fun saveRecentGames(context: Context, games: List<ScanGame>) =
         return children.firstOrNull { child ->
             !child.isDirectory && child.name.equals("icon.png", ignoreCase = true)
         }?.uri?.toString()
+    }
+
+    private fun scanRootIncrementalFile(
+        dir: File,
+        level: Int,
+        maxDepth: Int,
+        known: HashSet<String>,
+        out: MutableList<ScanGame>,
+    ) {
+        if (level > maxDepth || !dir.isDirectory) return
+        if (dir.absolutePath in known) return
+        val children = dir.listFiles() ?: return
+
+        val detected = detectEngine(dir)
+        if (detected.engine != EngineType.UNKNOWN) {
+            out.add(
+                ScanGame(
+                    title = dir.name.takeIf { it.isNotBlank() } ?: "未命名游戏",
+                    uri = dir.absolutePath,
+                    engine = detected.engine,
+                    launchTarget = detected.launchTarget,
+                    coverUri = findLocalCoverUri(children),
+                )
+            )
+            return
+        }
+        children.filter { it.isDirectory }.forEach { child ->
+            scanRootIncrementalFile(child, level + 1, maxDepth, known, out)
+        }
+    }
+
+    private fun traverseFileDirectories(
+        dir: File,
+        level: Int,
+        maxDepth: Int,
+        out: MutableList<ScanGame>,
+    ) {
+        if (level > maxDepth || !dir.isDirectory) return
+        val children = dir.listFiles() ?: return
+
+        val detected = detectEngine(dir)
+        if (detected.engine != EngineType.UNKNOWN) {
+            out.add(
+                ScanGame(
+                    title = dir.name.takeIf { it.isNotBlank() } ?: "未命名游戏",
+                    uri = dir.absolutePath,
+                    engine = detected.engine,
+                    launchTarget = detected.launchTarget,
+                    coverUri = findLocalCoverUri(children),
+                )
+            )
+            return
+        }
+        children.filter { it.isDirectory }.forEach { child ->
+            traverseFileDirectories(child, level + 1, maxDepth, out)
+        }
+    }
+
+    private fun findLocalCoverUri(children: Array<File>): String? {
+        return children.firstOrNull { child ->
+            child.isFile && child.name.equals("icon.png", ignoreCase = true)
+        }?.let { Uri.fromFile(it).toString() }
     }
 
     // ============ 引擎识别（移植自 EngineDetector） ============
@@ -407,6 +477,74 @@ internal fun saveRecentGames(context: Context, games: List<ScanGame>) =
             return Detection(EngineType.KIRIKIRI, if (xp3Files.isNotEmpty()) 95 else 80, xp3Files.firstOrNull() ?: "[游戏目录]")
         }
         // ONS
+        if (hasOnsScript || hasOnsArchive) {
+            return Detection(EngineType.ONS, if (hasOnsScript) 90 else 70, "[游戏目录]")
+        }
+        return r
+    }
+
+    fun detectEngine(dir: File): Detection {
+        val r = Detection(EngineType.UNKNOWN, 0, "")
+        if (!dir.isDirectory) return r
+        val children = dir.listFiles() ?: return r
+
+        val xp3Files = mutableListOf<String>()
+        var hasStartupTjs = false
+        var hasConfigTjs = false
+        var hasIndex = false
+        var hasAppAsar = false
+        var hasTyranoDir = false
+        var hasSystemIni = false
+        var hasFirstIet = false
+        var hasRootPfs = false
+        var hasAnyPfs = false
+        var hasOnsScript = false
+        var hasOnsArchive = false
+
+        fun collect(f: File, rel: String) {
+            val lower = f.name.lowercase(Locale.ROOT)
+            if (lower.isEmpty()) return
+            val childRel = if (rel.isEmpty()) lower else "$rel/$lower"
+            if (f.isDirectory) {
+                if (lower == "tyrano") hasTyranoDir = true
+                if (lower == "app.asar" || childRel.endsWith("/app.asar")) hasAppAsar = true
+                if (lower == "data" || lower == "tyrano" || lower == "scenario" ||
+                    lower == "system" || lower == "app" || lower == "game" ||
+                    lower == "resources" || lower == "app.asar"
+                ) {
+                    f.listFiles()?.forEach { collect(it, childRel) }
+                }
+                return
+            }
+            when {
+                lower == "index.html" || lower == "index.htm" -> hasIndex = true
+                lower == "app.asar" || childRel.endsWith("/app.asar") -> hasAppAsar = true
+                lower == "startup.tjs" -> hasStartupTjs = true
+                lower == "config.tjs" -> hasConfigTjs = true
+                lower == "system.ini" -> hasSystemIni = true
+                childRel == "system/first.iet" || childRel.endsWith("/system/first.iet") -> hasFirstIet = true
+                lower == "root.pfs" -> hasRootPfs = true
+                lower.endsWith(".pfs") -> hasAnyPfs = true
+                lower == "0.txt" || lower == "00.txt" || lower == "nscript.dat" ||
+                    lower == "onscript.nt2" || lower == "onscript.nt3" -> hasOnsScript = true
+                lower.endsWith(".nsa") || lower.endsWith(".sar") -> hasOnsArchive = true
+                lower.endsWith(".xp3") -> xp3Files.add(childRel)
+            }
+        }
+        children.forEach { collect(it, "") }
+
+        if ((hasSystemIni && hasFirstIet) || hasRootPfs || hasAnyPfs) {
+            return Detection(EngineType.ARTEMIS, if ((hasSystemIni && hasFirstIet) || hasRootPfs) 95 else 90, "[游戏目录]")
+        }
+        if ((hasIndex && hasTyranoDir) || hasAppAsar) {
+            return Detection(EngineType.TYRANO, if (hasAppAsar) 96 else 95, "[游戏目录]")
+        }
+        if (hasIndex) {
+            return Detection(EngineType.TYRANO, 70, "[游戏目录]")
+        }
+        if (xp3Files.isNotEmpty() || hasStartupTjs || hasConfigTjs) {
+            return Detection(EngineType.KIRIKIRI, if (xp3Files.isNotEmpty()) 95 else 80, xp3Files.firstOrNull() ?: "[游戏目录]")
+        }
         if (hasOnsScript || hasOnsArchive) {
             return Detection(EngineType.ONS, if (hasOnsScript) 90 else 70, "[游戏目录]")
         }
