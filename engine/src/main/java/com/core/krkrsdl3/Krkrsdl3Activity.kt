@@ -1,9 +1,13 @@
 package com.core.krkrsdl3
 
 import android.content.Context
+import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.util.Log
 import android.view.View
 import android.view.WindowManager
 import com.core.engine.EngineThemeColors
@@ -23,22 +27,35 @@ import java.util.Locale
  */
 class Krkrsdl3Activity : KRKRActivity() {
 
+    /**
+     * 启动加载期方向锁（与 KirikiroidLauncherBaseActivity 同款防护）：
+     * sensorLandscape 允许 180° 翻转，用户在引擎加载 XP3/TJS 期间快速反转屏幕会触发
+     * surface 销毁/重建与 native 初始化竞态导致闪退。进入游戏前冻结为固定横屏方向，
+     * 原生游戏窗口创建（[setOrientationBis]）+ 缓冲后解除，恢复用户请求的传感器方向。
+     */
+    private var launchOrientationGuardEnabled = true
+    private val mainHandler = Handler(Looper.getMainLooper())
+
     override fun onCreate(savedInstanceState: Bundle?) {
+        // 先落方向锁再走 super：super 链中 KRKRActivity.onCreate → fullscreen() 会设置方向
+        applyEngineRequestedOrientation()
         applyLauncherWindowTone()
         super.onCreate(savedInstanceState)
+        // 绝对超时兜底：即使原生窗口创建回调异常缺失，超时后也解除方向锁
+        scheduleGuardRelease(GUARD_FALLBACK_RELEASE_MS)
     }
 
     override fun onResume() {
         super.onResume()
         // 覆盖 KRKRActivity 固定的竖屏强制：按启动器传入的方向（默认 sensorLandscape=6），
         // 与 KirikiroidLauncherBaseActivity.onResume 行为一致。
-        setRequestedOrientation(intent?.getIntExtra("orientation", 6) ?: 6)
+        applyEngineRequestedOrientation()
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
         // 旋转/重配置后系统可能清除沉浸全屏（状态栏/挖孔露出白底），重新断言横屏 + 沉浸。
-        setRequestedOrientation(intent?.getIntExtra("orientation", 6) ?: 6)
+        applyEngineRequestedOrientation()
         applySystemUiVisibility()
     }
 
@@ -49,7 +66,7 @@ class Krkrsdl3Activity : KRKRActivity() {
     }
 
     /**
-     * 拦截 SDL 原生方向回调（[org.libsdl3.app.SDLActivity.setOrientation] JNI → setOrientationBis）。
+     * 拦截 SDL 原生方向回调（[SDLActivity.setOrientation] JNI → setOrientationBis）。
      *
      * SDL 原生层在 **SDL 线程**回调本方法（Android_CreateWindow → Android_JNI_SetOrientation）：
      * 默认无 `SDL_HINT_ORIENTATIONS` hint 时原生按窗口 w/h 推断方向，而初始 surface 为设备竖屏
@@ -60,13 +77,16 @@ class Krkrsdl3Activity : KRKRActivity() {
      * 并重新应用沉浸全屏标志。注意 `setRequestedOrientation` 为 binder 调用任意线程安全，但
      * `applySystemUiVisibility` 操作 View（requestLayout）必须回到 UI 线程，否则
      * ViewRootImpl 抛 CalledFromWrongThreadException 导致闪退。
+     *
+     * 该回调同时标志 native 游戏窗口已创建（事件循环开始泵事件）：加载最脆弱的 bootstrap
+     * 阶段已过，留一小段缓冲等待 TVP 首帧后解除方向锁。
      */
     override fun setOrientationBis(w: Int, h: Int, resizable: Boolean, hint: String?) {
-        val orientation = intent?.getIntExtra("orientation", 6) ?: 6
         runOnUiThread {
             if (isFinishing || isDestroyed) return@runOnUiThread
-            setRequestedOrientation(orientation)
+            applyEngineRequestedOrientation()
             applySystemUiVisibility()
+            scheduleGuardRelease(GUARD_RELEASE_GRACE_MS)
         }
     }
 
@@ -80,8 +100,56 @@ class Krkrsdl3Activity : KRKRActivity() {
         } catch (ignored: Exception) {
             // ActionBar 不存在可安全忽略
         }
-        setRequestedOrientation(intent?.getIntExtra("orientation", 6) ?: 6)
+        applyEngineRequestedOrientation()
         applySystemUiVisibility()
+    }
+
+    override fun onDestroy() {
+        mainHandler.removeCallbacksAndMessages(null)
+        super.onDestroy()
+    }
+
+    /** 统一方向入口：加载期走固定横屏，进入游戏后恢复启动器请求方向（默认 sensorLandscape）。 */
+    private fun applyEngineRequestedOrientation() {
+        try {
+            setRequestedOrientation(currentEngineRequestedOrientation())
+        } catch (t: Throwable) {
+            // 个别 ROM 对非全屏窗口调用会抛 IllegalStateException；保持当前方向即可
+            Log.w(TAG, "apply orientation failed", t)
+        }
+    }
+
+    private fun currentEngineRequestedOrientation(): Int {
+        val requested = intent?.getIntExtra("orientation", 6) ?: 6
+        if (!launchOrientationGuardEnabled) return requested
+        // 加载期冻结 180° 传感器翻转：固定到请求方向对应的单一横屏
+        return if (requested == ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE) {
+            ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE
+        } else {
+            ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+        }
+    }
+
+    /** 延迟解除方向锁（先到先得；已解除或宿主销毁时不动作）。 */
+    private fun scheduleGuardRelease(delayMs: Long) {
+        if (!launchOrientationGuardEnabled || isFinishing || isDestroyed) return
+        mainHandler.postDelayed({
+            if (launchOrientationGuardEnabled && !isFinishing && !isDestroyed) {
+                launchOrientationGuardEnabled = false
+                applyEngineRequestedOrientation()
+                Log.i(TAG, "release launch orientation guard after ${delayMs}ms")
+            }
+        }, delayMs)
+    }
+
+    companion object {
+        private const val TAG = "Krkrsdl3Activity"
+
+        /** 原生窗口创建后的缓冲：等待 TVP 完成首帧渲染再恢复传感器方向。 */
+        private const val GUARD_RELEASE_GRACE_MS = 2_000L
+
+        /** 绝对超时兜底（与 KirikiroidLauncherBaseActivity.SAFE_FALLBACK_REVEAL_MS 对齐）。 */
+        private const val GUARD_FALLBACK_RELEASE_MS = 20_000L
     }
 
     /**
