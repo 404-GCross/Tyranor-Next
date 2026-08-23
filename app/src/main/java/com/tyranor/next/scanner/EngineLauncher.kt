@@ -51,7 +51,7 @@ object EngineLauncher {
         if (path == null) {
             return "无法解析游戏目录（仅支持本地文件路径）"
         }
-        requestAllFilesAccessIfNeeded(context, path)?.let { return it }
+        requestAllFilesAccessIfNeeded(context, game, path)?.let { return it }
         EnginePluginBootstrap.ensureForLaunch(context, game.engine)?.let { return it }
         if (game.engine == EngineType.KIRIKIRI && !effectiveKrScopedSaveDir(context, game.uri)) {
             ensureKrGameSaveDir(context, game, path)?.let { return it }
@@ -95,9 +95,10 @@ object EngineLauncher {
      * Native engines receive a real /storage path, so SAF tree grants are not enough on Android 11+.
      * Match RinneMobile's requirement: ask the user to enable "Manage all files" before launching.
      */
-    private fun requestAllFilesAccessIfNeeded(context: Context, path: String): String? {
+    private fun requestAllFilesAccessIfNeeded(context: Context, game: ScanGame, path: String): String? {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return null
         if (Environment.isExternalStorageManager()) return null
+        if (game.engine == EngineType.KIRIKIRI && EngineScanner.isRemovableStoragePath(path)) return null
         if (!needsAllFilesAccess(path)) return null
 
         val app = context.applicationContext

@@ -494,19 +494,9 @@ public abstract class KirikiroidLauncherBaseActivity extends KR2Activity {
         // leave the KRKR shell above an otherwise running game.
         Log.i(TAG, "direct game launch waits for native scene transition so=" + gameLibrary);
         Intent intent = getIntent();
-        boolean scopedSaveDir = intent != null && intent.getBooleanExtra("scopedSaveDir", false);
         boolean safFileFallback = intent != null && intent.getBooleanExtra("safFileFallback", false);
         if (intent == null) {
             Log.i(TAG, "native interceptor skipped: no launch intent");
-            return;
-        }
-
-        // The scoped launcher keeps game assets at their original path and
-        // provides a real app-private savedata directory through the Java
-        // write bridge. Keep native filesystem calls intact: krkr_bridge
-        // only hooks open/open64(path, flags), while games also use other write APIs.
-        if (scopedSaveDir) {
-            Log.i(TAG, "KRKR scoped save uses direct savedata directory; native open interceptor disabled");
             return;
         }
 
@@ -516,7 +506,9 @@ public abstract class KirikiroidLauncherBaseActivity extends KR2Activity {
         }
         String prefix = null;
         try {
-            String rawPath = intent.getStringExtra("path");
+            String rawPath = intent.getStringExtra("projectRoot");
+            if (rawPath == null || rawPath.trim().isEmpty()) rawPath = intent.getStringExtra("gamedir");
+            if (rawPath == null || rawPath.trim().isEmpty()) rawPath = intent.getStringExtra("path");
             if (rawPath != null && !rawPath.trim().isEmpty()) {
                 String resolved = normalizeKrPath(rawPath);
                 File root = new File(resolved);
