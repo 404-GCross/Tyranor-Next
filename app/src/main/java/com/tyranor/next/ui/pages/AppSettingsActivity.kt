@@ -50,6 +50,7 @@ import com.tyranor.next.scanner.EngineScanner
 import com.tyranor.next.theme.AppThemeColors
 import com.tyranor.next.theme.MiuixSettingsTheme
 import com.tyranor.next.theme.TyranorNextTheme
+import com.tyranor.next.ui.common.WithoutPressIndication
 import kotlin.math.roundToInt
 import top.yukonga.miuix.kmp.basic.Card as MiuixCard
 import top.yukonga.miuix.kmp.basic.ColorPicker
@@ -82,7 +83,9 @@ class AppSettingsActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background,
                 ) {
-                    AppSettingsScreen()
+                    WithoutPressIndication {
+                        AppSettingsScreen()
+                    }
                 }
             }
         }

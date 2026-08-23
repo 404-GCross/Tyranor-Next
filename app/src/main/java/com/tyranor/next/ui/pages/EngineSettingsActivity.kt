@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import com.tyranor.next.R
 import com.tyranor.next.settings.AppSettingsStore
 import com.tyranor.next.theme.TyranorNextTheme
+import com.tyranor.next.ui.common.WithoutPressIndication
 
 class EngineSettingsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -41,7 +42,9 @@ class EngineSettingsActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background,
                 ) {
-                    EngineSettingsDetailScreen(kind = kind)
+                    WithoutPressIndication {
+                        EngineSettingsDetailScreen(kind = kind)
+                    }
                 }
             }
         }

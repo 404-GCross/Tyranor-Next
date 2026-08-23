@@ -54,6 +54,7 @@ import com.tyranor.next.scanner.ScanGameIntents
 import com.tyranor.next.settings.AppSettingsStore
 import com.tyranor.next.theme.NavWhite
 import com.tyranor.next.theme.TyranorNextTheme
+import com.tyranor.next.ui.common.WithoutPressIndication
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -77,7 +78,9 @@ class SaveManagementActivity : ComponentActivity() {
         setContent {
             TyranorNextTheme {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    SaveManagementScreen(game = game)
+                    WithoutPressIndication {
+                        SaveManagementScreen(game = game)
+                    }
                 }
             }
         }

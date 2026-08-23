@@ -63,6 +63,7 @@ import com.tyranor.next.theme.NavWhite
 import com.tyranor.next.theme.TyranorNextTheme
 import com.tyranor.next.ui.common.TimeFormats
 import com.tyranor.next.ui.common.TopBarIcon
+import com.tyranor.next.ui.common.WithoutPressIndication
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -86,7 +87,9 @@ class KrkrOnlinePatchActivity : ComponentActivity() {
         setContent {
             TyranorNextTheme {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    KrkrOnlinePatchScreen(game = game)
+                    WithoutPressIndication {
+                        KrkrOnlinePatchScreen(game = game)
+                    }
                 }
             }
         }

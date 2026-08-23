@@ -37,6 +37,7 @@ import com.tyranor.next.settings.AppSettingsStore
 import com.tyranor.next.theme.UnselectedGrey
 import com.tyranor.next.ui.common.LiquidGlassNavItem
 import com.tyranor.next.ui.common.LiquidGlassNavigationBar
+import com.tyranor.next.ui.common.WithoutPressIndication
 import com.tyranor.next.ui.pages.EngineScreen
 import com.tyranor.next.ui.pages.GameScreen
 import com.tyranor.next.ui.pages.HomeScreen
@@ -77,25 +78,27 @@ fun MainScreen(modifier: Modifier = Modifier) {
         .background(MaterialTheme.colorScheme.background),
     ) {
       Box(Modifier.weight(1f).fillMaxWidth()) {
-        AnimatedContent(
-          targetState = selectedIndex,
-          transitionSpec = {
-            val direction = if (targetState > initialState) 1 else -1
-            slideInHorizontally(
-              animationSpec = tween(durationMillis = 240),
-              initialOffsetX = { fullWidth -> direction * fullWidth },
-            ) togetherWith slideOutHorizontally(
-              animationSpec = tween(durationMillis = 240),
-              targetOffsetX = { fullWidth -> -direction * fullWidth },
-            ) using SizeTransform(clip = false)
-          },
-          label = "main_page_horizontal_slide",
-        ) { page ->
-          when (page) {
-            0 -> HomeScreen(Modifier.fillMaxSize())
-            1 -> GameScreen(Modifier.fillMaxSize())
-            2 -> EngineScreen(Modifier.fillMaxSize())
-            3 -> SettingsScreen(Modifier.fillMaxSize())
+        WithoutPressIndication {
+          AnimatedContent(
+            targetState = selectedIndex,
+            transitionSpec = {
+              val direction = if (targetState > initialState) 1 else -1
+              slideInHorizontally(
+                animationSpec = tween(durationMillis = 240),
+                initialOffsetX = { fullWidth -> direction * fullWidth },
+              ) togetherWith slideOutHorizontally(
+                animationSpec = tween(durationMillis = 240),
+                targetOffsetX = { fullWidth -> -direction * fullWidth },
+              ) using SizeTransform(clip = false)
+            },
+            label = "main_page_horizontal_slide",
+          ) { page ->
+            when (page) {
+              0 -> HomeScreen(Modifier.fillMaxSize())
+              1 -> GameScreen(Modifier.fillMaxSize())
+              2 -> EngineScreen(Modifier.fillMaxSize())
+              3 -> SettingsScreen(Modifier.fillMaxSize())
+            }
           }
         }
       }

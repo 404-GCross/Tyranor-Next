@@ -16,6 +16,7 @@ import com.tyranor.next.scanner.ScanGame
 import com.tyranor.next.scanner.ScanGameIntents
 import com.tyranor.next.settings.AppSettingsStore
 import com.tyranor.next.theme.TyranorNextTheme
+import com.tyranor.next.ui.common.WithoutPressIndication
 
 class PerGameSettingsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -40,7 +41,9 @@ class PerGameSettingsActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background,
                 ) {
-                    PerGameSettingsScreen(game = game)
+                    WithoutPressIndication {
+                        PerGameSettingsScreen(game = game)
+                    }
                 }
             }
         }
