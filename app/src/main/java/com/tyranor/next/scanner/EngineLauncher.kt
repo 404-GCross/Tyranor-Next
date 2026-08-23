@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.Settings
+import android.util.Log
 import androidx.documentfile.provider.DocumentFile
 import androidx.compose.ui.graphics.toArgb
 import com.akira.tyranoemu.remote.ArtemisActivityV1
@@ -28,6 +29,7 @@ import java.io.File
  * intent 契约与 RinneMobile 保持一致。
  */
 object EngineLauncher {
+    private const val TAG = "EngineLauncher"
 
     /** 支持的引擎列表（用于引擎页展示）。 */
     val supportedEngines: List<EngineType> = listOf(
@@ -200,9 +202,9 @@ object EngineLauncher {
         intent.putExtra("primaryColor", AppThemeColors.primary.toArgb())
         intent.putExtra("themeColorPrimary", AppThemeColors.primary.toArgb())
         intent.putExtra("themeColorOnPrimary", 0xFFFFFFFF.toInt())
-        intent.putExtra("themeColorCard", if (dark) 0xFF1E1F1F else 0xFFFFFFFF)
-        intent.putExtra("themeColorText", if (dark) 0xFFF0F0F0 else 0xFF14221B)
-        intent.putExtra("themeColorTextMuted", if (dark) 0xFF9A9A9A else 0xFF82908A)
+        intent.putExtra("themeColorCard", (if (dark) 0xFF1E1F1F else 0xFFFFFFFF).toInt())
+        intent.putExtra("themeColorText", (if (dark) 0xFFF0F0F0 else 0xFF14221B).toInt())
+        intent.putExtra("themeColorTextMuted", (if (dark) 0xFF9A9A9A else 0xFF82908A).toInt())
         return intent
     }
 
@@ -216,11 +218,17 @@ object EngineLauncher {
         val kernel = or(PerGameSettingsStore.getStr(context, gid, PerGameSettingsStore.F_ENGINE_KERNEL), EngineSettingsStore.getKrKernel(context))
         val launchEntry = pickKrActivateEntry(path, game)
         if (kernel == EngineSettingsStore.KERNEL_KRKRSDL3) {
-            // krkrsdl3 内核：gameargs 首项为启动文件绝对路径
+            val args = buildKrkrsdl3Args(context, gid, path, launchEntry)
+            Log.i(TAG, "krkrsdl3 launch root=$path entry=$launchEntry args=$args")
+            // krkrsdl3 内核：gameargs 首项为启动文件绝对路径，后续为 TVP 命令行参数
             return Intent(context, Krkrsdl3Activity::class.java).apply {
-                putStringArrayListExtra("gameargs", arrayListOf(launchEntry))
-                putExtra("path", launchEntry)
+                putStringArrayListExtra("gameargs", args)
+                putExtra("path", path)
+                putExtra("gamePath", launchEntry)
+                putExtra("projectRoot", path)
+                putExtra("gamedir", path)
                 putExtra("rootUri", game.uri)
+                putExtra("launchTarget", game.launchTarget)
                 putExtra("launchMode", "internal.krkrsdl3")
                 putExtra("orientation", 6)
                 putExtra("focus", "true")
@@ -279,6 +287,44 @@ object EngineLauncher {
             }
         }
     }
+
+    private fun buildKrkrsdl3Args(
+        context: Context,
+        gid: String,
+        path: String,
+        launchEntry: String,
+    ): ArrayList<String> {
+        fun <T> or(override: T?, global: T): T = override ?: global
+        val args = arrayListOf(launchEntry)
+        val renderer = normalizeKrkrsdl3Renderer(
+            or(
+                PerGameSettingsStore.getStr(context, gid, PerGameSettingsStore.F_RENDERER),
+                EngineSettingsStore.getKrRenderer(context),
+            ),
+        )
+        args.add("-render=$renderer")
+
+        val scoped = or(
+            PerGameSettingsStore.getBool(context, gid, PerGameSettingsStore.F_SCOPED_SAVE_DIR),
+            EngineSettingsStore.isKrScopedSaveDir(context),
+        )
+        if (scoped) {
+            val baseDir = context.getExternalFilesDir(null) ?: context.filesDir
+            val saveDir = File(File(baseDir, "save"), EngineScanner.safeSaveName(path))
+            if (saveDir.exists() || saveDir.mkdirs()) {
+                args.add("--save-dir")
+                args.add(saveDir.absolutePath)
+            }
+        }
+        return args
+    }
+
+    private fun normalizeKrkrsdl3Renderer(value: String): String =
+        when (value.trim().lowercase()) {
+            EngineSettingsStore.RENDERER_OPENGL, "gl", "gpu" -> EngineSettingsStore.RENDERER_OPENGL
+            EngineSettingsStore.RENDERER_SOFTWARE, "sw" -> EngineSettingsStore.RENDERER_SOFTWARE
+            else -> EngineSettingsStore.RENDERER_SOFTWARE
+        }
 
     /**
      * Artemis 启动：按设置页选择的引擎版本路由到 V1/V2/V3，并应用画面反转与补丁策略。

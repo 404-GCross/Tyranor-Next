@@ -46,6 +46,7 @@
             android:process=":krkrsdl3"
             android:launchMode="singleInstance"
             android:taskAffinity="com.core.Krkrsdl3"
+            android:theme="@style/Theme.Krkrsdl3"
             android:screenOrientation="sensorLandscape"
             android:configChanges="keyboardHidden|orientation|screenSize|screenLayout|smallestScreenSize|uiMode|density|fontScale|locale|layoutDirection" />
 

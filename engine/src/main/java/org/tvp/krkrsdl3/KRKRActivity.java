@@ -4,6 +4,7 @@ import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.content.res.AssetManager;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 
 import org.libsdl3.app.SDLActivity;
@@ -12,6 +13,7 @@ import java.util.ArrayList;
 import java.util.Objects;
 
 public class KRKRActivity extends SDLActivity {
+    private static final String TAG = "KRKRActivity";
     /** 引擎 argv 协议键：启动器经该 extra 传入游戏启动参数列表（首项为启动文件绝对路径）。 */
     public static final String SHAREDPREF_GAMECONFIG = "gameargs";
     private ArrayList<String> m_gameargs;
@@ -32,25 +34,37 @@ public class KRKRActivity extends SDLActivity {
 
     @Override
     protected String[] getArguments() {
-        // 兼容两种 extra 形态：启动器传 StringArrayList（getStringArrayListExtra），
-        // adb 调试传 String[]（--esa → getStringArrayExtra）。两者皆缺省时给空参数，
-        // 由引擎 TVPTryStartupFromArchives 自行定位 startup.tjs。
-        if (m_gameargs != null)
+        if (m_gameargs == null)
+            m_gameargs = readGameArgs(getIntent());
+        if (m_gameargs != null && !m_gameargs.isEmpty())
             return m_gameargs.toArray(new String[0]);
-        String[] arr = getIntent().getStringArrayExtra(SHAREDPREF_GAMECONFIG);
-        if (arr != null)
-            return arr;
         return new String[] { "" };
     }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        m_gameargs = readGameArgs(getIntent());
+        Log.i(TAG, "launch args=" + m_gameargs);
         super.onCreate(savedInstanceState);
         setNativeAssetManager(getAssets());
-        Intent intent = getIntent();
-
-        m_gameargs = intent.getStringArrayListExtra(SHAREDPREF_GAMECONFIG);
         this.fullscreen();
+    }
+
+    private ArrayList<String> readGameArgs(Intent intent) {
+        if (intent == null)
+            return null;
+        ArrayList<String> args = intent.getStringArrayListExtra(SHAREDPREF_GAMECONFIG);
+        if (args != null)
+            return args;
+        String[] arr = intent.getStringArrayExtra(SHAREDPREF_GAMECONFIG);
+        if (arr == null)
+            return null;
+        args = new ArrayList<>();
+        for (String item : arr) {
+            if (item != null)
+                args.add(item);
+        }
+        return args;
     }
 
     @Override
