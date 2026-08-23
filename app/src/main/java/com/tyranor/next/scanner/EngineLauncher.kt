@@ -312,8 +312,7 @@ object EngineLauncher {
             val baseDir = context.getExternalFilesDir(null) ?: context.filesDir
             val saveDir = File(File(baseDir, "save"), EngineScanner.safeSaveName(path))
             if (saveDir.exists() || saveDir.mkdirs()) {
-                args.add("--save-dir")
-                args.add(saveDir.absolutePath)
+                args.add("-savedir=${saveDir.absolutePath}")
             }
         }
         return args
