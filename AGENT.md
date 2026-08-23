@@ -112,7 +112,7 @@ Column(fillMaxSize)                                // 页面根
 
 以下颜色固定不变，从 `theme/Color.kt` 常量引用，**禁止**在页面中直接写 `Color(0x...)`：
 
-- `PageGrey` 页面背景灰、`NavWhite` 卡片/导航栏白、`TextColor` 正文深灰、`UnselectedGrey` 导航栏未选中灰。
+- `PageGrey` 页面背景色、`NavWhite` 卡片/导航栏组件色；二者由应用设置「色调切换」控制是否互换。`TextColor` 正文深灰、`UnselectedGrey` 导航栏未选中灰。
 - 语义色：`colorScheme.error`（错误/删除）、引擎封面色（`EngineType.coverColor()`）、封面占位白字等。
 - 新增任何颜色先检查 `Color.kt` 是否已有现成常量；中性色必须统一收口到 `Color.kt`，不在页面内散落硬编码。
 

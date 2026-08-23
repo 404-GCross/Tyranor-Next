@@ -208,6 +208,20 @@ internal fun AppSettingsScreen() {
                 item {
                     MiuixCard(modifier = Modifier.fillMaxWidth(), cornerRadius = 8.dp) {
                         Column(Modifier.padding(vertical = 4.dp)) {
+                            SwitchPreference(
+                                title = "色调切换",
+                                checked = AppThemeColors.toneSwitchEnabled,
+                                onCheckedChange = { checked ->
+                                    AppSettingsStore.setToneSwitchEnabled(ctx, checked)
+                                    AppThemeColors.refresh(ctx)
+                                },
+                            )
+                        }
+                    }
+                }
+                item {
+                    MiuixCard(modifier = Modifier.fillMaxWidth(), cornerRadius = 8.dp) {
+                        Column(Modifier.padding(vertical = 4.dp)) {
                             var depth by remember { mutableIntStateOf(AppSettingsStore.getScanDepth(ctx)) }
                             Row(
                                 modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 10.dp),

@@ -23,7 +23,7 @@ private val TyranorMiuixTextStyles = defaultTextStyles(
 
 /**
  * 设置页专用 Miuix 主题：配色与 TyranorNextTheme 对齐，深/浅色由应用设置「外观模式」控制
- * （深灰页面背景 + 深色卡片 或 浅灰背景 + 白色卡片）。
+ * 页面背景与组件色由应用设置「色调切换」控制是否互换。
  * primaryColor 由应用设置「色调轮盘」提供，默认蓝与 TyranorNextTheme 一致。
  */
 @Composable

@@ -36,7 +36,7 @@ fun TyranorNextTheme(
       primary = primary,
       secondary = Teal40,
       tertiary = Amber40,
-      // 页面中性灰
+      // 页面背景与组件色由应用设置「色调切换」控制
       background = PageGrey,
       surface = PageGrey,
       onBackground = TextColor,

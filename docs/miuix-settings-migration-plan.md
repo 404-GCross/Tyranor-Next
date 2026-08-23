@@ -95,9 +95,9 @@ miuix 0.9.2 的 `miuix-squircle-android` / `miuix-shader-android` 等模块硬�
 ```kotlin
 private val TyranorMiuixLightColors = lightColorScheme(
     primary = Blue40,          // #307DEF，与应用主色一致
-    background = PageGrey,     // #F2F3F5，页面背景与其他 Tab 一致
+    background = PageGrey,     // 页面背景与其他 Tab 一致
     surface = PageGrey,
-    surfaceContainer = NavWhite, // 白色卡片
+    surfaceContainer = NavWhite, // 组件/卡片色，由「色调切换」控制
     onBackground = TextColor,
     onSurface = TextColor,
     onSurfaceContainer = TextColor,

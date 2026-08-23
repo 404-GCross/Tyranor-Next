@@ -15,6 +15,7 @@ object AppSettingsStore {
     const val KEY_NAV_STYLE = "nav_style"
     const val KEY_SCAN_DEPTH = "scan_depth"
     const val KEY_THEME_MODE = "theme_mode"
+    const val KEY_TONE_SWITCH = "tone_switch"
 
     /** 默认主题色：#307DEF，与 theme/Color.kt 的 Blue40 一致。 */
     const val DEFAULT_THEME_COLOR = "#307DEF"
@@ -77,6 +78,13 @@ object AppSettingsStore {
 
     fun setThemeMode(c: Context, mode: String) =
         prefs(c).edit().putString(KEY_THEME_MODE, mode).apply()
+
+    /** 色调切换：开启时使用白色页面背景 + 中性灰组件；关闭时使用中性灰页面背景 + 白色组件。 */
+    fun isToneSwitchEnabled(c: Context): Boolean =
+        prefs(c).getBoolean(KEY_TONE_SWITCH, true)
+
+    fun setToneSwitchEnabled(c: Context, enabled: Boolean) =
+        prefs(c).edit().putBoolean(KEY_TONE_SWITCH, enabled).apply()
 
     /** 系统当前是否深色模式（资源配置 uiMode）。 */
     fun isSystemDark(c: Context): Boolean =

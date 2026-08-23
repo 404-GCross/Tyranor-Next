@@ -20,6 +20,10 @@ object AppThemeColors {
     var isDark by mutableStateOf(false)
         private set
 
+    /** 色调切换：控制页面背景色与组件色是否互换。 */
+    var toneSwitchEnabled by mutableStateOf(true)
+        private set
+
     /** 首次组合时从存储加载（幂等，避免每次重组都读 prefs）；
      *  跟随系统时每次组合都重读，系统深/浅切换（Activity 重建）后能立即拿到新值。 */
     fun ensureLoaded(context: Context) {
@@ -33,6 +37,7 @@ object AppThemeColors {
     fun refresh(context: Context) {
         primary = parseColorHex(AppSettingsStore.getThemeColorHex(context))
         isDark = AppSettingsStore.isDarkEffective(context)
+        toneSwitchEnabled = AppSettingsStore.isToneSwitchEnabled(context)
     }
 }
 

@@ -6,6 +6,8 @@ build/
 # Kotlin 编译会话/错误缓存
 .kotlin/
 
+.trae/
+
 # ===== IDE =====
 .idea/
 .vscode/
