@@ -202,7 +202,9 @@ object VndbCoverService {
     }
 
     private fun cleanTitle(s: String): String {
-        val cleaned = s.replace("[\\[\\]【】（）()].*".toRegex(), " ")
+        val cleaned = s.replace("""\[[^\]]*\]|【[^】]*】""".toRegex(), " ")
+            .replace("[\\[\\]【】]".toRegex(), " ")
+            .replace("[（）()].*".toRegex(), " ")
             .replace("(?i)complete|汉化|中文版|日文版|体验版|trial|patch".toRegex(), " ")
             .replace('_', ' ')
             .trim()
