@@ -75,6 +75,7 @@ import com.tyranor.next.scanner.GameSaveManager
 import com.tyranor.next.scanner.ScanGame
 import com.tyranor.next.scanner.VndbCandidate
 import com.tyranor.next.scanner.VndbCoverService
+import com.tyranor.next.settings.AppSettingsStore
 import com.tyranor.next.settings.PerGameSettingsStore
 import com.tyranor.next.theme.NavWhite
 import com.tyranor.next.theme.MiuixSettingsTheme
@@ -89,11 +90,13 @@ import top.yukonga.miuix.kmp.basic.InputField
 import top.yukonga.miuix.kmp.basic.SearchBar
 import top.yukonga.miuix.kmp.basic.SearchBarDefaults
 import java.io.File
+import java.util.Locale
 
 @Composable
 fun GameScreen(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    AppSettingsStore.initGameSort(context)
 
     var games by remember { mutableStateOf(EngineScanner.loadGames(context)) }
     var scanning by remember { mutableStateOf(false) }
@@ -271,6 +274,25 @@ fun GameScreen(modifier: Modifier = Modifier) {
     }
 }
 
+private fun sortGames(games: List<ScanGame>, sortMode: String): List<ScanGame> {
+    return when (sortMode) {
+        AppSettingsStore.GAME_SORT_BRACKET_TAG -> games.sortedWith(
+            compareBy<ScanGame> { bracketTag(it.title).isBlank() }
+                .thenBy { bracketTag(it.title).lowercase(Locale.ROOT) }
+                .thenBy { titleSortKey(it.title) },
+        )
+        else -> games.sortedBy { titleSortKey(it.title) }
+    }
+}
+
+private fun bracketTag(title: String): String {
+    val match = Regex("""【([^】]+)】|\[([^\]]+)]""").find(title) ?: return ""
+    return (match.groups[1]?.value ?: match.groups[2]?.value).orEmpty().trim()
+}
+
+private fun titleSortKey(title: String): String =
+    title.lowercase(Locale.ROOT).trim()
+
 /** 删除游戏后清理应用内关联数据（设置/最近记录/快捷启动/封面/存档镜像），绝不触碰游戏文件。 */
 internal fun cleanupDeletedGame(context: android.content.Context, target: ScanGame) {
     PerGameSettingsStore.clear(context, target.uri)
@@ -317,9 +339,11 @@ private fun GameLibraryContent(
 ) {
     var showSearch by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
-    val filteredGames = remember(games, query) {
+    val gameSort = AppSettingsStore.gameSortState.value
+    val sortedGames = remember(games, gameSort) { sortGames(games, gameSort) }
+    val filteredGames = remember(sortedGames, query) {
         val q = query.trim()
-        if (q.isEmpty()) games else games.filter { it.title.contains(q, ignoreCase = true) }
+        if (q.isEmpty()) sortedGames else sortedGames.filter { it.title.contains(q, ignoreCase = true) }
     }
 
     Column(modifier.fillMaxSize()) {
