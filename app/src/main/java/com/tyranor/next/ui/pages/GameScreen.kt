@@ -10,6 +10,8 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,6 +23,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -66,6 +69,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.tyranor.next.R
 import com.tyranor.next.scanner.EngineLauncher
@@ -496,73 +500,80 @@ internal fun GameActionsSheet(
         sheetState = rememberModalBottomSheetState(),
         containerColor = MaterialTheme.colorScheme.background,
     ) {
-        Text(
-            game.title,
-            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
-        )
-
         Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = GameActionsSheetMaxHeight)
+                .verticalScroll(rememberScrollState()),
         ) {
-            GameActionRow(R.drawable.ic_sheet_launch, "启动游戏") {
-                if (EngineLauncher.needsArtemisPatchConfirm(context, game)) {
-                    showPatchConfirm = true
-                } else {
-                    startLaunch()
-                }
-            }
-            if (game.engine == EngineType.KIRIKIRI) {
-                GameActionRow(
-                    iconRes = R.drawable.ic_sheet_launch_file,
-                    label = "启动文件",
-                    subtitle = game.launchFile ?: "自动",
-                ) { showLaunchFilePicker = true }
-            }
-            val quickLaunched = EngineScanner.isQuickLaunched(context, game.uri)
-            GameActionRow(
-                iconRes = R.drawable.ic_home,
-                label = if (quickLaunched) "移除快捷启动" else "添加快捷启动",
-            ) {
-                if (quickLaunched) {
-                    EngineScanner.removeQuickLaunch(context, game.uri)
-                    onDismiss()
-                } else if (EngineScanner.addQuickLaunch(context, game)) {
-                    onDismiss()
-                } else {
-                    android.widget.Toast.makeText(context, "首页快捷启动已满（最多 3 个）", android.widget.Toast.LENGTH_SHORT).show()
-                }
-            }
-            GameActionRow(R.drawable.ic_sheet_search_cover, "搜索封面") { showVndbSearch = true }
-            GameActionRow(R.drawable.ic_sheet_edit_cover, "修改封面") { imagePicker.launch("image/*") }
-            GameActionRow(R.drawable.ic_sheet_rename, "名称修改") { showRenameDialog = true }
-            GameActionRow(R.drawable.ic_sheet_saves, "存档管理") {
-                startActivityWithPageTransition(context, SaveManagementActivity.createIntent(context, game))
-                onDismiss()
-            }
-            if (game.engine == EngineType.KIRIKIRI) {
-                GameActionRow(R.drawable.ic_sheet_patch, "在线补丁") {
-                    startActivityWithPageTransition(context, KrkrOnlinePatchActivity.createIntent(context, game))
-                    onDismiss()
-                }
-            }
-            GameActionRow(R.drawable.ic_sheet_settings, "引擎设置", onClick = onEngineSettings)
-            GameActionRow(R.drawable.ic_sheet_delete, "删除游戏", danger = true) { showDeleteConfirm = true }
-        }
-
-        launchError?.let {
             Text(
-                it,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                game.title,
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
             )
-        }
 
-        // 底部安全区留白
-        Box(Modifier.navigationBarsPadding().height(16.dp))
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                GameActionRow(R.drawable.ic_sheet_launch, "启动游戏") {
+                    if (EngineLauncher.needsArtemisPatchConfirm(context, game)) {
+                        showPatchConfirm = true
+                    } else {
+                        startLaunch()
+                    }
+                }
+                if (game.engine == EngineType.KIRIKIRI) {
+                    GameActionRow(
+                        iconRes = R.drawable.ic_sheet_launch_file,
+                        label = "启动文件",
+                        subtitle = game.launchFile ?: "自动",
+                    ) { showLaunchFilePicker = true }
+                }
+                val quickLaunched = EngineScanner.isQuickLaunched(context, game.uri)
+                GameActionRow(
+                    iconRes = R.drawable.ic_home,
+                    label = if (quickLaunched) "移除快捷启动" else "添加快捷启动",
+                ) {
+                    if (quickLaunched) {
+                        EngineScanner.removeQuickLaunch(context, game.uri)
+                        onDismiss()
+                    } else if (EngineScanner.addQuickLaunch(context, game)) {
+                        onDismiss()
+                    } else {
+                        android.widget.Toast.makeText(context, "首页快捷启动已满（最多 3 个）", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                }
+                GameActionRow(R.drawable.ic_sheet_search_cover, "搜索封面") { showVndbSearch = true }
+                GameActionRow(R.drawable.ic_sheet_edit_cover, "修改封面") { imagePicker.launch("image/*") }
+                GameActionRow(R.drawable.ic_sheet_rename, "名称修改") { showRenameDialog = true }
+                GameActionRow(R.drawable.ic_sheet_saves, "存档管理") {
+                    startActivityWithPageTransition(context, SaveManagementActivity.createIntent(context, game))
+                    onDismiss()
+                }
+                if (game.engine == EngineType.KIRIKIRI) {
+                    GameActionRow(R.drawable.ic_sheet_patch, "在线补丁") {
+                        startActivityWithPageTransition(context, KrkrOnlinePatchActivity.createIntent(context, game))
+                        onDismiss()
+                    }
+                }
+                GameActionRow(R.drawable.ic_sheet_settings, "引擎设置", onClick = onEngineSettings)
+                GameActionRow(R.drawable.ic_sheet_delete, "删除游戏", danger = true) { showDeleteConfirm = true }
+            }
+
+            launchError?.let {
+                Text(
+                    it,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                )
+            }
+
+            // 底部安全区留白
+            Box(Modifier.navigationBarsPadding().height(16.dp))
+        }
     }
 
     // ===== Artemis 自动补丁确认：总是（记住 auto）/ 本次 / 不再（记住 off）；点遮罩取消 = 不启动 =====
@@ -671,6 +682,8 @@ internal fun GameActionsSheet(
         )
     }
 }
+
+private val GameActionsSheetMaxHeight: Dp = 560.dp
 
 @Composable
 private fun RenameGameDialog(

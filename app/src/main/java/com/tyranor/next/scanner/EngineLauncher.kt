@@ -5,6 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
+import android.provider.DocumentsContract
 import android.provider.Settings
 import android.util.Log
 import androidx.documentfile.provider.DocumentFile
@@ -53,7 +54,7 @@ object EngineLauncher {
         requestAllFilesAccessIfNeeded(context, path)?.let { return it }
         EnginePluginBootstrap.ensureForLaunch(context, game.engine)?.let { return it }
         if (game.engine == EngineType.KIRIKIRI && !effectiveKrScopedSaveDir(context, game.uri)) {
-            ensureKrGameSaveDir(path)?.let { return it }
+            ensureKrGameSaveDir(context, game, path)?.let { return it }
         }
         // “总是/不再”持久化为全局补丁策略；“本次”不落盘，仅本次按 auto 生效
         if (game.engine == EngineType.ARTEMIS) {
@@ -219,7 +220,13 @@ object EngineLauncher {
     private fun buildKirikiriIntent(context: Context, path: String, game: ScanGame): Intent {
         val gid = game.uri
         fun <T> or(override: T?, global: T): T = override ?: global
-        val kernel = or(PerGameSettingsStore.getStr(context, gid, PerGameSettingsStore.F_ENGINE_KERNEL), EngineSettingsStore.getKrKernel(context))
+        val requestedKernel = or(PerGameSettingsStore.getStr(context, gid, PerGameSettingsStore.F_ENGINE_KERNEL), EngineSettingsStore.getKrKernel(context))
+        val needsSafFallback = EngineScanner.isRemovableStoragePath(path)
+        val kernel = if (needsSafFallback && requestedKernel == EngineSettingsStore.KERNEL_KRKRSDL3) {
+            EngineSettingsStore.KERNEL_KIRIKIRI2
+        } else {
+            requestedKernel
+        }
         val launchEntry = pickKrActivateEntry(path, game)
         if (kernel == EngineSettingsStore.KERNEL_KRKRSDL3) {
             val args = buildKrkrsdl3Args(context, gid, path, launchEntry)
@@ -257,6 +264,7 @@ object EngineLauncher {
             putExtra("rootUri", game.uri)
             putExtra("launchTarget", game.launchTarget)
             putExtra("launchMode", "internal.kirikiroid2")
+            putExtra("safFileFallback", needsSafFallback)
             putExtra("orientation", 6)
             putExtra("scopedSaveDir", scoped)
             // 独立存档：把 scopedSaveRoot 指向与 GameSaveManager 一致的镜像目录，
@@ -323,14 +331,75 @@ object EngineLauncher {
         PerGameSettingsStore.getBool(context, gid, PerGameSettingsStore.F_SCOPED_SAVE_DIR)
             ?: EngineSettingsStore.isKrScopedSaveDir(context)
 
-    private fun ensureKrGameSaveDir(path: String): String? {
+    private fun ensureKrGameSaveDir(context: Context, game: ScanGame, path: String): String? {
         val saveDir = File(path, "savedata")
+        if (saveDir.isDirectory) return null
+        if (saveDir.exists()) return "KRKR 存档路径已存在但不是目录：${saveDir.absolutePath}"
+        if (saveDir.mkdirs() || saveDir.isDirectory) return null
+        if (ensureKrGameSaveDirViaSaf(context, game, path)) return null
+        return "无法创建 KRKR 存档目录：${saveDir.absolutePath}"
+    }
+
+    private fun ensureKrGameSaveDirViaSaf(context: Context, game: ScanGame, path: String): Boolean {
+        return try {
+            val saveDir = DocumentFile.fromTreeUri(context.applicationContext, Uri.parse(game.uri))
+                ?.takeIf { it.isDirectory }
+                ?.findFile("savedata")
+                ?: DocumentFile.fromTreeUri(context.applicationContext, Uri.parse(game.uri))
+                    ?.takeIf { it.isDirectory }
+                    ?.createDirectory("savedata")
+            if (saveDir?.isDirectory == true) return true
+            createSafDirectoryForStoragePath(context, "$path/savedata")
+        } catch (_: Throwable) {
+            createSafDirectoryForStoragePath(context, "$path/savedata")
+        }
+    }
+
+    private fun createSafDirectoryForStoragePath(context: Context, storagePath: String): Boolean {
+        val normalized = storagePath.replace('\\', '/').trimEnd('/')
+        val parsed = parseStoragePath(normalized) ?: return false
+        val (volume, relative) = parsed
+        val resolver = context.contentResolver
+        for (perm in resolver.persistedUriPermissions) {
+            val tree = perm.uri ?: continue
+            val treeId = runCatching { DocumentsContract.getTreeDocumentId(tree) }.getOrNull() ?: continue
+            val decodedTreeId = Uri.decode(treeId)
+            if (!decodedTreeId.startsWith("$volume:", ignoreCase = true)) continue
+            val treeRel = decodedTreeId.substringAfter(':', "")
+            if (treeRel.isNotEmpty() && relative != treeRel && !relative.startsWith("$treeRel/")) continue
+            var current = DocumentFile.fromTreeUri(context.applicationContext, tree) ?: continue
+            val localRel = if (treeRel.isNotEmpty() && relative.startsWith("$treeRel/")) {
+                relative.substring(treeRel.length + 1)
+            } else {
+                relative
+            }
+            var ok = true
+            for (segment in localRel.split('/').filter { it.isNotBlank() }) {
+                val next = current.findFile(segment)?.takeIf { it.isDirectory }
+                    ?: current.createDirectory(segment)
+                if (next == null || !next.isDirectory) {
+                    ok = false
+                    break
+                }
+                current = next
+            }
+            if (ok && current.name.equals("savedata", ignoreCase = true) && current.isDirectory) return true
+        }
+        return false
+    }
+
+    private fun parseStoragePath(path: String): Pair<String, String>? {
         return when {
-            saveDir.isDirectory -> null
-            saveDir.exists() -> "KRKR 存档路径已存在但不是目录：${saveDir.absolutePath}"
-            saveDir.mkdirs() -> null
-            saveDir.isDirectory -> null
-            else -> "无法创建 KRKR 存档目录：${saveDir.absolutePath}"
+            path == "/storage/emulated/0" -> "primary" to ""
+            path.startsWith("/storage/emulated/0/") -> "primary" to path.substring("/storage/emulated/0/".length)
+            path == "/sdcard" -> "primary" to ""
+            path.startsWith("/sdcard/") -> "primary" to path.substring("/sdcard/".length)
+            path.startsWith("/storage/") -> {
+                val rest = path.substring("/storage/".length)
+                val slash = rest.indexOf('/')
+                if (slash <= 0) null else rest.substring(0, slash) to rest.substring(slash + 1)
+            }
+            else -> null
         }
     }
 
