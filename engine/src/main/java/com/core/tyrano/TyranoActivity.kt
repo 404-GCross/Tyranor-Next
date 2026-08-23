@@ -9,6 +9,7 @@ import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.view.Gravity
+import android.view.KeyEvent
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -56,6 +57,7 @@ class TyranoActivity : Activity() {
     private var firstResume = true
     private var localServer: TyranoLocalHttpServer? = null
     private var allowExternalNetwork = false
+    private var backInvokedCallback: Any? = null
     private val processExitScheduled = AtomicBoolean(false)
 
     override fun attachBaseContext(newBase: Context) {
@@ -64,6 +66,7 @@ class TyranoActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        backInvokedCallback = DoubleBackExit.registerPredictiveBack(this) { finish() }
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         enterFullscreen()
         allowExternalNetwork = getSharedPreferences(EnginePrefs.APP_PREFS, Context.MODE_PRIVATE)
@@ -404,7 +407,12 @@ class TyranoActivity : Activity() {
 
     @Deprecated("Deprecated in Android")
     override fun onBackPressed() {
-        if (DoubleBackExit.shouldExit(this)) finish()
+        DoubleBackExit.handleBack(this) { finish() }
+    }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (DoubleBackExit.dispatchBackKey(this, event) { finish() }) return true
+        return super.dispatchKeyEvent(event)
     }
 
     override fun onPause() {
@@ -423,6 +431,8 @@ class TyranoActivity : Activity() {
     }
 
     override fun onDestroy() {
+        DoubleBackExit.unregisterPredictiveBack(this, backInvokedCallback)
+        DoubleBackExit.clear(this)
         runCatching {
             webView?.stopLoading()
             webView?.loadUrl("about:blank")
