@@ -42,11 +42,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.RadioButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -80,6 +76,7 @@ import com.tyranor.next.scanner.VndbCandidate
 import com.tyranor.next.scanner.VndbCoverService
 import com.tyranor.next.settings.PerGameSettingsStore
 import com.tyranor.next.theme.NavWhite
+import com.tyranor.next.theme.MiuixSettingsTheme
 import com.tyranor.next.ui.common.glassNavBottomInset
 import com.tyranor.next.ui.common.isWideScreen
 import com.tyranor.next.theme.PageGrey
@@ -87,6 +84,8 @@ import com.tyranor.next.ui.common.TopBarIcon
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import top.yukonga.miuix.kmp.basic.InputField
+import top.yukonga.miuix.kmp.basic.SearchBar
 import java.io.File
 
 @Composable
@@ -319,27 +318,25 @@ private fun GameLibraryContent(
                 }
                 // 搜索框：点击搜索按钮后出现在顶部栏下方
                 if (showSearch) {
-                    OutlinedTextField(
-                        value = query,
-                        onValueChange = { query = it },
-                        placeholder = { Text("搜索游戏") },
-                        singleLine = true,
-                        shape = RoundedCornerShape(8.dp),
-                        leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                        trailingIcon = {
-                            if (query.isNotEmpty()) {
-                                Icon(
-                                    Icons.Filled.Close,
-                                    contentDescription = "清除",
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(6.dp))
-                                        .clickable { query = "" },
+                    MiuixSettingsTheme {
+                        SearchBar(
+                            inputField = {
+                                InputField(
+                                    query = query,
+                                    onQueryChange = { query = it },
+                                    onSearch = { },
+                                    expanded = false,
+                                    onExpandedChange = { },
+                                    label = "搜索游戏",
+                                    modifier = Modifier.fillMaxWidth(),
                                 )
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 10.dp),
-                    )
+                            },
+                            expanded = false,
+                            onExpandedChange = { },
+                            modifier = Modifier.fillMaxWidth().padding(start = 4.dp, end = 4.dp, bottom = 10.dp),
+                            content = {},
+                        )
+                    }
                 }
             }
         }
@@ -619,13 +616,25 @@ private fun VndbSearchDialog(
         title = { Text("搜索 VNDB 封面", style = MaterialTheme.typography.titleMedium) },
         text = {
             Column {
-                OutlinedTextField(
-                    value = keyword,
-                    onValueChange = { keyword = it },
-                    singleLine = true,
-                    label = { Text("游戏名称") },
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                MiuixSettingsTheme {
+                    SearchBar(
+                        inputField = {
+                            InputField(
+                                query = keyword,
+                                onQueryChange = { keyword = it },
+                                onSearch = { search() },
+                                expanded = false,
+                                onExpandedChange = { },
+                                label = "游戏名称",
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        },
+                        expanded = false,
+                        onExpandedChange = { },
+                        modifier = Modifier.fillMaxWidth(),
+                        content = {},
+                    )
+                }
                 Button(
                     onClick = { search() },
                     enabled = !searching,

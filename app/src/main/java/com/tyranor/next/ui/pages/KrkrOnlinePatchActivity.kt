@@ -34,10 +34,8 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -59,6 +57,7 @@ import com.tyranor.next.scanner.KrkrPatchEntry
 import com.tyranor.next.scanner.ScanGame
 import com.tyranor.next.scanner.ScanGameIntents
 import com.tyranor.next.settings.AppSettingsStore
+import com.tyranor.next.theme.MiuixSettingsTheme
 import com.tyranor.next.theme.NavWhite
 import com.tyranor.next.theme.TyranorNextTheme
 import com.tyranor.next.ui.common.TimeFormats
@@ -67,6 +66,8 @@ import com.tyranor.next.ui.common.WithoutPressIndication
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import top.yukonga.miuix.kmp.basic.InputField
+import top.yukonga.miuix.kmp.basic.SearchBar
 
 class KrkrOnlinePatchActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -170,13 +171,25 @@ private fun KrkrOnlinePatchScreen(game: ScanGame) {
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item {
-                OutlinedTextField(
-                    value = keyword,
-                    onValueChange = { keyword = it },
-                    singleLine = true,
-                    label = { Text("搜索游戏名或品牌") },
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                MiuixSettingsTheme {
+                    SearchBar(
+                        inputField = {
+                            InputField(
+                                query = keyword,
+                                onQueryChange = { keyword = it },
+                                onSearch = { },
+                                expanded = false,
+                                onExpandedChange = { },
+                                label = "搜索游戏名或品牌",
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        },
+                        expanded = false,
+                        onExpandedChange = { },
+                        modifier = Modifier.fillMaxWidth(),
+                        content = {},
+                    )
+                }
             }
 
             if (loading) {
