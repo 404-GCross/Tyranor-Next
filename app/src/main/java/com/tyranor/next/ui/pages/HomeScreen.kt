@@ -164,7 +164,7 @@ fun HomeScreen(modifier: Modifier = Modifier) {
             onGameUpdated = { replaceGame(it) },
             onDeleteGame = { deleteGame(game) },
             onEngineSettings = {
-                startActivityWithFade(context, PerGameSettingsActivity.createIntent(context, game))
+                startActivityWithPageTransition(context, PerGameSettingsActivity.createIntent(context, game))
                 selectedGame = null
             },
         )

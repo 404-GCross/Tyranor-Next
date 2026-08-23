@@ -198,7 +198,7 @@ fun GameScreen(modifier: Modifier = Modifier) {
             onGameUpdated = { replaceGame(it) },
             onDeleteGame = { deleteGame(game) },
             onEngineSettings = {
-                startActivityWithFade(context, PerGameSettingsActivity.createIntent(context, game))
+                startActivityWithPageTransition(context, PerGameSettingsActivity.createIntent(context, game))
                 selectedGame = null
             },
         )
@@ -258,12 +258,12 @@ private fun deleteCoverFile(context: android.content.Context, coverUri: String?)
     }
 }
 
-internal fun startActivityWithFade(context: android.content.Context, intent: android.content.Intent) {
+internal fun startActivityWithPageTransition(context: android.content.Context, intent: android.content.Intent) {
     if (context is Activity) {
         val options = ActivityOptions.makeCustomAnimation(
             context,
-            android.R.anim.fade_in,
-            android.R.anim.fade_out,
+            R.anim.page_slide_in_from_bottom,
+            R.anim.page_slide_out_to_top,
         )
         context.startActivity(intent, options.toBundle())
     } else {
@@ -464,12 +464,12 @@ internal fun GameActionsSheet(
             GameActionRow(R.drawable.ic_sheet_search_cover, "搜索封面") { showVndbSearch = true }
             GameActionRow(R.drawable.ic_sheet_edit_cover, "修改封面") { imagePicker.launch("image/*") }
             GameActionRow(R.drawable.ic_sheet_saves, "存档管理") {
-                startActivityWithFade(context, SaveManagementActivity.createIntent(context, game))
+                startActivityWithPageTransition(context, SaveManagementActivity.createIntent(context, game))
                 onDismiss()
             }
             if (game.engine == EngineType.KIRIKIRI) {
                 GameActionRow(R.drawable.ic_sheet_patch, "在线补丁") {
-                    startActivityWithFade(context, KrkrOnlinePatchActivity.createIntent(context, game))
+                    startActivityWithPageTransition(context, KrkrOnlinePatchActivity.createIntent(context, game))
                     onDismiss()
                 }
             }

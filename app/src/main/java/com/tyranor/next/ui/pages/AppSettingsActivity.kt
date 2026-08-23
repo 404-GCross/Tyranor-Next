@@ -44,6 +44,7 @@ import androidx.compose.ui.graphics.Color as ComposeColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.tyranor.next.R
 import com.tyranor.next.settings.AppSettingsStore
 import com.tyranor.next.scanner.EngineScanner
 import com.tyranor.next.theme.AppThemeColors
@@ -90,7 +91,7 @@ class AppSettingsActivity : ComponentActivity() {
     @Suppress("DEPRECATION")
     override fun finish() {
         super.finish()
-        overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
+        overridePendingTransition(R.anim.page_slide_in_from_top, R.anim.page_slide_out_to_bottom)
     }
 
     companion object {

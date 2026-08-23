@@ -127,7 +127,7 @@ MiuixSettingsTheme
 | 禁用 Material3 TopAppBar/Scaffold | ✅ 未使用 M3 Scaffold；miuix Scaffold 为下拉浮层宿主所需 |
 | 卡片圆角统一 8dp | ⚠️ 设置页改用 Miuix 默认 16dp squircle（Miuix 风格核心特征），其他页面维持 8dp |
 | 弹窗白底 8dp | ✅ 字体选择弹窗保留 `AppAlertDialog`；新增的下拉浮层为 Miuix 原生样式 |
-| 页面切换 Crossfade / Activity fade | ✅ 不变 |
+| 页面切换：主 Tab 水平移动 / Activity 上进下出 | ✅ 不变 |
 
 ## 5. 实施步骤
 

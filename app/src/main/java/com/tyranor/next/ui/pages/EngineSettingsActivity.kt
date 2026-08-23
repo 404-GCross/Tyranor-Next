@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
+import com.tyranor.next.R
 import com.tyranor.next.settings.AppSettingsStore
 import com.tyranor.next.theme.TyranorNextTheme
 
@@ -49,7 +50,7 @@ class EngineSettingsActivity : ComponentActivity() {
     @Suppress("DEPRECATION")
     override fun finish() {
         super.finish()
-        overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
+        overridePendingTransition(R.anim.page_slide_in_from_top, R.anim.page_slide_out_to_bottom)
     }
 
     companion object {

@@ -1,7 +1,11 @@
 package com.tyranor.next.ui.main
 
-import androidx.compose.animation.Crossfade
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -73,10 +77,19 @@ fun MainScreen(modifier: Modifier = Modifier) {
         .background(MaterialTheme.colorScheme.background),
     ) {
       Box(Modifier.weight(1f).fillMaxWidth()) {
-        Crossfade(
+        AnimatedContent(
           targetState = selectedIndex,
-          animationSpec = tween(durationMillis = 180),
-          label = "main_page_fade",
+          transitionSpec = {
+            val direction = if (targetState > initialState) 1 else -1
+            slideInHorizontally(
+              animationSpec = tween(durationMillis = 240),
+              initialOffsetX = { fullWidth -> direction * fullWidth },
+            ) togetherWith slideOutHorizontally(
+              animationSpec = tween(durationMillis = 240),
+              targetOffsetX = { fullWidth -> -direction * fullWidth },
+            ) using SizeTransform(clip = false)
+          },
+          label = "main_page_horizontal_slide",
         ) { page ->
           when (page) {
             0 -> HomeScreen(Modifier.fillMaxSize())

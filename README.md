@@ -48,7 +48,7 @@
 
 - **语言**：Kotlin（引擎层含 Java 桥接代码）
 - **UI**：Jetpack Compose + Material 3 + [Miuix](https://github.com/compose-miuix-ui/miuix)
-- **导航**：底部导航 `NavigationBar` + `Crossfade` 页面切换；详情页由独立 Activity 承载并配系统 fade 动画
+- **导航**：底部导航 `NavigationBar`；主 Tab 内容页使用水平移动切换，详情/设置等独立 Activity 进入使用向上翻页、退出使用向下翻页
 - **构建**：Gradle 9.5.1 / AGP 9.2.1 / Kotlin 2.x + Compose Compiler，`compileSdk 37`、`minSdk 26`、`targetSdk 36`
 - **持久化**：SharedPreferences（扫描结果、引擎全局设置、单游戏设置覆盖、最近记录）
 - **文件访问**：Storage Access Framework（SAF）管理外部游戏目录，`documentFile` 库辅助

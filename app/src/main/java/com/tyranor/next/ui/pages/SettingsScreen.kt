@@ -115,7 +115,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                                         )
                                     },
                                     onClick = {
-                                        startActivityWithFade(ctx, EngineSettingsActivity.createIntent(ctx, kind))
+                                        startActivityWithPageTransition(ctx, EngineSettingsActivity.createIntent(ctx, kind))
                                     },
                                 )
                             }
@@ -125,7 +125,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                 item {
                     MiuixCard(modifier = Modifier.fillMaxWidth(), cornerRadius = 8.dp) {
                         Column(Modifier.padding(vertical = 4.dp)) {
-                            ArrowPreference(title = "应用设置", onClick = { startActivityWithFade(ctx, AppSettingsActivity.createIntent(ctx)) })
+                            ArrowPreference(title = "应用设置", onClick = { startActivityWithPageTransition(ctx, AppSettingsActivity.createIntent(ctx)) })
                             ArrowPreference(title = if (checkingUpdate) "正在检查更新" else "更新检查", onClick = { checkUpdate() })
                             ArrowPreference(
                                 title = "加入群聊",
