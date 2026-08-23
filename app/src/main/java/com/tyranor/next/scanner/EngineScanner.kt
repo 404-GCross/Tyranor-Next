@@ -200,12 +200,52 @@ internal fun saveRecentGames(context: Context, games: List<ScanGame>) =
         prefs.edit().putString(KEY_ROOTS, existing.joinToString("\n")).apply()
     }
 
+    fun removeRootAndGames(context: Context, uri: Uri) {
+        removeRoot(context, uri)
+        val root = uri.toString()
+        val removedUris = loadGames(context)
+            .filter { isGameUnderRoot(root, it.uri) }
+            .mapTo(HashSet()) { it.uri }
+        if (removedUris.isEmpty()) return
+        saveGames(context, loadGames(context).filterNot { it.uri in removedUris })
+        saveRecentGames(context, loadRecentGames(context).filterNot { it.uri in removedUris })
+        saveQuickLaunch(context, loadQuickLaunch(context).filterNot { it.uri in removedUris })
+    }
+
     fun loadRoots(context: Context): List<String> =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .getString(KEY_ROOTS, null)
             ?.split("\n")
             ?.filter { it.isNotBlank() }
             ?: emptyList()
+
+    private fun isGameUnderRoot(rootUriText: String, gameUriText: String): Boolean {
+        val rootPath = normalizePath(safUriToPath(rootUriText))
+        val gamePath = normalizePath(safUriToPath(gameUriText) ?: uriFilePath(gameUriText))
+        if (rootPath != null && gamePath != null && isSameOrChildPath(rootPath, gamePath)) return true
+
+        val rootDocId = documentId(rootUriText) ?: return false
+        val gameDocId = documentId(gameUriText) ?: return false
+        return gameDocId == rootDocId || gameDocId.startsWith("${rootDocId.trimEnd('/')}/")
+    }
+
+    private fun documentId(uriText: String): String? = runCatching {
+        val uri = Uri.parse(uriText)
+        DocumentsContract.getDocumentId(uri)
+    }.getOrNull() ?: runCatching {
+        DocumentsContract.getTreeDocumentId(Uri.parse(uriText))
+    }.getOrNull()
+
+    private fun uriFilePath(uriText: String): String? = runCatching {
+        val uri = Uri.parse(uriText)
+        if (uri.scheme.equals("file", ignoreCase = true)) uri.path else null
+    }.getOrNull() ?: uriText.takeIf { it.startsWith("/") }
+
+    private fun normalizePath(path: String?): String? =
+        path?.replace('\\', '/')?.trimEnd('/')?.takeIf { it.isNotBlank() }
+
+    private fun isSameOrChildPath(rootPath: String, gamePath: String): Boolean =
+        gamePath == rootPath || gamePath.startsWith("$rootPath/")
 
     // ============ 扫描游戏 ============
 

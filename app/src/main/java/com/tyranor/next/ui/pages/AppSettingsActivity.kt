@@ -317,7 +317,7 @@ internal fun AppSettingsScreen() {
                             )
                             TextButton(
                                 onClick = {
-                                    EngineScanner.removeRoot(ctx, android.net.Uri.parse(dir))
+                                    EngineScanner.removeRootAndGames(ctx, android.net.Uri.parse(dir))
                                     scanDirs = EngineScanner.loadRoots(ctx)
                                 },
                             ) {
