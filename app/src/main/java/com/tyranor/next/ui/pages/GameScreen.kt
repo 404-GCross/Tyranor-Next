@@ -151,21 +151,18 @@ fun GameScreen(modifier: Modifier = Modifier) {
         }
     }
 
-    // 扫描游戏库：无数据时全量扫描；已有数据时增量扫描（保留现有游戏，
-    // 遍历时剪枝跳过已识别游戏目录，只发现新游戏），避免每次全量重扫。
+    // 扫描游戏库：每次按扫描目录全量重建，删除/改名/移动后的旧缓存条目会被清理。
     fun scanLibrary() {
         if (scanning) return
         scope.launch {
             scanning = true
             val roots = EngineScanner.loadRoots(context)
             if (roots.isNotEmpty()) {
-                val updated = if (games.isEmpty()) {
-                    EngineScanner.scanAll(context)
-                } else {
-                    EngineScanner.incrementalScan(context)
-                }
-                EngineScanner.saveGames(context, updated)
+                val updated = EngineScanner.rescanLibrary(context)
                 games = updated
+                selectedGame = selectedGame?.let { selected ->
+                    updated.firstOrNull { it.uri == selected.uri }
+                }
             }
             scanning = false
         }
@@ -180,7 +177,7 @@ fun GameScreen(modifier: Modifier = Modifier) {
                         android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
                 )
             }
-            // 保存根目录后立即扫描（有数据时增量）
+            // 保存根目录后立即全量扫描
             EngineScanner.saveRoot(context, u)
             scanLibrary()
         }
