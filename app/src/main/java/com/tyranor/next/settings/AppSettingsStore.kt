@@ -1,6 +1,7 @@
 package com.tyranor.next.settings
 
 import android.content.Context
+import android.content.res.Configuration
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 
@@ -23,6 +24,9 @@ object AppSettingsStore {
 
     /** 外观模式：深色。 */
     const val THEME_MODE_DARK = "dark"
+
+    /** 外观模式：跟随系统深/浅色。 */
+    const val THEME_MODE_SYSTEM = "system"
 
     /** 文件夹扫描深度默认值（层级，1..5）。 */
     const val DEFAULT_SCAN_DEPTH = 3
@@ -67,10 +71,22 @@ object AppSettingsStore {
     fun setScanDepth(c: Context, depth: Int) =
         prefs(c).edit().putInt(KEY_SCAN_DEPTH, depth.coerceIn(1, 5)).apply()
 
-    /** 外观模式（浅色/深色）。 */
+    /** 外观模式（跟随系统/浅色/深色）。 */
     fun getThemeMode(c: Context): String =
         prefs(c).getString(KEY_THEME_MODE, THEME_MODE_LIGHT) ?: THEME_MODE_LIGHT
 
     fun setThemeMode(c: Context, mode: String) =
         prefs(c).edit().putString(KEY_THEME_MODE, mode).apply()
+
+    /** 系统当前是否深色模式（资源配置 uiMode）。 */
+    fun isSystemDark(c: Context): Boolean =
+        (c.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
+            Configuration.UI_MODE_NIGHT_YES
+
+    /** 实际生效的深色状态：dark 恒深色，system 跟随系统，其余（含 light 与未知值）为浅色。 */
+    fun isDarkEffective(c: Context): Boolean = when (getThemeMode(c)) {
+        THEME_MODE_DARK -> true
+        THEME_MODE_SYSTEM -> isSystemDark(c)
+        else -> false
+    }
 }

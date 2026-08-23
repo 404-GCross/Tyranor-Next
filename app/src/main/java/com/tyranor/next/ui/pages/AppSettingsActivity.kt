@@ -65,7 +65,7 @@ class AppSettingsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val darkMode = AppSettingsStore.getThemeMode(this) == AppSettingsStore.THEME_MODE_DARK
+        val darkMode = AppSettingsStore.isDarkEffective(this)
         enableEdgeToEdge(
             statusBarStyle = if (darkMode) androidx.activity.SystemBarStyle.dark(Color.TRANSPARENT) else androidx.activity.SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
             navigationBarStyle = if (darkMode) androidx.activity.SystemBarStyle.dark(Color.TRANSPARENT) else androidx.activity.SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
@@ -177,15 +177,25 @@ internal fun AppSettingsScreen() {
                 item {
                     MiuixCard(modifier = Modifier.fillMaxWidth(), cornerRadius = 8.dp) {
                         Column(Modifier.padding(vertical = 4.dp)) {
-                            val modeIndex = if (AppSettingsStore.getThemeMode(ctx) == AppSettingsStore.THEME_MODE_DARK) 1 else 0
+                            // 状态驱动选中项：跟随系统时系统深浅不变也不会漏刷新下拉展示
+                            var themeMode by remember { mutableStateOf(AppSettingsStore.getThemeMode(ctx)) }
+                            val themeModes = listOf(
+                                AppSettingsStore.THEME_MODE_SYSTEM to "跟随系统",
+                                AppSettingsStore.THEME_MODE_LIGHT to "浅色",
+                                AppSettingsStore.THEME_MODE_DARK to "深色",
+                            )
+                            val modeIndex = themeModes.indexOfFirst { it.first == themeMode }
+                                .let { if (it < 0) 1 else it } // 未知存量值回退浅色
                             OverlayDropdownPreference(
                                 title = "外观模式",
-                                items = listOf("浅色", "深色"),
+                                items = themeModes.map { it.second },
                                 selectedIndex = modeIndex,
                                 onSelectedIndexChange = { index ->
-                                    val mode = if (index == 1) AppSettingsStore.THEME_MODE_DARK else AppSettingsStore.THEME_MODE_LIGHT
-                                    AppSettingsStore.setThemeMode(ctx, mode)
-                                    AppThemeColors.refresh(ctx)
+                                    themeModes.getOrNull(index)?.first?.let { mode ->
+                                        themeMode = mode
+                                        AppSettingsStore.setThemeMode(ctx, mode)
+                                        AppThemeColors.refresh(ctx)
+                                    }
                                 },
                             )
                         }

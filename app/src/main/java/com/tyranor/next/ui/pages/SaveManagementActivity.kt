@@ -61,7 +61,7 @@ class SaveManagementActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val darkMode = AppSettingsStore.getThemeMode(this) == AppSettingsStore.THEME_MODE_DARK
+        val darkMode = AppSettingsStore.isDarkEffective(this)
         enableEdgeToEdge(
             statusBarStyle = if (darkMode) androidx.activity.SystemBarStyle.dark(Color.TRANSPARENT) else androidx.activity.SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
             navigationBarStyle = if (darkMode) androidx.activity.SystemBarStyle.dark(Color.TRANSPARENT) else androidx.activity.SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),

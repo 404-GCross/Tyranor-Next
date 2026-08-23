@@ -20,18 +20,19 @@ object AppThemeColors {
     var isDark by mutableStateOf(false)
         private set
 
-    /** 首次组合时从存储加载（幂等，避免每次重组都读 prefs）。 */
+    /** 首次组合时从存储加载（幂等，避免每次重组都读 prefs）；
+     *  跟随系统时每次组合都重读，系统深/浅切换（Activity 重建）后能立即拿到新值。 */
     fun ensureLoaded(context: Context) {
-        if (!loaded) {
+        if (!loaded || AppSettingsStore.getThemeMode(context) == AppSettingsStore.THEME_MODE_SYSTEM) {
             loaded = true
             refresh(context)
         }
     }
 
-    /** 从存储重读主题色与外观模式并广播变更。 */
+    /** 从存储重读主题色与外观模式并广播变更（system 模式按系统当前深/浅解析）。 */
     fun refresh(context: Context) {
         primary = parseColorHex(AppSettingsStore.getThemeColorHex(context))
-        isDark = AppSettingsStore.getThemeMode(context) == AppSettingsStore.THEME_MODE_DARK
+        isDark = AppSettingsStore.isDarkEffective(context)
     }
 }
 
