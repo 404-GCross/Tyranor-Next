@@ -123,7 +123,7 @@ object EngineLauncher {
             normalized.startsWith("/sdcard/") ||
             normalized == "/storage/emulated/0" ||
             normalized.startsWith("/storage/emulated/0/") ||
-            normalized.matches(Regex("""^/storage/[^/]+(/.*)?$"""))
+            EngineScanner.isRemovableStoragePath(normalized)
     }
 
     /** 构建引擎 Intent；path 为真实文件路径。 */
@@ -242,6 +242,7 @@ object EngineLauncher {
             else -> Kirikiroid139::class.java
         }
         val scoped = or(PerGameSettingsStore.getBool(context, gid, PerGameSettingsStore.F_SCOPED_SAVE_DIR), EngineSettingsStore.isKrScopedSaveDir(context))
+        if (!scoped) ensureKrGameSaveDir(path)
         val defaultFont = PerGameSettingsStore.getStr(context, gid, PerGameSettingsStore.F_DEFAULT_FONT)
             ?: EngineSettingsStore.getKrDefaultFont(context)
         val forceFont = or(PerGameSettingsStore.getBool(context, gid, PerGameSettingsStore.F_FORCE_DEFAULT_FONT), EngineSettingsStore.isKrForceDefaultFont(context))
@@ -315,8 +316,17 @@ object EngineLauncher {
             if (saveDir.exists() || saveDir.mkdirs()) {
                 args.add("-savedir=${saveDir.absolutePath}")
             }
+        } else {
+            ensureKrGameSaveDir(path)
         }
         return args
+    }
+
+    private fun ensureKrGameSaveDir(path: String) {
+        runCatching {
+            val saveDir = File(path, "savedata")
+            if (!saveDir.exists()) saveDir.mkdirs()
+        }
     }
 
     private fun normalizeKrkrsdl3Renderer(value: String): String =

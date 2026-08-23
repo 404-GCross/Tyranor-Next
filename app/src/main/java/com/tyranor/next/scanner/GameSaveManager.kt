@@ -30,14 +30,24 @@ class GameSaveManager(private val context: Context) {
             EngineType.KIRIKIRI -> {
                 val scoped = PerGameSettingsStore.getBool(appContext, game.uri, PerGameSettingsStore.F_SCOPED_SAVE_DIR)
                     ?: EngineSettingsStore.isKrScopedSaveDir(appContext)
-                if (scoped && EngineSettingsStore.getKrKernel(appContext) != EngineSettingsStore.KERNEL_KRKRSDL3) {
-                    val internal = appContext.filesDir
-                        ?: return SaveLocation(null, "应用内部存储目录不可用", false)
-                    SaveLocation(
-                        File(File(File(internal, "krkr_mirror"), EngineScanner.safeSaveName(root)), "savedata"),
-                        "KRKR 独立存档目录",
-                        true,
-                    )
+                if (scoped) {
+                    if (EngineSettingsStore.getKrKernel(appContext) == EngineSettingsStore.KERNEL_KRKRSDL3) {
+                        val external = appContext.getExternalFilesDir(null)
+                            ?: return SaveLocation(null, "KRKR SDL3 应用独立存储目录不可用", false)
+                        SaveLocation(
+                            File(File(external, "save"), EngineScanner.safeSaveName(root)),
+                            "KRKR SDL3 独立存档目录",
+                            true,
+                        )
+                    } else {
+                        val internal = appContext.filesDir
+                            ?: return SaveLocation(null, "应用内部存储目录不可用", false)
+                        SaveLocation(
+                            File(File(File(internal, "krkr_mirror"), EngineScanner.safeSaveName(root)), "savedata"),
+                            "KRKR 独立存档目录",
+                            true,
+                        )
+                    }
                 } else {
                     SaveLocation(File(root, "savedata"), "KRKR 游戏目录存档", true)
                 }

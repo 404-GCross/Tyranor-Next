@@ -68,6 +68,11 @@ object EngineScanner {
         }
     }
 
+    fun isRemovableStoragePath(path: String): Boolean {
+        val normalized = path.replace('\\', '/')
+        return normalized.matches(Regex("""^/storage/(?!emulated/0(?:/|$))[^/]+(/.*)?$"""))
+    }
+
     // ============ 游戏结果持久化 ============
 
     fun saveGames(context: Context, games: List<ScanGame>) = saveList(context, KEY_GAMES, games)
