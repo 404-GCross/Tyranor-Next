@@ -619,6 +619,12 @@ class TyranoActivity : Activity() {
         dir.resolve("resources/app.asar").takeIf { it.isFile }?.let {
             return TyranoEntry(dir, it.absolutePath)
         }
+        dir.resolve("app.asar").takeIf { it.isDirectory && it.resolve("index.html").isFile }?.let {
+            return TyranoEntry(it, null)
+        }
+        dir.resolve("resources/app.asar").takeIf { it.isDirectory && it.resolve("index.html").isFile }?.let {
+            return TyranoEntry(it, null)
+        }
         dir.resolve("index.html").takeIf { it.isFile }?.let {
             return TyranoEntry(dir, null)
         }
@@ -666,7 +672,7 @@ class TyranoActivity : Activity() {
         private const val EXTRA_SCOPED_SAVE_ROOT = "scopedSaveRoot"
         private const val PROCESS_EXIT_DELAY_MS = 500L
         private const val MAX_ENTRY_SEARCH_DEPTH = 2
-        private val TYRANO_ENTRY_SUBDIRS = arrayOf("resources", "app", "tyrano", "data", "scenario", "system", "game")
+        private val TYRANO_ENTRY_SUBDIRS = arrayOf("resources", "app.asar", "app", "tyrano", "data", "scenario", "system", "game")
 
         private const val KEY_UI_FONT_SCALE = "ui_font_scale"
         private const val KEY_UI_SCALE = "ui_scale"
