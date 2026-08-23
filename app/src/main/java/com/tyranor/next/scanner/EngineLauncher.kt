@@ -122,7 +122,8 @@ object EngineLauncher {
         return normalized == "/sdcard" ||
             normalized.startsWith("/sdcard/") ||
             normalized == "/storage/emulated/0" ||
-            normalized.startsWith("/storage/emulated/0/")
+            normalized.startsWith("/storage/emulated/0/") ||
+            normalized.matches(Regex("""^/storage/[^/]+(/.*)?$"""))
     }
 
     /** 构建引擎 Intent；path 为真实文件路径。 */
