@@ -13,7 +13,7 @@ import kotlin.math.abs
 
 /**
  * 精简版游戏扫描器，识别逻辑移植自 RinneMobile 的 EngineDetector/GameScanner。
- * 支持引擎：Kirikiri(kr/krkr2)、ONS、Tyrano(ty)、Artemis(ar)。
+ * 支持引擎：Kirikiri、ONS、Tyrano、RPG Maker MV/MZ、VN、WebOther、Artemis。
  */
 object EngineScanner {
 
@@ -499,6 +499,9 @@ internal fun saveRecentGames(context: Context, games: List<ScanGame>) =
         var hasIndex = false
         var hasAppAsar = false
         var hasTyranoDir = false
+        var hasRpgMvCore = false
+        var hasRpgMzCore = false
+        var hasVnData = false
         var hasSystemIni = false
         var hasFirstIet = false
         var hasRootPfs = false
@@ -517,7 +520,7 @@ internal fun saveRecentGames(context: Context, games: List<ScanGame>) =
                 // resources/app.asar 可能是文件，也可能是已解包目录，需继续下钻识别父级游戏目录。
                 if (lower == "data" || lower == "tyrano" || lower == "scenario" ||
                     lower == "system" || lower == "app" || lower == "game" ||
-                    lower == "resources" || lower == "app.asar"
+                    lower == "resources" || lower == "app.asar" || lower == "www" || lower == "js"
                 ) {
                     val sub = f.listFiles()
                     sub.forEach { collect(it, childRel) }
@@ -526,6 +529,9 @@ internal fun saveRecentGames(context: Context, games: List<ScanGame>) =
             }
             when {
                 lower == "index.html" || lower == "index.htm" -> hasIndex = true
+                childRel == "js/rpg_core.js" || childRel.endsWith("/js/rpg_core.js") -> hasRpgMvCore = true
+                childRel == "js/rmmz_core.js" || childRel.endsWith("/js/rmmz_core.js") -> hasRpgMzCore = true
+                lower == "globaldata.vndata" -> hasVnData = true
                 lower == "app.asar" || childRel.endsWith("/app.asar") -> hasAppAsar = true
                 lower == "startup.tjs" -> hasStartupTjs = true
                 lower == "config.tjs" -> hasConfigTjs = true
@@ -545,12 +551,26 @@ internal fun saveRecentGames(context: Context, games: List<ScanGame>) =
         if ((hasSystemIni && hasFirstIet) || hasRootPfs || hasAnyPfs) {
             return Detection(EngineType.ARTEMIS, if ((hasSystemIni && hasFirstIet) || hasRootPfs) 95 else 90, "[游戏目录]")
         }
-        // Tyrano（Ty）：浏览器结构（index.html + data/tyrano）或 asar 打包（app.asar / resources/app.asar）
-        if ((hasIndex && hasTyranoDir) || hasAppAsar) {
-            return Detection(EngineType.TYRANO, if (hasAppAsar) 96 else 95, "[游戏目录]")
+        if (hasIndex && hasTyranoDir) {
+            return Detection(EngineType.TYRANO, 95, "[游戏目录]")
+        }
+        // RPG Maker 的 Windows/NW.js 发布目录通常是“游戏主目录/www/...”。
+        // 在主目录识别可避免继续下钻后把所有游戏都命名为 www。
+        if (hasIndex && hasRpgMvCore) {
+            return Detection(EngineType.RPG_MV, 95, "[游戏目录]")
+        }
+        if (hasIndex && hasRpgMzCore) {
+            return Detection(EngineType.RPG_MZ, 95, "[游戏目录]")
+        }
+        if (hasIndex && hasVnData) {
+            return Detection(EngineType.VN, 90, "[游戏目录]")
+        }
+        // 打包 ASAR 无法在 SAF 扫描阶段读取内部目录，启动后由 Web 宿主再次精确识别。
+        if (hasAppAsar) {
+            return Detection(EngineType.TYRANO, 80, "[游戏目录]")
         }
         if (hasIndex) {
-            return Detection(EngineType.TYRANO, 70, "[游戏目录]")
+            return Detection(EngineType.WEB_OTHER, 70, "[游戏目录]")
         }
         // Kirikiri（kr）
         if (xp3Files.isNotEmpty() || hasStartupTjs || hasConfigTjs) {
@@ -574,6 +594,9 @@ internal fun saveRecentGames(context: Context, games: List<ScanGame>) =
         var hasIndex = false
         var hasAppAsar = false
         var hasTyranoDir = false
+        var hasRpgMvCore = false
+        var hasRpgMzCore = false
+        var hasVnData = false
         var hasSystemIni = false
         var hasFirstIet = false
         var hasRootPfs = false
@@ -590,7 +613,7 @@ internal fun saveRecentGames(context: Context, games: List<ScanGame>) =
                 if (lower == "app.asar" || childRel.endsWith("/app.asar")) hasAppAsar = true
                 if (lower == "data" || lower == "tyrano" || lower == "scenario" ||
                     lower == "system" || lower == "app" || lower == "game" ||
-                    lower == "resources" || lower == "app.asar"
+                    lower == "resources" || lower == "app.asar" || lower == "www" || lower == "js"
                 ) {
                     f.listFiles()?.forEach { collect(it, childRel) }
                 }
@@ -598,6 +621,9 @@ internal fun saveRecentGames(context: Context, games: List<ScanGame>) =
             }
             when {
                 lower == "index.html" || lower == "index.htm" -> hasIndex = true
+                childRel == "js/rpg_core.js" || childRel.endsWith("/js/rpg_core.js") -> hasRpgMvCore = true
+                childRel == "js/rmmz_core.js" || childRel.endsWith("/js/rmmz_core.js") -> hasRpgMzCore = true
+                lower == "globaldata.vndata" -> hasVnData = true
                 lower == "app.asar" || childRel.endsWith("/app.asar") -> hasAppAsar = true
                 lower == "startup.tjs" -> hasStartupTjs = true
                 lower == "config.tjs" -> hasConfigTjs = true
@@ -616,11 +642,23 @@ internal fun saveRecentGames(context: Context, games: List<ScanGame>) =
         if ((hasSystemIni && hasFirstIet) || hasRootPfs || hasAnyPfs) {
             return Detection(EngineType.ARTEMIS, if ((hasSystemIni && hasFirstIet) || hasRootPfs) 95 else 90, "[游戏目录]")
         }
-        if ((hasIndex && hasTyranoDir) || hasAppAsar) {
-            return Detection(EngineType.TYRANO, if (hasAppAsar) 96 else 95, "[游戏目录]")
+        if (hasIndex && hasTyranoDir) {
+            return Detection(EngineType.TYRANO, 95, "[游戏目录]")
+        }
+        if (hasIndex && hasRpgMvCore) {
+            return Detection(EngineType.RPG_MV, 95, "[游戏目录]")
+        }
+        if (hasIndex && hasRpgMzCore) {
+            return Detection(EngineType.RPG_MZ, 95, "[游戏目录]")
+        }
+        if (hasIndex && hasVnData) {
+            return Detection(EngineType.VN, 90, "[游戏目录]")
+        }
+        if (hasAppAsar) {
+            return Detection(EngineType.TYRANO, 80, "[游戏目录]")
         }
         if (hasIndex) {
-            return Detection(EngineType.TYRANO, 70, "[游戏目录]")
+            return Detection(EngineType.WEB_OTHER, 70, "[游戏目录]")
         }
         if (xp3Files.isNotEmpty() || hasStartupTjs || hasConfigTjs) {
             return Detection(EngineType.KIRIKIRI, if (xp3Files.isNotEmpty()) 95 else 80, xp3Files.firstOrNull() ?: "[游戏目录]")

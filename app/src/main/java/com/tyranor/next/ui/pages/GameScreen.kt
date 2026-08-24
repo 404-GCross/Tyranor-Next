@@ -1016,6 +1016,10 @@ internal fun EngineType.coverColor(): Color = when (this) {
     EngineType.KIRIKIRI -> Color(0xFF3B5998)
     EngineType.ONS -> Color(0xFF43A047)
     EngineType.TYRANO -> Color(0xFFC6443C)
+    EngineType.RPG_MV -> Color(0xFF2E7D6E)
+    EngineType.RPG_MZ -> Color(0xFF1976D2)
+    EngineType.VN -> Color(0xFF8E5A9E)
+    EngineType.WEB_OTHER -> Color(0xFF546E7A)
     EngineType.ARTEMIS -> Color(0xFF7E57C2)
     EngineType.UNKNOWN -> Color(0xFF607D8B)
 }

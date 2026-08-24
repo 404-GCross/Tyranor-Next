@@ -37,6 +37,10 @@ object EngineLauncher {
         EngineType.KIRIKIRI,
         EngineType.ONS,
         EngineType.TYRANO,
+        EngineType.RPG_MV,
+        EngineType.RPG_MZ,
+        EngineType.VN,
+        EngineType.WEB_OTHER,
         EngineType.ARTEMIS,
     )
 
@@ -188,7 +192,11 @@ object EngineLauncher {
                 }
             }
 
-            EngineType.TYRANO -> buildTyranoIntent(context, path, game)
+            EngineType.TYRANO,
+            EngineType.RPG_MV,
+            EngineType.RPG_MZ,
+            EngineType.VN,
+            EngineType.WEB_OTHER -> buildWebIntent(context, path, game)
 
             EngineType.ARTEMIS -> buildArtemisIntent(context, path, game, patchChoice)
 
@@ -493,7 +501,7 @@ object EngineLauncher {
         }
     }
 
-    private fun buildTyranoIntent(context: Context, path: String, game: ScanGame): Intent {
+    private fun buildWebIntent(context: Context, path: String, game: ScanGame): Intent {
         val scoped = PerGameSettingsStore.getBool(context, game.uri, "ty_scoped")
             ?: EngineSettingsStore.isTyranoScopedSaveDir(context)
         val scopedSaveRoot = if (scoped) {
@@ -510,8 +518,15 @@ object EngineLauncher {
             putExtra("gamedir", path)
             putExtra("rootUri", game.uri)
             putExtra("launchTarget", game.launchTarget)
-            putExtra("type", "Tyrano")
-            putExtra("launchMode", "internal.tyrano")
+            val webType = when (game.engine) {
+                EngineType.RPG_MV -> "RPG"
+                EngineType.RPG_MZ -> "RMMZ"
+                EngineType.VN -> "VN"
+                EngineType.WEB_OTHER -> "WebOther"
+                else -> "Tyrano"
+            }
+            putExtra("type", webType)
+            putExtra("launchMode", "internal.${webType.lowercase()}")
             putExtra("orientation", 6)
             putExtra("scopedSaveDir", scoped)
             scopedSaveRoot?.let { putExtra("scopedSaveRoot", it) }

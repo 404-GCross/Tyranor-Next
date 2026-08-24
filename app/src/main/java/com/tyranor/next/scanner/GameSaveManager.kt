@@ -62,7 +62,9 @@ class GameSaveManager(private val context: Context) {
                     SaveLocation(File(root, "save"), "ONS 游戏内存档目录", true)
                 }
             }
-            EngineType.TYRANO -> {
+            EngineType.TYRANO,
+            EngineType.RPG_MV,
+            EngineType.RPG_MZ -> {
                 val scoped = PerGameSettingsStore.getBool(appContext, game.uri, "ty_scoped")
                     ?: EngineSettingsStore.isTyranoScopedSaveDir(appContext)
                 if (scoped) {
@@ -70,13 +72,19 @@ class GameSaveManager(private val context: Context) {
                         ?: return SaveLocation(null, "Tyrano 应用独立存储目录不可用", false)
                     SaveLocation(
                         File(File(File(external, "save"), "tyrano"), EngineScanner.safeSaveName(root)),
-                        "Tyrano 应用独立存档目录",
+                        "${game.engine.displayName} 应用独立存档目录",
                         true,
                     )
                 } else {
-                    SaveLocation(File(root, "savedata"), "Tyrano 游戏内存档目录", true)
+                    SaveLocation(
+                        File(root, "savedata"),
+                        "${game.engine.displayName} 游戏内存档目录",
+                        true,
+                    )
                 }
             }
+            EngineType.VN, EngineType.WEB_OTHER ->
+                SaveLocation(null, "${game.engine.displayName} 没有标准文件存档接口", false)
             EngineType.ARTEMIS -> SaveLocation(File(root), "Artemis 游戏目录存档", true)
             EngineType.UNKNOWN -> SaveLocation(null, "未知引擎不支持存档管理", false)
         }
@@ -151,7 +159,9 @@ class GameSaveManager(private val context: Context) {
                 val external = appContext.getExternalFilesDir(null) ?: return
                 listOf(File(File(external, "save"), File(root).name))
             }
-            EngineType.TYRANO -> {
+            EngineType.TYRANO,
+            EngineType.RPG_MV,
+            EngineType.RPG_MZ -> {
                 val external = appContext.getExternalFilesDir(null) ?: return
                 listOf(File(File(File(external, "save"), "tyrano"), EngineScanner.safeSaveName(root)))
             }
