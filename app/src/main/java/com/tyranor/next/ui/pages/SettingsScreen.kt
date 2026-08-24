@@ -29,6 +29,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -50,6 +52,7 @@ import androidx.compose.ui.unit.dp
 import com.tyranor.next.R
 import com.tyranor.next.settings.EngineSettingsStore
 import com.tyranor.next.theme.MiuixSettingsTheme
+import com.tyranor.next.theme.NavWhite
 import com.tyranor.next.ui.common.TopBarIcon
 import com.tyranor.next.ui.common.glassNavBottomInset
 import com.tyranor.next.updater.GitHubUpdateChecker
@@ -166,11 +169,11 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    GroupChannelItem("企鹅群聊") {
+                    GroupChannelItem("企鹅群聊", R.drawable.ic_group_qq) {
                         showGroupDialog = false
                         ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://qm.qq.com/q/M9JH8A9Yys")))
                     }
-                    GroupChannelItem("飞机频道") {
+                    GroupChannelItem("飞机频道", R.drawable.ic_group_telegram) {
                         showGroupDialog = false
                         ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/tyranornext")))
                     }
@@ -358,19 +361,33 @@ private fun SettingsItemIcon(@DrawableRes iconRes: Int) {
     )
 }
 
-/** 统一弹窗内的群聊/频道选项项。 */
+/** 统一弹窗内的群聊/频道选项项：左侧 logo + 名称 + 右侧指示箭头。 */
 @Composable
-private fun GroupChannelItem(label: String, onClick: () -> Unit) {
-    Box(
+private fun GroupChannelItem(label: String, iconRes: Int, onClick: () -> Unit) {
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(8.dp))
             .clickable(onClick = onClick)
-            .background(MiuixTheme.colorScheme.surfaceContainer)
-            .padding(vertical = 14.dp, horizontal = 16.dp),
-        contentAlignment = Alignment.CenterStart,
+            .background(NavWhite)
+            .padding(vertical = 12.dp, horizontal = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, style = MaterialTheme.typography.bodyLarge)
+        Image(
+            painter = painterResource(iconRes),
+            contentDescription = null,
+            modifier = Modifier.size(24.dp),
+        )
+        Text(
+            label,
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.padding(start = 12.dp).weight(1f),
+        )
+        Icon(
+            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            contentDescription = null,
+            tint = MiuixTheme.colorScheme.onBackground,
+        )
     }
 }
 
