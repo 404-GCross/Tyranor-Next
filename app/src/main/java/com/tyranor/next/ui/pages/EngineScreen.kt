@@ -80,7 +80,7 @@ private fun EngineRow(engine: EngineType) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Image(
-                painter = painterResource(R.drawable.engine_logo),
+                painter = painterResource(R.drawable.ic_engine_icon),
                 contentDescription = null,
                 contentScale = ContentScale.Fit,
                 colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.primary),
