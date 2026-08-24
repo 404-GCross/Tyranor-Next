@@ -1,6 +1,7 @@
 package com.tyranor.next.theme
 
 import android.content.Context
+import android.os.Build
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -24,6 +25,25 @@ object AppThemeColors {
     var toneSwitchEnabled by mutableStateOf(true)
         private set
 
+    /** 莫奈动态取色开关（应用设置「动态取色」）。 */
+    var monetEnabled by mutableStateOf(false)
+        private set
+
+    /** 动态取色来源：system（跟随系统壁纸）/ cover（游戏封面）。 */
+    var monetSource by mutableStateOf(AppSettingsStore.MONET_SOURCE_SYSTEM)
+        private set
+
+    /** 配色风格（Material You 调色板）。 */
+    var paletteStyle by mutableStateOf(PaletteStyle.TonalSpot)
+        private set
+
+    /** 当前选中游戏的封面 URI（由 GameScreen 写入，供「游戏封面取色」读取）。 */
+    var currentCoverUri by mutableStateOf<String?>(null)
+
+    /** 实际生效的种子色：由 TyranorNextTheme 计算后写入，供嵌套的 MiuixSettingsTheme 复用。 */
+    var effectiveSeed by mutableStateOf(Blue40)
+        private set
+
     /** 首次组合时从存储加载（幂等，避免每次重组都读 prefs）；
      *  跟随系统时每次组合都重读，系统深/浅切换（Activity 重建）后能立即拿到新值。 */
     fun ensureLoaded(context: Context) {
@@ -38,6 +58,33 @@ object AppThemeColors {
         primary = parseColorHex(AppSettingsStore.getThemeColorHex(context))
         isDark = AppSettingsStore.isDarkEffective(context)
         toneSwitchEnabled = AppSettingsStore.isToneSwitchEnabled(context)
+        monetEnabled = AppSettingsStore.isMonetEnabled(context)
+        monetSource = AppSettingsStore.getMonetSource(context)
+        paletteStyle = PaletteStyle.fromStorageValue(AppSettingsStore.getPaletteStyleValue(context))
+    }
+
+    /**
+     * 解析实际生效的种子色（供主题生成动态配色）：
+     * - 动态取色关闭：返回手动轮盘色 [primary]
+     * - 来源「跟随系统壁纸」且 Android 12+：取系统壁纸 accent 色，失败回退手动色；
+     *   Android 12 以下不支持壁纸取色（未引入 MonetCompat），直接回退手动色
+     * - 来源「游戏封面」：从 [currentCoverUri] 提取主色，失败回退手动色
+     */
+    suspend fun resolveSeedColor(context: Context): Color {
+        if (!monetEnabled) return primary
+        return when (monetSource) {
+            AppSettingsStore.MONET_SOURCE_COVER ->
+                extractSeedColorFromCover(context, currentCoverUri) ?: primary
+            else -> {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    runCatching {
+                        Color(context.resources.getColor(android.R.color.system_accent1_500, null))
+                    }.getOrDefault(primary)
+                } else {
+                    primary
+                }
+            }
+        }
     }
 }
 

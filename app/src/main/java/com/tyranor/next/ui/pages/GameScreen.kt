@@ -53,6 +53,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -78,6 +79,7 @@ import com.tyranor.next.scanner.VndbCandidate
 import com.tyranor.next.scanner.VndbCoverService
 import com.tyranor.next.settings.AppSettingsStore
 import com.tyranor.next.settings.PerGameSettingsStore
+import com.tyranor.next.theme.AppThemeColors
 import com.tyranor.next.theme.NavWhite
 import com.tyranor.next.ui.common.AppSearchField
 import com.tyranor.next.ui.common.glassNavBottomInset
@@ -201,6 +203,8 @@ fun GameScreen(modifier: Modifier = Modifier) {
 
     // ===== 点击游戏卡片的底部抽屉栏 =====
     selectedGame?.let { game ->
+        // 供「动态取色 → 游戏封面」来源取色：打开游戏详情时把当前封面 URI 广播给主题
+        SideEffect { AppThemeColors.currentCoverUri = game.coverUri }
         GameActionsSheet(
             game = game,
             onDismiss = { selectedGame = null },
