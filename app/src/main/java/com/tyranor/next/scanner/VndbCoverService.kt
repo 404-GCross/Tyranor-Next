@@ -36,6 +36,7 @@ object VndbCoverService {
         val cover = downloadCover(context, candidate.coverUrl, "vndb_${stableKey(game.uri)}") ?: return null
         return game.copy(
             coverUri = cover,
+            coverSource = "vndb",
             vndbId = candidate.id,
             metadataTitle = candidate.displayTitle(),
         )
@@ -45,6 +46,7 @@ object VndbCoverService {
         val cover = downloadCover(context, candidate.coverUrl, "vndb_${stableKey(game.uri)}") ?: return null
         return game.copy(
             coverUri = cover,
+            coverSource = "vndb",
             vndbId = candidate.id,
             metadataTitle = candidate.displayTitle(),
         )
@@ -74,7 +76,7 @@ object VndbCoverService {
                     oldFile.delete()
                 }
             }
-            game.copy(coverUri = Uri.fromFile(target).toString())
+            game.copy(coverUri = Uri.fromFile(target).toString(), coverSource = "custom")
         } catch (_: Exception) {
             target.delete()
             null

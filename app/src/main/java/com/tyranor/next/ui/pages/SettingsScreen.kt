@@ -139,6 +139,12 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                                 onClick = { startActivityWithPageTransition(ctx, AppSettingsActivity.createIntent(ctx)) },
                             )
                             ArrowPreference(
+                                title = "封面刮削",
+                                summary = "设置多源封面来源、顺序与授权",
+                                startAction = { SettingsItemIcon(R.drawable.ic_game_cover) },
+                                onClick = { startActivityWithPageTransition(ctx, CoverScraperSettingsActivity.createIntent(ctx)) },
+                            )
+                            ArrowPreference(
                                 title = if (checkingUpdate) "正在检查更新" else "更新检查",
                                 summary = "对项目Github获取更新信息",
                                 startAction = { SettingsItemIcon(R.drawable.ic_settings_update) },

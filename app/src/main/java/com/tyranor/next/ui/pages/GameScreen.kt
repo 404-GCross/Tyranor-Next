@@ -71,6 +71,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.tyranor.next.R
+import com.tyranor.next.scanner.CoverScraperService
 import com.tyranor.next.scanner.EngineLauncher
 import com.tyranor.next.scanner.EngineScanner
 import com.tyranor.next.scanner.EngineType
@@ -130,22 +131,17 @@ fun GameScreen(modifier: Modifier = Modifier) {
         scope.launch {
             scanning = true
             val current = games
-            val updated = withContext(Dispatchers.IO) {
-                current.map { game ->
-                    val local = runCatching { EngineScanner.applyLocalCover(context, game) }.getOrDefault(game)
-                    val next = runCatching { VndbCoverService.fetchBestCover(context, local) }.getOrNull()
-                    if (next != null && next.coverUri != game.coverUri) {
-                        next
-                    } else if (local.coverUri != game.coverUri) {
-                        local
-                    } else {
-                        game
-                    }
-                }
+            val result = withContext(Dispatchers.IO) {
+                CoverScraperService.scrapeLibraryCovers(context, current)
             }
-            games = updated
-            EngineScanner.saveGames(context, updated)
+            games = result.games
+            EngineScanner.saveGames(context, result.games)
             scanning = false
+            android.widget.Toast.makeText(
+                context,
+                "批量刮削完成：更新 ${result.updatedCount}，跳过 ${result.skippedCount}，失败 ${result.failedCount}",
+                android.widget.Toast.LENGTH_SHORT,
+            ).show()
         }
     }
 
@@ -360,7 +356,7 @@ private fun GameLibraryContent(
                         showSearch = !showSearch
                         if (!showSearch) query = ""
                     }
-                    TopBarIcon(painterResource(R.drawable.ic_game_cover), "自动获取封面", MaterialTheme.colorScheme.primary) {
+                    TopBarIcon(painterResource(R.drawable.ic_game_cover), "批量刮削封面", MaterialTheme.colorScheme.primary) {
                         syncMissingCovers()
                     }
                     TopBarIcon(painterResource(R.drawable.ic_game_scan), "扫描游戏", MaterialTheme.colorScheme.primary) {

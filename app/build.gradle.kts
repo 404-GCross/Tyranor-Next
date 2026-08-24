@@ -1,4 +1,5 @@
 import org.gradle.api.tasks.bundling.Zip
+import java.util.Properties
 
 plugins {
   alias(libs.plugins.android.application)
@@ -6,9 +7,23 @@ plugins {
   alias(libs.plugins.kotlin.serialization)
 }
 
+val localProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.isFile) {
+        file.inputStream().use { load(it) }
+    }
+}
+fun configValue(name: String): String =
+    System.getenv(name)?.takeIf { it.isNotBlank() }
+        ?: localProperties.getProperty(name)?.takeIf { it.isNotBlank() }
+        ?: ""
+fun String.asBuildConfigString(): String =
+    "\"" + replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+
 val nativePluginSourceDir = layout.projectDirectory.dir("src/main/nativeplugins")
 val bundledNativePluginAssetsDir = layout.buildDirectory.dir("generated/assets/nativeplugins")
 val bundledNativePluginEngineIds = listOf("kirikiroid2", "ons", "artemis")
+val hikarinagiClientId = configValue("HIKARINAGI_CLIENT_ID")
 val ciKeystoreFile = System.getenv("ANDROID_KEYSTORE_FILE")?.takeIf { it.isNotBlank() }
 val ciKeystorePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")?.takeIf { it.isNotBlank() }
 val ciKeyAlias = System.getenv("ANDROID_KEY_ALIAS")?.takeIf { it.isNotBlank() }
@@ -52,6 +67,7 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "1.16"
+        buildConfigField("String", "HIKARINAGI_CLIENT_ID", hikarinagiClientId.asBuildConfigString())
     }
 
     signingConfigs {
@@ -82,7 +98,7 @@ android {
     buildFeatures {
       compose = true
       aidl = false
-      buildConfig = false
+      buildConfig = true
       shaders = false
     }
 
@@ -154,6 +170,7 @@ dependencies {
   implementation(libs.androidx.navigation3.runtime)
   implementation(libs.androidx.lifecycle.viewmodel.navigation3)
   implementation(libs.androidx.documentfile)
+  implementation(libs.appauth)
 
   // Miuix 组件库（设置页 Card + Preference 体系）
   implementation(libs.miuix.ui)

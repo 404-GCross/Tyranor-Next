@@ -198,6 +198,7 @@ object EngineScanner {
             clean(g.metadataTitle.orEmpty()),
             g.launchFile.orEmpty(),
             g.openTime.toString(),
+            g.coverSource.orEmpty(),
         ).joinToString("\u0001")
     }
 
@@ -214,6 +215,7 @@ object EngineScanner {
             metadataTitle = p.getOrElse(6) { "" }.takeIf { it.isNotBlank() },
             launchFile = p.getOrElse(7) { "" }.takeIf { it.isNotBlank() },
             openTime = p.getOrElse(8) { "" }.toLongOrNull() ?: 0,
+            coverSource = p.getOrElse(9) { "" }.takeIf { it.isNotBlank() },
         )
     }
 
@@ -302,6 +304,7 @@ object EngineScanner {
             existingByUri[current.uri]?.let { previous ->
                 current.copy(
                     coverUri = previous.coverUri ?: current.coverUri,
+                    coverSource = if (previous.coverUri != null) previous.coverSource else current.coverSource,
                     vndbId = previous.vndbId,
                     metadataTitle = previous.metadataTitle,
                     launchFile = previous.launchFile,
@@ -428,7 +431,7 @@ object EngineScanner {
         if (!game.coverUri.isNullOrBlank()) return game
         val dir = DocumentFile.fromTreeUri(context.applicationContext, Uri.parse(game.uri)) ?: return game
         val coverUri = findLocalCoverUri(dir.listFiles())
-        return if (coverUri.isNullOrBlank()) game else game.copy(coverUri = coverUri)
+        return if (coverUri.isNullOrBlank()) game else game.copy(coverUri = coverUri, coverSource = "local")
     }
 
     private fun findLocalCoverUri(children: Array<DocumentFile>): String? {

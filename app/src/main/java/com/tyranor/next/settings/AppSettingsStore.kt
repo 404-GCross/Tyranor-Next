@@ -17,6 +17,21 @@ object AppSettingsStore {
     const val KEY_THEME_MODE = "theme_mode"
     const val KEY_TONE_SWITCH = "tone_switch"
     const val KEY_GAME_SORT = "game_sort"
+    const val KEY_COVER_SCRAPER_ONLY_MISSING = "cover_scraper_only_missing"
+    const val KEY_COVER_SCRAPER_SOURCE_ORDER = "cover_scraper_source_order"
+    private const val KEY_COVER_SCRAPER_SOURCE_ENABLED_PREFIX = "cover_scraper_source_enabled_"
+
+    const val COVER_SOURCE_HIKARINAGI = "hikarinagi"
+    const val COVER_SOURCE_BANGUMI = "bangumi"
+    const val COVER_SOURCE_STEAM = "steam"
+    const val COVER_SOURCE_VNDB = "vndb"
+
+    val DEFAULT_COVER_SCRAPER_SOURCES = listOf(
+        COVER_SOURCE_HIKARINAGI,
+        COVER_SOURCE_BANGUMI,
+        COVER_SOURCE_STEAM,
+        COVER_SOURCE_VNDB,
+    )
 
     /** 默认主题色：#307DEF，与 theme/Color.kt 的 Blue40 一致。 */
     const val DEFAULT_THEME_COLOR = "#307DEF"
@@ -50,6 +65,9 @@ object AppSettingsStore {
 
     /** 游戏排序内存态：设置页切换后游戏页可随重组读取。 */
     val gameSortState: MutableState<String> = mutableStateOf(GAME_SORT_ALPHA)
+
+    /** 封面刮削设置内存态：设置页修改后游戏页可即时读取。 */
+    val coverScraperSettingsVersion: MutableState<Int> = mutableStateOf(0)
 
     /** 首次组合时从持久化加载导航栏样式到内存态（幂等，重复调用仅重新读一次）。 */
     fun initNavStyle(c: Context) {
@@ -101,6 +119,52 @@ object AppSettingsStore {
         gameSortState.value = normalized
     }
 
+    fun isCoverScraperOnlyMissing(c: Context): Boolean =
+        prefs(c).getBoolean(KEY_COVER_SCRAPER_ONLY_MISSING, true)
+
+    fun setCoverScraperOnlyMissing(c: Context, onlyMissing: Boolean) {
+        prefs(c).edit().putBoolean(KEY_COVER_SCRAPER_ONLY_MISSING, onlyMissing).apply()
+        bumpCoverScraperSettingsVersion()
+    }
+
+    fun getCoverScraperSourceOrder(c: Context): List<String> {
+        val stored = prefs(c).getString(KEY_COVER_SCRAPER_SOURCE_ORDER, null)
+            ?.split(",")
+            ?.map { it.trim() }
+            ?.filter { it in DEFAULT_COVER_SCRAPER_SOURCES }
+            .orEmpty()
+        return (stored + DEFAULT_COVER_SCRAPER_SOURCES).distinct()
+    }
+
+    fun setCoverScraperSourceOrder(c: Context, sources: List<String>) {
+        val normalized = (sources.filter { it in DEFAULT_COVER_SCRAPER_SOURCES } + DEFAULT_COVER_SCRAPER_SOURCES)
+            .distinct()
+        prefs(c).edit().putString(KEY_COVER_SCRAPER_SOURCE_ORDER, normalized.joinToString(",")).apply()
+        bumpCoverScraperSettingsVersion()
+    }
+
+    fun isCoverScraperSourceEnabled(c: Context, source: String): Boolean {
+        if (source !in DEFAULT_COVER_SCRAPER_SOURCES) return false
+        return prefs(c).getBoolean(KEY_COVER_SCRAPER_SOURCE_ENABLED_PREFIX + source, true)
+    }
+
+    fun setCoverScraperSourceEnabled(c: Context, source: String, enabled: Boolean) {
+        if (source !in DEFAULT_COVER_SCRAPER_SOURCES) return
+        prefs(c).edit().putBoolean(KEY_COVER_SCRAPER_SOURCE_ENABLED_PREFIX + source, enabled).apply()
+        bumpCoverScraperSettingsVersion()
+    }
+
+    fun moveCoverScraperSource(c: Context, source: String, offset: Int) {
+        val sources = getCoverScraperSourceOrder(c).toMutableList()
+        val index = sources.indexOf(source)
+        if (index < 0) return
+        val target = (index + offset).coerceIn(0, sources.lastIndex)
+        if (target == index) return
+        val item = sources.removeAt(index)
+        sources.add(target, item)
+        setCoverScraperSourceOrder(c, sources)
+    }
+
     /** 外观模式（跟随系统/浅色/深色）。 */
     fun getThemeMode(c: Context): String =
         prefs(c).getString(KEY_THEME_MODE, THEME_MODE_LIGHT) ?: THEME_MODE_LIGHT
@@ -125,5 +189,9 @@ object AppSettingsStore {
         THEME_MODE_DARK -> true
         THEME_MODE_SYSTEM -> isSystemDark(c)
         else -> false
+    }
+
+    private fun bumpCoverScraperSettingsVersion() {
+        coverScraperSettingsVersion.value += 1
     }
 }
