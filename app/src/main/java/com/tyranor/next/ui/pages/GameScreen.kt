@@ -41,7 +41,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -707,13 +706,36 @@ private fun RenameGameDialog(
         onDismissRequest = onDismiss,
         title = { Text("名称修改", style = MaterialTheme.typography.titleMedium) },
         text = {
-            OutlinedTextField(
-                value = title,
-                onValueChange = { title = it },
-                singleLine = true,
-                label = { Text("游戏名称") },
-                modifier = Modifier.fillMaxWidth(),
-            )
+            // 与项目内其他搜索/输入框统一：Miuix Settings 风格 SearchBar（非展开内嵌式）
+            MiuixSettingsTheme {
+                SearchBar(
+                    inputField = {
+                        InputField(
+                            query = title,
+                            onQueryChange = { title = it },
+                            // 键盘“搜索/完成”动作直接保存（内容有效时）
+                            onSearch = { if (canConfirm) onConfirm(normalizedTitle) },
+                            expanded = false,
+                            onExpandedChange = { },
+                            leadingIcon = {
+                                Icon(
+                                    modifier = Modifier
+                                        .padding(start = SearchBarDefaults.LeadingIconStartPadding, end = SearchBarDefaults.LeadingIconEndPadding)
+                                        .size(26.dp),
+                                    painter = painterResource(R.drawable.ic_sheet_rename),
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    contentDescription = "Rename",
+                                )
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    },
+                    expanded = false,
+                    onExpandedChange = { },
+                    modifier = Modifier.fillMaxWidth(),
+                    content = { },
+                )
+            }
         },
         confirmButton = {
             TextButton(
