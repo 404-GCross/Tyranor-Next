@@ -4,7 +4,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.NonSkippableComposable
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.sp
 import com.tyranor.next.ui.common.WithoutPressIndication
@@ -31,10 +30,8 @@ private val TyranorMiuixTextStyles = defaultTextStyles(
 @Composable
 @NonSkippableComposable
 fun MiuixSettingsTheme(
-    primaryColor: Color? = null,
     content: @Composable () -> Unit,
 ) {
-    AppThemeColors.ensureLoaded(LocalContext.current)
     // 复用外层 TyranorNextTheme 计算好的动态配色，不在此重复取色
     val scheme = MaterialTheme.colorScheme
     val dark = AppThemeColors.isDark

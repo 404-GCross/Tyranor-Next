@@ -26,46 +26,38 @@ private fun applyToneSwitch(scheme: ColorScheme): ColorScheme = scheme.copy(
 @Composable
 @NonSkippableComposable
 fun TyranorNextTheme(
-    primaryColor: Color? = null,
     content: @Composable () -> Unit,
 ) {
-  // 配色来源：动态取色开启时种子色来自壁纸/封面，关闭时由 primaryColor 或手动轮盘色提供
-  val context = LocalContext.current
-  AppThemeColors.ensureLoaded(context)
-  // 在函数体内直接读取全局主题色：配合 @NonSkippableComposable，主题色变更时本主题
-  // 必然重组并向整棵组合树提供新 colorScheme（不依赖调用点对默认参数的订阅）。
-  val manual = primaryColor ?: AppThemeColors.primary
-  // 深/浅色由应用设置「外观模式」控制；背景/文字用随模式的动态常量（Color.kt getter）
-  val dark = AppThemeColors.isDark
-  val style = AppThemeColors.paletteStyle
+    val context = LocalContext.current
+    AppThemeColors.ensureLoaded(context)
+    val manual = AppThemeColors.primary
+    val dark = AppThemeColors.isDark
+    val style = AppThemeColors.paletteStyle
 
-  // 动态取色开关、来源、封面 URI、手动主色变化时重新解析实际生效的种子色
-  LaunchedEffect(
-      AppThemeColors.monetEnabled,
-      AppThemeColors.monetSource,
-      AppThemeColors.currentCoverUri,
-      manual,
-  ) {
-      val seed = if (AppThemeColors.monetEnabled) {
-          withContext(Dispatchers.Default) {
-              AppThemeColors.resolveSeedColor(context)
-          }
-      } else {
-          manual
-      }
-      AppThemeColors.updateEffectiveSeed(seed)
-  }
+    LaunchedEffect(
+        AppThemeColors.monetEnabled,
+        AppThemeColors.monetSource,
+        AppThemeColors.currentCoverUri,
+        manual,
+    ) {
+        val seed = if (AppThemeColors.monetEnabled) {
+            withContext(Dispatchers.Default) {
+                AppThemeColors.resolveSeedColor(context)
+            }
+        } else {
+            manual
+        }
+        AppThemeColors.updateEffectiveSeed(seed)
+    }
 
-  // 主题色变更时本主题必然重组：读取 effectiveSeed 触发重组
-  val seed = AppThemeColors.effectiveSeed
-  val colorScheme = monetColorScheme(
-      seedColor = seed,
-      isDark = dark,
-      style = style,
-  ).let { applyToneSwitch(it) }
-  MaterialTheme(
-      colorScheme = colorScheme,
-      typography = Typography,
-      content = content,
-  )
+    val colorScheme = monetColorScheme(
+        seedColor = AppThemeColors.effectiveSeed,
+        isDark = dark,
+        style = style,
+    ).let { applyToneSwitch(it) }
+    MaterialTheme(
+        colorScheme = colorScheme,
+        typography = Typography,
+        content = content,
+    )
 }
