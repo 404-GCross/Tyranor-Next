@@ -296,7 +296,7 @@ public class KR2Activity extends Cocos2dxActivity {
         if (NativeLibraryLoader.loadKirikiroid139(this) == null) {
             throw new UnsatisfiedLinkError("Kirikiroid2 native plugin is missing or invalid");
         }
-        System.loadLibrary("krkr_bridge");
+        System.loadLibrary("krkr_bridge_v2");
     }
     @Override public void onCreate(Bundle savedInstanceState) {
         sInstance = this;

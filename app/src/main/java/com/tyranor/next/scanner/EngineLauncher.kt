@@ -53,8 +53,8 @@ object EngineLauncher {
         }
         requestAllFilesAccessIfNeeded(context, game, path)?.let { return it }
         EnginePluginBootstrap.ensureForLaunch(context, game.engine)?.let { return it }
-        if (game.engine == EngineType.KIRIKIRI && !effectiveKrScopedSaveDir(context, game.uri)) {
-            ensureKrGameSaveDir(context, game, path)?.let { return it }
+        if (game.engine == EngineType.KIRIKIRI) {
+            ensureKrSaveDir(context, game, path)?.let { return it }
         }
         // “总是/不再”持久化为全局补丁策略；“本次”不落盘，仅本次按 auto 生效
         if (game.engine == EngineType.ARTEMIS) {
@@ -221,13 +221,8 @@ object EngineLauncher {
     private fun buildKirikiriIntent(context: Context, path: String, game: ScanGame): Intent {
         val gid = game.uri
         fun <T> or(override: T?, global: T): T = override ?: global
-        val requestedKernel = or(PerGameSettingsStore.getStr(context, gid, PerGameSettingsStore.F_ENGINE_KERNEL), EngineSettingsStore.getKrKernel(context))
         val needsSafFallback = EngineScanner.isRemovableStoragePath(path)
-        val kernel = if (needsSafFallback && requestedKernel == EngineSettingsStore.KERNEL_KRKRSDL3) {
-            EngineSettingsStore.KERNEL_KIRIKIRI2
-        } else {
-            requestedKernel
-        }
+        val kernel = effectiveKrKernel(context, gid, path)
         val launchEntry = pickKrActivateEntry(path, game)
         if (kernel == EngineSettingsStore.KERNEL_KRKRSDL3) {
             val args = buildKrkrsdl3Args(context, gid, path, launchEntry)
@@ -253,6 +248,7 @@ object EngineLauncher {
             else -> Kirikiroid139::class.java
         }
         val scoped = effectiveKrScopedSaveDir(context, gid)
+        val actualSaveRoot = resolveKrSaveDir(context, path, kernel, scoped)
         val defaultFont = PerGameSettingsStore.getStr(context, gid, PerGameSettingsStore.F_DEFAULT_FONT)
             ?: EngineSettingsStore.getKrDefaultFont(context)
         val forceFont = or(PerGameSettingsStore.getBool(context, gid, PerGameSettingsStore.F_FORCE_DEFAULT_FONT), EngineSettingsStore.isKrForceDefaultFont(context))
@@ -262,22 +258,15 @@ object EngineLauncher {
             putExtra("gamePath", launchEntry)
             putExtra("projectRoot", path)
             putExtra("gamedir", path)
-            putExtra("gameSaveRoot", File(path, "savedata").absolutePath)
+            putExtra("gameSaveRoot", actualSaveRoot.absolutePath)
             putExtra("rootUri", game.uri)
             putExtra("launchTarget", game.launchTarget)
             putExtra("launchMode", "internal.kirikiroid2")
             putExtra("safFileFallback", needsSafFallback)
             putExtra("orientation", 6)
             putExtra("scopedSaveDir", scoped)
-            // 独立存档：把 scopedSaveRoot 指向与 GameSaveManager 一致的镜像目录，
-            // 否则 KR2 引擎会回退到游戏目录内 savedata，存档管理对着空镜像。
             if (scoped) {
-                context.filesDir?.let { internal ->
-                    putExtra(
-                        "scopedSaveRoot",
-                        File(File(File(internal, "krkr_mirror"), EngineScanner.safeSaveName(path)), "savedata").absolutePath,
-                    )
-                }
+                putExtra("scopedSaveRoot", actualSaveRoot.absolutePath)
             }
             putExtra("focus", "true")
             // 引擎版本
@@ -319,12 +308,7 @@ object EngineLauncher {
         args.add("-render=$renderer")
 
         val scoped = effectiveKrScopedSaveDir(context, gid)
-        val saveDir = if (scoped) {
-            val baseDir = context.getExternalFilesDir(null) ?: context.filesDir
-            File(File(baseDir, "save"), EngineScanner.safeSaveName(path))
-        } else {
-            File(path, "savedata")
-        }
+        val saveDir = resolveKrSaveDir(context, path, EngineSettingsStore.KERNEL_KRKRSDL3, scoped)
         if (saveDir.exists() || saveDir.mkdirs()) {
             args.add("-savedir=${saveDir.absolutePath}")
         }
@@ -335,13 +319,39 @@ object EngineLauncher {
         PerGameSettingsStore.getBool(context, gid, PerGameSettingsStore.F_SCOPED_SAVE_DIR)
             ?: EngineSettingsStore.isKrScopedSaveDir(context)
 
-    private fun ensureKrGameSaveDir(context: Context, game: ScanGame, path: String): String? {
-        val saveDir = File(path, "savedata")
+    private fun effectiveKrKernel(context: Context, gid: String, path: String): String {
+        val requested = PerGameSettingsStore.getStr(context, gid, PerGameSettingsStore.F_ENGINE_KERNEL)
+            ?: EngineSettingsStore.getKrKernel(context)
+        return if (EngineScanner.isRemovableStoragePath(path) && requested == EngineSettingsStore.KERNEL_KRKRSDL3) {
+            EngineSettingsStore.KERNEL_KIRIKIRI2
+        } else {
+            requested
+        }
+    }
+
+    private fun resolveKrSaveDir(context: Context, path: String, kernel: String, scoped: Boolean): File {
+        if (!scoped) return File(path, "savedata")
+        return if (kernel == EngineSettingsStore.KERNEL_KRKRSDL3) {
+            val baseDir = context.getExternalFilesDir(null) ?: context.filesDir
+            File(File(baseDir, "save"), EngineScanner.safeSaveName(path))
+        } else {
+            File(File(File(context.filesDir, "krkr_mirror"), EngineScanner.safeSaveName(path)), "savedata")
+        }
+    }
+
+    private fun ensureKrSaveDir(context: Context, game: ScanGame, path: String): String? {
+        val scoped = effectiveKrScopedSaveDir(context, game.uri)
+        val kernel = effectiveKrKernel(context, game.uri, path)
+        val saveDir = resolveKrSaveDir(context, path, kernel, scoped)
         if (saveDir.isDirectory) return null
         if (saveDir.exists()) return "KRKR 存档路径已存在但不是目录：${saveDir.absolutePath}"
         if (saveDir.mkdirs() || saveDir.isDirectory) return null
-        if (ensureKrGameSaveDirViaSaf(context, game, path)) return null
-        return "无法创建 KRKR 存档目录：${saveDir.absolutePath}"
+        if (!scoped && ensureKrGameSaveDirViaSaf(context, game, path)) return null
+        return if (scoped) {
+            "无法创建 KRKR 应用独立存档目录：${saveDir.absolutePath}"
+        } else {
+            "无法创建 KRKR 存档目录：${saveDir.absolutePath}"
+        }
     }
 
     private fun ensureKrGameSaveDirViaSaf(context: Context, game: ScanGame, path: String): Boolean {
