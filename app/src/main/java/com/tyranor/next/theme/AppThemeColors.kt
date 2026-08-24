@@ -64,7 +64,7 @@ object AppThemeColors {
     }
 
     /** 更新主题实际使用的种子色，并广播组合重组。 */
-    fun setEffectiveSeed(seed: Color) {
+    fun updateEffectiveSeed(seed: Color) {
         effectiveSeed = seed
     }
 

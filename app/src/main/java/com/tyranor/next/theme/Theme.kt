@@ -53,7 +53,7 @@ fun TyranorNextTheme(
       } else {
           manual
       }
-      AppThemeColors.setEffectiveSeed(seed)
+      AppThemeColors.updateEffectiveSeed(seed)
   }
 
   // 主题色变更时本主题必然重组：读取 effectiveSeed 触发重组
