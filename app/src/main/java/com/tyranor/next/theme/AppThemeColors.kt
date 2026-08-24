@@ -40,7 +40,7 @@ object AppThemeColors {
     /** 当前选中游戏的封面 URI（由 GameScreen 写入，供「游戏封面取色」读取）。 */
     var currentCoverUri by mutableStateOf<String?>(null)
 
-    /** 实际生效的种子色：由 TyranorNextTheme 计算后写入，供嵌套的 MiuixSettingsTheme 复用。 */
+    /** 实际生效的种子色：动态取色开启时由 TyranorNextTheme 解析写入，供主题生成配色。 */
     var effectiveSeed by mutableStateOf(Blue40)
         private set
 
@@ -69,25 +69,21 @@ object AppThemeColors {
     }
 
     /**
-     * 解析实际生效的种子色（供主题生成动态配色）：
-     * - 动态取色关闭：返回手动轮盘色 [primary]
+     * 解析动态取色来源的种子色（仅动态取色开启时由主题调用）：
      * - 来源「跟随系统壁纸」且 Android 12+：取系统壁纸 accent 色，失败回退手动色；
      *   Android 12 以下不支持壁纸取色（未引入 MonetCompat），直接回退手动色
      * - 来源「游戏封面」：从 [currentCoverUri] 提取主色，失败回退手动色
      */
-    suspend fun resolveSeedColor(context: Context): Color {
-        if (!monetEnabled) return primary
-        return when (monetSource) {
-            AppSettingsStore.MONET_SOURCE_COVER ->
-                extractSeedColorFromCover(context, currentCoverUri) ?: primary
-            else -> {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    runCatching {
-                        Color(context.resources.getColor(android.R.color.system_accent1_500, null))
-                    }.getOrDefault(primary)
-                } else {
-                    primary
-                }
+    suspend fun resolveSeedColor(context: Context): Color = when (monetSource) {
+        AppSettingsStore.MONET_SOURCE_COVER ->
+            extractSeedColorFromCover(context, currentCoverUri) ?: primary
+        else -> {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                runCatching {
+                    Color(context.resources.getColor(android.R.color.system_accent1_500, null))
+                }.getOrDefault(primary)
+            } else {
+                primary
             }
         }
     }

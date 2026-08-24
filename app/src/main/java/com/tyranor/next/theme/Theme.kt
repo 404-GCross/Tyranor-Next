@@ -7,8 +7,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.NonSkippableComposable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 /**
  * 在生成后的动态 ColorScheme 上套用「色调切换」与固定灰白背景：
@@ -40,18 +38,17 @@ fun TyranorNextTheme(
         AppThemeColors.currentCoverUri,
         manual,
     ) {
-        val seed = if (AppThemeColors.monetEnabled) {
-            withContext(Dispatchers.Default) {
-                AppThemeColors.resolveSeedColor(context)
-            }
-        } else {
-            manual
+        if (AppThemeColors.monetEnabled) {
+            AppThemeColors.updateEffectiveSeed(AppThemeColors.resolveSeedColor(context))
         }
-        AppThemeColors.updateEffectiveSeed(seed)
     }
 
     val colorScheme = monetColorScheme(
-        seedColor = AppThemeColors.effectiveSeed,
+        seedColor = if (AppThemeColors.monetEnabled) {
+            AppThemeColors.effectiveSeed
+        } else {
+            manual
+        },
         isDark = dark,
         style = style,
     ).let { applyToneSwitch(it) }

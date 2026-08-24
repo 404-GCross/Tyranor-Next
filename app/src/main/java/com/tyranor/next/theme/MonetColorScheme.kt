@@ -30,8 +30,6 @@ enum class PaletteStyle(val storageValue: String, val displayName: String) {
 
 /**
  * 用种子色生成完整的 Material 3 动态 ColorScheme（纯计算，可在后台线程调用）。
- * 规格固定用 Material 2021 版（Spec2021），全部风格均支持，避免 Expressive 风格
- * 组合在部分风格上缺失导致的降级分支。
  */
 fun monetColorScheme(
     seedColor: Color,
@@ -54,7 +52,7 @@ fun monetColorScheme(
         isDark = isDark,
         style = mkStyle,
         contrastLevel = 0.0,
-        specVersion = ColorSpec.SpecVersion.SPEC_2021,
+        specVersion = ColorSpec.SpecVersion.SPEC_2025,
     )
 }
 

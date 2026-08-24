@@ -7,7 +7,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import com.materialkolor.quantize.QuantizerCelebi
 import com.materialkolor.score.Score
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 
 /**
@@ -22,12 +25,18 @@ suspend fun extractSeedColorFromCover(
 ): Color? {
     if (coverUri.isNullOrBlank()) return null
     return withContext(Dispatchers.IO) {
-        runCatching {
+        try {
+            currentCoroutineContext().ensureActive()
             val decoded = context.contentResolver.openInputStream(android.net.Uri.parse(coverUri))
                 ?.use { BitmapFactory.decodeStream(it) }
                 ?: return@withContext null
+            currentCoroutineContext().ensureActive()
             extractSeedColor(decoded)
-        }.getOrNull()
+        } catch (error: CancellationException) {
+            throw error
+        } catch (_: Exception) {
+            null
+        }
     }
 }
 
@@ -50,7 +59,9 @@ private fun extractSeedColor(bitmap: Bitmap): Color? {
     try {
         val pixels = IntArray(scaled.width * scaled.height)
         scaled.getPixels(pixels, 0, scaled.width, 0, 0, scaled.width, scaled.height)
-        val quantized = QuantizerCelebi.quantize(pixels, 128)
+        val opaquePixels = pixels.filter { (it ushr 24) >= 0x40 }.toIntArray()
+        if (opaquePixels.isEmpty()) return null
+        val quantized = QuantizerCelebi.quantize(opaquePixels, 128)
         val scored = Score.score(quantized, 1, Blue40.toArgb(), true)
         return scored.firstOrNull()?.let { Color(it) }
     } finally {

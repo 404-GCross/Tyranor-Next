@@ -31,10 +31,13 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.Icon
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -65,6 +68,7 @@ import com.tyranor.next.ui.common.WithoutPressIndication
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.util.concurrent.ConcurrentHashMap
 import top.yukonga.miuix.kmp.basic.Card as MiuixCard
 import top.yukonga.miuix.kmp.basic.ColorPicker
 import top.yukonga.miuix.kmp.basic.Scaffold as MiuixScaffold
@@ -178,30 +182,21 @@ internal fun AppSettingsScreen() {
                                 },
                             )
                             if (AppThemeColors.monetEnabled) {
-                                // 配色风格：Material You 调色板
-                                var paletteStyle by remember {
-                                    mutableStateOf(AppSettingsStore.getPaletteStyleValue(ctx))
-                                }
                                 val paletteStyles = PaletteStyle.entries
                                 val paletteIndex = paletteStyles
-                                    .indexOfFirst { it.storageValue == paletteStyle }
-                                    .let { if (it < 0) 0 else it }
+                                    .indexOf(AppThemeColors.paletteStyle)
+                                    .coerceAtLeast(0)
                                 OverlayDropdownPreference(
                                     title = "配色风格",
                                     items = paletteStyles.map { it.displayName },
                                     selectedIndex = paletteIndex,
                                     onSelectedIndexChange = { index ->
                                         paletteStyles.getOrNull(index)?.let { style ->
-                                            paletteStyle = style.storageValue
                                             AppSettingsStore.setPaletteStyleValue(ctx, style.storageValue)
                                             AppThemeColors.refresh(ctx)
                                         }
                                     },
                                 )
-                                // 取色来源：跟随系统壁纸（Android 12+）/ 游戏封面（全版本）
-                                var monetSource by remember {
-                                    mutableStateOf(AppSettingsStore.getMonetSource(ctx))
-                                }
                                 val sources = buildList {
                                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                                         add(AppSettingsStore.MONET_SOURCE_SYSTEM to "跟随系统壁纸")
@@ -209,15 +204,14 @@ internal fun AppSettingsScreen() {
                                     add(AppSettingsStore.MONET_SOURCE_COVER to "游戏封面")
                                 }
                                 val sourceIndex = sources
-                                    .indexOfFirst { it.first == monetSource }
-                                    .let { if (it < 0) 0 else it }
+                                    .indexOfFirst { it.first == AppThemeColors.monetSource }
+                                    .coerceAtLeast(0)
                                 OverlayDropdownPreference(
                                     title = "取色来源",
                                     items = sources.map { it.second },
                                     selectedIndex = sourceIndex,
                                     onSelectedIndexChange = { index ->
                                         sources.getOrNull(index)?.first?.let { source ->
-                                            monetSource = source
                                             AppSettingsStore.setMonetSource(ctx, source)
                                             AppThemeColors.refresh(ctx)
                                         }
@@ -502,6 +496,9 @@ private fun BottomInsetSpacer() {
  * （InstallerX 同款：主色圆 + 主/次/辅容器弧形环），点击直接设为手动主色。
  * 仅动态取色关闭时显示。
  */
+/** 迷你莫奈色卡缓存：(种子色, 风格, 深浅) → ColorScheme，避免每次进入设置页重复计算。 */
+private val swatchSchemeCache = ConcurrentHashMap<Triple<Int, PaletteStyle, Boolean>, ColorScheme>()
+
 @Composable
 private fun PaletteGrid() {
     val ctx = LocalContext.current
@@ -540,15 +537,17 @@ private fun ColorSwatch(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    // 用当前配色风格生成迷你色卡配色（在后台线程计算，避免阻塞 UI）
+    // 用当前配色风格生成迷你色卡配色（后台线程计算 + 进程内缓存）
     val swatchScheme by produceState<ColorScheme?>(
-        initialValue = null,
+        initialValue = swatchSchemeCache[Triple(preset.color.toArgb(), style, AppThemeColors.isDark)],
         key1 = preset.color.toArgb(),
         key2 = style,
+        key3 = AppThemeColors.isDark,
     ) {
+        val cacheKey = Triple(preset.color.toArgb(), style, AppThemeColors.isDark)
         value = withContext(Dispatchers.Default) {
-            monetColorScheme(seedColor = preset.color, isDark = AppThemeColors.isDark, style = style)
-        }
+            monetColorScheme(seedColor = preset.color, isDark = cacheKey.third, style = style)
+        }.also { swatchSchemeCache[cacheKey] = it }
     }
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -570,7 +569,12 @@ private fun ColorSwatch(
                     contentAlignment = Alignment.Center,
                 ) {
                     if (isSelected) {
-                        Text("✓", style = MaterialTheme.typography.labelSmall, color = ComposeColor.White)
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = null,
+                            tint = ComposeColor.White,
+                            modifier = Modifier.size(14.dp),
+                        )
                     }
                 }
             } else {
@@ -579,7 +583,12 @@ private fun ColorSwatch(
                     contentAlignment = Alignment.Center,
                 ) {
                     if (isSelected) {
-                        Text("✓", style = MaterialTheme.typography.labelSmall, color = ComposeColor.White)
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = null,
+                            tint = ComposeColor.White,
+                            modifier = Modifier.size(14.dp),
+                        )
                     }
                 }
             }
