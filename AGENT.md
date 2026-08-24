@@ -91,6 +91,42 @@ Column(fillMaxSize)                                // 页面根
 
 ---
 
+## 搜索/输入框统一规范
+
+全 App 的搜索过滤框与弹窗内单行文本输入框，必须统一使用公共组件
+`com.tyranor.next.ui.common.AppSearchField`（`app/src/main/java/com/tyranor/next/ui/common/AppSearchField.kt`）。
+**禁止**在页面内直接拼装 Miuix `SearchBar`/`InputField`，也**禁止**使用 Material 的
+`TextField`/`OutlinedTextField` 充当搜索框或弹窗输入框。
+
+### 1. 组件形态（Miuix 风格，非展开内嵌式）
+
+- 组件内部固定为 `MiuixSettingsTheme + SearchBar + InputField` 模板，`expanded` 恒为
+  `false`（内嵌式），不使用 Miuix 的展开式全屏搜索页形态。
+- 前导图标固定 **26dp**，内边距固定 `SearchBarDefaults.LeadingIconStartPadding /
+  LeadingIconEndPadding`，`tint` 统一取 `MiuixTheme.colorScheme.primary`——以上均由组件
+  内部处理，调用方不要传色值/尺寸，保证全局样式单点可改。
+
+### 2. 参数约定
+
+- `query` / `onQueryChange`：必传，输入状态由调用方持有。
+- `onSearch`：键盘 IME 动作回调。本地即时过滤场景可不传（默认空实现）；
+  需显式触发时传入（如网络请求、回车即保存）。
+- `leadingIcon`：drawable 资源（`R.drawable.ic_*`）。搜索语义用默认 `ic_game_search`；
+  其他语义必须传对应图标（如名称修改用 `ic_sheet_rename`），禁止搜索图标滥用。
+- `iconContentDescription`：无障碍描述，跟随图标语义。
+- `modifier`：仅用于布局微调（如外边距），宽度由组件内部 `fillMaxWidth` 保证。
+
+### 3. 现有调用点（新增场景照此对齐）
+
+| 场景 | 位置 | 图标 | onSearch |
+|---|---|---|---|
+| 游戏库过滤 | `GameScreen.kt`（顶栏下方） | `ic_game_search` | 即时过滤，不传 |
+| VNDB 封面搜索 | `GameScreen.kt`（VndbSearchDialog） | `ic_game_search` | `search()` 网络请求 |
+| krkr 在线补丁过滤 | `KrkrOnlinePatchActivity.kt`（列表首项） | `ic_game_search` | 即时过滤，不传 |
+| 名称修改 | `GameScreen.kt`（RenameGameDialog） | `ic_sheet_rename` | 内容有效即保存 |
+
+---
+
 ## 主题色调统一使用规范
 
 应用主题色（primary）由用户通过 **应用设置 → 色调轮盘** 修改，必须全局统一生效。规范如下：

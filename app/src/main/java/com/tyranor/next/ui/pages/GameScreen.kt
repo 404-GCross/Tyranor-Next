@@ -79,7 +79,7 @@ import com.tyranor.next.scanner.VndbCoverService
 import com.tyranor.next.settings.AppSettingsStore
 import com.tyranor.next.settings.PerGameSettingsStore
 import com.tyranor.next.theme.NavWhite
-import com.tyranor.next.theme.MiuixSettingsTheme
+import com.tyranor.next.ui.common.AppSearchField
 import com.tyranor.next.ui.common.glassNavBottomInset
 import com.tyranor.next.ui.common.isWideScreen
 import com.tyranor.next.theme.PageGrey
@@ -87,9 +87,6 @@ import com.tyranor.next.ui.common.TopBarIcon
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import top.yukonga.miuix.kmp.basic.InputField
-import top.yukonga.miuix.kmp.basic.SearchBar
-import top.yukonga.miuix.kmp.basic.SearchBarDefaults
 import java.io.File
 import java.util.Locale
 
@@ -372,34 +369,11 @@ private fun GameLibraryContent(
                 }
                 // 搜索框：点击搜索按钮后出现在顶部栏下方
                 if (showSearch) {
-                    MiuixSettingsTheme {
-                        SearchBar(
-                            inputField = {
-                                InputField(
-                                    query = query,
-                                    onQueryChange = { query = it },
-                                    onSearch = { },
-                                    expanded = false,
-                                    onExpandedChange = { },
-                                    leadingIcon = {
-                                        Icon(
-                                            modifier = Modifier
-                                                .padding(start = SearchBarDefaults.LeadingIconStartPadding, end = SearchBarDefaults.LeadingIconEndPadding)
-                                                .size(26.dp),
-                                            painter = painterResource(R.drawable.ic_game_search),
-                                            tint = MaterialTheme.colorScheme.primary,
-                                            contentDescription = "Search",
-                                        )
-                                    },
-                                    modifier = Modifier.fillMaxWidth(),
-                                )
-                            },
-                            expanded = false,
-                            onExpandedChange = { },
-                            modifier = Modifier.fillMaxWidth().padding(start = 4.dp, end = 4.dp, bottom = 10.dp),
-                            content = {},
-                        )
-                    }
+                    AppSearchField(
+                        query = query,
+                        onQueryChange = { query = it },
+                        modifier = Modifier.padding(start = 4.dp, end = 4.dp, bottom = 10.dp),
+                    )
                 }
             }
         }
@@ -706,36 +680,14 @@ private fun RenameGameDialog(
         onDismissRequest = onDismiss,
         title = { Text("名称修改", style = MaterialTheme.typography.titleMedium) },
         text = {
-            // 与项目内其他搜索/输入框统一：Miuix Settings 风格 SearchBar（非展开内嵌式）
-            MiuixSettingsTheme {
-                SearchBar(
-                    inputField = {
-                        InputField(
-                            query = title,
-                            onQueryChange = { title = it },
-                            // 键盘“搜索/完成”动作直接保存（内容有效时）
-                            onSearch = { if (canConfirm) onConfirm(normalizedTitle) },
-                            expanded = false,
-                            onExpandedChange = { },
-                            leadingIcon = {
-                                Icon(
-                                    modifier = Modifier
-                                        .padding(start = SearchBarDefaults.LeadingIconStartPadding, end = SearchBarDefaults.LeadingIconEndPadding)
-                                        .size(26.dp),
-                                    painter = painterResource(R.drawable.ic_sheet_rename),
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    contentDescription = "Rename",
-                                )
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    },
-                    expanded = false,
-                    onExpandedChange = { },
-                    modifier = Modifier.fillMaxWidth(),
-                    content = { },
-                )
-            }
+            // 统一 Miuix 风格输入框（AppSearchField）；键盘“搜索/完成”动作直接保存（内容有效时）
+            AppSearchField(
+                query = title,
+                onQueryChange = { title = it },
+                onSearch = { if (canConfirm) onConfirm(normalizedTitle) },
+                leadingIcon = painterResource(R.drawable.ic_sheet_rename),
+                iconContentDescription = "Rename",
+            )
         },
         confirmButton = {
             TextButton(
@@ -782,34 +734,11 @@ private fun VndbSearchDialog(
         title = { Text("搜索 VNDB 封面", style = MaterialTheme.typography.titleMedium) },
         text = {
             Column {
-                MiuixSettingsTheme {
-                    SearchBar(
-                        inputField = {
-                            InputField(
-                                query = keyword,
-                                onQueryChange = { keyword = it },
-                                onSearch = { search() },
-                                expanded = false,
-                                onExpandedChange = { },
-                                leadingIcon = {
-                                    Icon(
-                                        modifier = Modifier
-                                            .padding(start = SearchBarDefaults.LeadingIconStartPadding, end = SearchBarDefaults.LeadingIconEndPadding)
-                                            .size(26.dp),
-                                        painter = painterResource(R.drawable.ic_game_search),
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        contentDescription = "Search",
-                                    )
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                        },
-                        expanded = false,
-                        onExpandedChange = { },
-                        modifier = Modifier.fillMaxWidth(),
-                        content = {},
-                    )
-                }
+                AppSearchField(
+                    query = keyword,
+                    onQueryChange = { keyword = it },
+                    onSearch = { search() },
+                )
                 Button(
                     onClick = { search() },
                     enabled = !searching,
