@@ -43,6 +43,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
@@ -305,11 +306,11 @@ private fun RecentGameRow(
         val offset = remember { Animatable(0f) }
         // 统一裁切圆角：红色删除层与白色内容层圆角一致，内容左移越界部分被裁掉
         Box(Modifier.clip(RoundedCornerShape(8.dp))) {
-            // 红色删除层与行同尺寸，点击直接删除；仅滑出约 1/6 时露出右侧「删除」区域
+            // 删除层：主题色背景 + 白色删除图标，仅滑出约 1/6 时露出右侧「删除」区域
             Box(
                 modifier = Modifier
                     .matchParentSize()
-                    .background(MaterialTheme.colorScheme.errorContainer)
+                    .background(MaterialTheme.colorScheme.primary)
                     .clickable(onClick = onSwipeDelete),
             ) {
                 Column(
@@ -323,12 +324,7 @@ private fun RecentGameRow(
                     Icon(
                         imageVector = Icons.Filled.Delete,
                         contentDescription = "删除",
-                        tint = MaterialTheme.colorScheme.onErrorContainer,
-                    )
-                    Text(
-                        "删除",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        tint = Color.White,
                     )
                 }
             }
