@@ -1,8 +1,32 @@
 # Tyranor Next
 
-基于 **Tyranor 模拟器逆向重写**的多引擎视觉小说（Galgame）聚合启动器，面向 Android 平台。内置 Kirikiri / ONScripter / Tyrano / Artemis 四套引擎运行时，提供游戏库管理、封面获取、存档镜像、引擎参数调节等一体化体验。
+基于 **Tyranor 模拟器逆向重写**的多引擎视觉小说（Galgame）聚合启动器，面向 Android 平台。内置 Kirikiri / ONScripter / Tyrano / Artemis 四套引擎运行环境，可识别和启动八类游戏，提供游戏库管理、封面获取、存档镜像、引擎参数调节等一体化体验。
 
 主打轻便、简单、快捷，不引入其他冗余功能的简约设计思路
+
+## 支持范围
+
+### 引擎与游戏类型
+
+| 游戏类型 | 典型识别特征 | 运行环境 |
+| --- | --- | --- |
+| Kirikiri / Kirikiri2 | `.xp3`、`startup.tjs` | Kirikiroid2 / krkrsdl3 原生运行时 |
+| ONScripter | `nscript.dat`、`.nsa` | ONScripter 原生运行时 |
+| Artemis | `system.ini`、`.pfs` | Artemis 原生运行时 |
+| TyranoBuilder | `index.html`、`tyrano/` | 内置 Tyrano Web 运行环境 |
+| RPG Maker MV | `www/`、`js/rpg_core.js` | 内置 Web 运行环境 |
+| RPG Maker MZ | `www/`、`js/rmmz_core.js` | 内置 Web 运行环境 |
+| VN | `globalData.vndata` | 内置 Web 运行环境 |
+| WebOther | 通用 `index.html` 网页游戏 | 内置 Web 运行环境 |
+
+内置 Web 运行环境同时支持部分以 `app.asar` 打包的 NW.js 游戏；启动时会根据归档内容进一步识别具体类型。
+
+### 平台与文件要求
+
+- Android 8.0（API 26）及以上。
+- 当前原生引擎库仅提供 `arm64-v8a`，设备需为 64 位 ARM 架构。
+- 游戏目录需位于 Android 可访问的本地存储，并通过系统文件选择器（SAF）授权；启动时目录必须能够映射为真实文件路径，外置存储上的部分引擎可能需要“所有文件访问”权限。
+- 实际兼容性取决于游戏使用的引擎版本、封包/加密方式和脚本特性；特殊修改版可能需要调整引擎设置或补丁。
 
 ## 参与贡献
 

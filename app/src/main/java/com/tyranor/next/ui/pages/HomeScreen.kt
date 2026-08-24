@@ -116,7 +116,7 @@ fun HomeScreen(modifier: Modifier = Modifier) {
         if (EngineLauncher.needsArtemisPatchConfirm(context, game)) {
             patchLaunchTarget = game
         } else {
-            launchError = EngineLauncher.launch(context, game)
+            scope.launch { launchError = EngineLauncher.launch(context, game) }
         }
     }
 
@@ -217,7 +217,9 @@ fun HomeScreen(modifier: Modifier = Modifier) {
                 TextButton(
                     onClick = {
                         patchLaunchTarget = null
-                        launchError = EngineLauncher.launch(context, game, EngineLauncher.ArtemisPatchChoice.ALWAYS)
+                        scope.launch {
+                            launchError = EngineLauncher.launch(context, game, EngineLauncher.ArtemisPatchChoice.ALWAYS)
+                        }
                     },
                 ) { Text("总是") }
             },
@@ -226,13 +228,17 @@ fun HomeScreen(modifier: Modifier = Modifier) {
                     TextButton(
                         onClick = {
                             patchLaunchTarget = null
-                            launchError = EngineLauncher.launch(context, game, EngineLauncher.ArtemisPatchChoice.NEVER)
+                            scope.launch {
+                                launchError = EngineLauncher.launch(context, game, EngineLauncher.ArtemisPatchChoice.NEVER)
+                            }
                         },
                     ) { Text("不再") }
                     TextButton(
                         onClick = {
                             patchLaunchTarget = null
-                            launchError = EngineLauncher.launch(context, game, EngineLauncher.ArtemisPatchChoice.ONCE)
+                            scope.launch {
+                                launchError = EngineLauncher.launch(context, game, EngineLauncher.ArtemisPatchChoice.ONCE)
+                            }
                         },
                     ) { Text("本次") }
                 }
