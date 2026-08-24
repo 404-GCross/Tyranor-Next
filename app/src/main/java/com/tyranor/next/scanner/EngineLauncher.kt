@@ -262,6 +262,7 @@ object EngineLauncher {
             putExtra("gamePath", launchEntry)
             putExtra("projectRoot", path)
             putExtra("gamedir", path)
+            putExtra("gameSaveRoot", File(path, "savedata").absolutePath)
             putExtra("rootUri", game.uri)
             putExtra("launchTarget", game.launchTarget)
             putExtra("launchMode", "internal.kirikiroid2")
@@ -318,12 +319,14 @@ object EngineLauncher {
         args.add("-render=$renderer")
 
         val scoped = effectiveKrScopedSaveDir(context, gid)
-        if (scoped) {
+        val saveDir = if (scoped) {
             val baseDir = context.getExternalFilesDir(null) ?: context.filesDir
-            val saveDir = File(File(baseDir, "save"), EngineScanner.safeSaveName(path))
-            if (saveDir.exists() || saveDir.mkdirs()) {
-                args.add("-savedir=${saveDir.absolutePath}")
-            }
+            File(File(baseDir, "save"), EngineScanner.safeSaveName(path))
+        } else {
+            File(path, "savedata")
+        }
+        if (saveDir.exists() || saveDir.mkdirs()) {
+            args.add("-savedir=${saveDir.absolutePath}")
         }
         return args
     }

@@ -428,14 +428,15 @@ public class KR2Activity extends Cocos2dxActivity {
     }
     public String[] getStoragePath() {
         // The native engine uses this array for both its writable data root and
-        // archive/plugin discovery. The game root stays on external storage;
-        // only the first entry is the redirected app-private savedata path.
-        // Keep savedata first to preserve the app-scoped write target, then add
-        // the normal game roots below for read-only discovery.
+        // archive/plugin discovery. Keep the selected savedata directory first
+        // as the writable root, then add the game root for read-only discovery.
         java.util.LinkedHashSet<String> paths = new java.util.LinkedHashSet<>();
         try {
-            if (getIntent() != null && getIntent().getBooleanExtra("scopedSaveDir", false)) {
-                File dir = scopedSaveDirectory(getIntent());
+            Intent intent = getIntent();
+            if (intent != null) {
+                File dir = intent.getBooleanExtra("scopedSaveDir", false)
+                        ? scopedSaveDirectory(intent)
+                        : gameSaveDirectory(intent);
                 if (dir != null) {
                     if (!dir.exists()) dir.mkdirs();
                     paths.add(dir.getAbsolutePath());
@@ -466,6 +467,18 @@ public class KR2Activity extends Cocos2dxActivity {
         return out;
     }
 
+    private static File gameSaveDirectory(Intent intent) {
+        if (intent == null) return null;
+        String explicit = KrPathUtils.normalizeFilePath(intent.getStringExtra("gameSaveRoot"));
+        if (explicit != null && !explicit.trim().isEmpty() && explicit.startsWith("/")) {
+            return new File(explicit);
+        }
+        String root = KrPathUtils.normalizeFilePath(intent.getStringExtra("projectRoot"));
+        if (root == null || root.trim().isEmpty()) root = KrPathUtils.normalizeFilePath(intent.getStringExtra("gamedir"));
+        if (root == null || root.trim().isEmpty() || !root.startsWith("/")) return null;
+        return new File(root, "savedata");
+    }
+
     private static void addKrStoragePathFromIntent(java.util.LinkedHashSet<String> out, Intent intent, String key) {
         if (intent == null || key == null) return;
         addKrStoragePath(out, intent.getStringExtra(key));
@@ -480,34 +493,35 @@ public class KR2Activity extends Cocos2dxActivity {
         p = KrPathUtils.normalizeFilePath(p);
         if (p == null || !p.startsWith("/")) return;
         while (p.endsWith("/") && p.length() > 1) p = p.substring(0, p.length() - 1);
+        try {
+            File f = new File(p);
+            String exact;
+            if (f.isFile()) {
+                File parent = f.getParentFile();
+                exact = parent != null ? parent.getAbsolutePath() : p;
+            } else {
+                exact = f.getAbsolutePath();
+            }
+            out.add(exact);
+            addKrStorageAlias(out, exact);
+        } catch (Throwable ignored) { }
+    }
+
+    private static void addKrStorageAlias(java.util.LinkedHashSet<String> out, String path) {
+        if (out == null || path == null) return;
+        String p = KrPathUtils.normalizeFilePath(path);
+        if (p == null || !p.startsWith("/")) return;
+        while (p.endsWith("/") && p.length() > 1) p = p.substring(0, p.length() - 1);
         String lower = p.toLowerCase(Locale.ROOT);
         if (lower.equals("/sdcard") || lower.startsWith("/sdcard/")) {
             out.add("/sdcard");
-            return;
-        }
-        if (lower.equals("/storage/emulated/0") || lower.startsWith("/storage/emulated/0/")) {
+        } else if (lower.equals("/storage/emulated/0") || lower.startsWith("/storage/emulated/0/")) {
             out.add("/storage/emulated/0");
-            return;
-        }
-        if (lower.startsWith("/storage/")) {
+        } else if (lower.startsWith("/storage/")) {
             String rest = p.substring("/storage/".length());
             int slash = rest.indexOf('/');
-            if (slash > 0) {
-                out.add("/storage/" + rest.substring(0, slash));
-                return;
-            }
-            out.add(p);
-            return;
+            out.add(slash > 0 ? "/storage/" + rest.substring(0, slash) : p);
         }
-        try {
-            File f = new File(p);
-            if (f.isFile()) {
-                File parent = f.getParentFile();
-                if (parent != null) out.add(parent.getAbsolutePath());
-            } else {
-                out.add(f.getAbsolutePath());
-            }
-        } catch (Throwable ignored) { }
     }
 
     private static String contentUriToRawPath(String value) {
