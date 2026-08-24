@@ -101,6 +101,16 @@ public final class AudioRouteWatcher {
         ensureRegistered(rawContext);
     }
 
+    /**
+     * Hosts MUST call this on Activity destroy: the action lambda captures the Activity,
+     * and the static field would otherwise pin it after destruction (and a late route
+     * flip could run pause/resume cycles against a dead instance). The device callback
+     * itself stays registered — it only holds the application context.
+     */
+    public static synchronized void clearRecoveryAction() {
+        sRecoveryAction = null;
+    }
+
     private static void onRouteChanged(AudioDeviceInfo[] devices, boolean added) {
         boolean sinkChanged = false;
         if (devices != null) {
@@ -116,7 +126,10 @@ public final class AudioRouteWatcher {
         // list delivery right after registration has nothing to rebuild yet and no-ops safely.
         if (!sinkChanged && devices != null && devices.length > 0) return;
         boolean custom = sRecoveryAction != null;
-        if (custom && SystemClock.elapsedRealtime() - sRegisteredAtMs < REGISTRATION_GRACE_MS) {
+        // Grace covers BOTH paths: the default path registers right after the initial
+        // AudioTrack is created (SDLAudioManager.open), so the synchronous first delivery
+        // would otherwise schedule a pointless rebuild of the just-created track.
+        if (SystemClock.elapsedRealtime() - sRegisteredAtMs < REGISTRATION_GRACE_MS) {
             Log.i(TAG, "initial sink list delivery, ignored");
             return;
         }
@@ -172,6 +185,22 @@ public final class AudioRouteWatcher {
                 return;
             }
             if (wasPlaying) next.play();
+            // audioClose() runs on the native audio thread and may have raced us: it reads
+            // the field, releases the old track and nulls the static. If the field no longer
+            // holds the reference we started from, writing `next` back would leak an orphan
+            // playing track (and clobber any freshly opened one). Abort instead.
+            if (SDLAudioManager.mAudioTrack != old) {
+                try {
+                    next.pause();
+                } catch (Throwable ignored) {
+                }
+                try {
+                    next.release();
+                } catch (Throwable ignored) {
+                }
+                Log.i(TAG, "track closed during rebuild, discarding replacement");
+                return;
+            }
             SDLAudioManager.mAudioTrack = next;
             try {
                 old.pause();

@@ -13,7 +13,8 @@ import android.util.Log;
 public class SDLAudioManager {
     protected static final String TAG = "SDLAudio";
     protected static AudioRecord mAudioRecord;
-    protected static AudioTrack mAudioTrack;
+    /** Swapped on the main thread (AudioRouteWatcher), read by the native audio writer thread. */
+    protected static volatile AudioTrack mAudioTrack;
 
     public static void audioClose() {
         AudioTrack audioTrack = mAudioTrack;

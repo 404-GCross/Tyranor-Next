@@ -35,6 +35,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -44,8 +45,8 @@ import androidx.compose.ui.graphics.Color as ComposeColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.tyranor.next.R
 import androidx.documentfile.provider.DocumentFile
+import com.tyranor.next.R
 import com.tyranor.next.settings.AppSettingsStore
 import com.tyranor.next.scanner.EngineScanner
 import com.tyranor.next.theme.AppThemeColors
@@ -53,6 +54,8 @@ import com.tyranor.next.theme.MiuixSettingsTheme
 import com.tyranor.next.theme.TyranorNextTheme
 import com.tyranor.next.ui.common.WithoutPressIndication
 import kotlin.math.roundToInt
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.basic.Card as MiuixCard
 import top.yukonga.miuix.kmp.basic.ColorPicker
 import top.yukonga.miuix.kmp.basic.Scaffold as MiuixScaffold
@@ -327,8 +330,11 @@ internal fun AppSettingsScreen() {
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            // 目录被改名/删除或权限失效后标记为已失效，提示用户手动清理
-                            val valid = remember(dir) { isScanDirValid(ctx, dir) }
+                            // 目录被改名/删除或权限失效后标记为已失效，提示用户手动清理。
+                            // DocumentFile.isDirectory 可能触发 binder 调用，放到 IO 线程执行。
+                            val valid by produceState(initialValue = false, dir) {
+                                value = withContext(Dispatchers.IO) { isScanDirValid(ctx, dir) }
+                            }
                             Text(
                                 if (valid) scanDirName(ctx, dir) else "${scanDirName(ctx, dir)}（已失效）",
                                 style = MaterialTheme.typography.bodyMedium,

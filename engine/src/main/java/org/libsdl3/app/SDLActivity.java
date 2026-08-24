@@ -707,6 +707,9 @@ public class SDLActivity extends AppCompatActivity implements View.OnSystemUiVis
     @Override
     protected void onDestroy() {
         Log.v(TAG, "onDestroy()");
+        // The recovery lambda captures this Activity; drop the static reference so it
+        // doesn't leak past destruction (re-registered on next onCreate if needed).
+        AudioRouteWatcher.clearRecoveryAction();
         DoubleBackExit.unregisterPredictiveBack(this, backInvokedCallback);
         DoubleBackExit.clear(this);
 
