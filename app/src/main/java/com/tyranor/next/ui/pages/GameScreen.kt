@@ -190,7 +190,7 @@ fun GameScreen(modifier: Modifier = Modifier) {
             if (EngineLauncher.needsArtemisPatchConfirm(context, game)) {
                 patchLaunchTarget = game
             } else {
-                launchError = EngineLauncher.launch(context, game)
+                scope.launch { launchError = EngineLauncher.launch(context, game) }
             }
         },
     )
@@ -228,9 +228,11 @@ fun GameScreen(modifier: Modifier = Modifier) {
             },
             confirmButton = {
                 TextButton(
-                    onClick = {
-                        patchLaunchTarget = null
-                        launchError = EngineLauncher.launch(context, game, EngineLauncher.ArtemisPatchChoice.ALWAYS)
+                        onClick = {
+                            patchLaunchTarget = null
+                            scope.launch {
+                                launchError = EngineLauncher.launch(context, game, EngineLauncher.ArtemisPatchChoice.ALWAYS)
+                            }
                     },
                 ) { Text("总是") }
             },
@@ -239,13 +241,17 @@ fun GameScreen(modifier: Modifier = Modifier) {
                     TextButton(
                         onClick = {
                             patchLaunchTarget = null
-                            launchError = EngineLauncher.launch(context, game, EngineLauncher.ArtemisPatchChoice.NEVER)
+                            scope.launch {
+                                launchError = EngineLauncher.launch(context, game, EngineLauncher.ArtemisPatchChoice.NEVER)
+                            }
                         },
                     ) { Text("不再") }
                     TextButton(
                         onClick = {
                             patchLaunchTarget = null
-                            launchError = EngineLauncher.launch(context, game, EngineLauncher.ArtemisPatchChoice.ONCE)
+                            scope.launch {
+                                launchError = EngineLauncher.launch(context, game, EngineLauncher.ArtemisPatchChoice.ONCE)
+                            }
                         },
                     ) { Text("本次") }
                 }
@@ -440,8 +446,10 @@ internal fun GameActionsSheet(
 
     // 发起启动；Artemis 需要 PFS 基础补丁且策略为“启动时询问”时，先弹窗确认再带选择启动
     fun startLaunch(patchChoice: EngineLauncher.ArtemisPatchChoice? = null) {
-        launchError = EngineLauncher.launch(context, game, patchChoice)
-        if (launchError == null) onDismiss()
+        scope.launch {
+            launchError = EngineLauncher.launch(context, game, patchChoice)
+            if (launchError == null) onDismiss()
+        }
     }
 
     // 打开相册选择自定义封面
