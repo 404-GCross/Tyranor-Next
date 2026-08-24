@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -56,6 +57,7 @@ import com.tyranor.next.scanner.EngineScanner
 import com.tyranor.next.theme.AppThemeColors
 import com.tyranor.next.theme.MiuixSettingsTheme
 import com.tyranor.next.theme.PaletteStyle
+import com.tyranor.next.theme.PresetSeedColor
 import com.tyranor.next.theme.PresetSeedColors
 import com.tyranor.next.theme.TyranorNextTheme
 import com.tyranor.next.theme.monetColorScheme

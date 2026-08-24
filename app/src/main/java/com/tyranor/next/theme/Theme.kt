@@ -30,7 +30,8 @@ fun TyranorNextTheme(
     content: @Composable () -> Unit,
 ) {
   // 配色来源：动态取色开启时种子色来自壁纸/封面，关闭时由 primaryColor 或手动轮盘色提供
-  AppThemeColors.ensureLoaded(LocalContext.current)
+  val context = LocalContext.current
+  AppThemeColors.ensureLoaded(context)
   // 在函数体内直接读取全局主题色：配合 @NonSkippableComposable，主题色变更时本主题
   // 必然重组并向整棵组合树提供新 colorScheme（不依赖调用点对默认参数的订阅）。
   val manual = primaryColor ?: AppThemeColors.primary
@@ -47,12 +48,12 @@ fun TyranorNextTheme(
   ) {
       val seed = if (AppThemeColors.monetEnabled) {
           withContext(Dispatchers.Default) {
-              AppThemeColors.resolveSeedColor(LocalContext.current)
+              AppThemeColors.resolveSeedColor(context)
           }
       } else {
           manual
       }
-      AppThemeColors.effectiveSeed = seed
+      AppThemeColors.setEffectiveSeed(seed)
   }
 
   // 主题色变更时本主题必然重组：读取 effectiveSeed 触发重组

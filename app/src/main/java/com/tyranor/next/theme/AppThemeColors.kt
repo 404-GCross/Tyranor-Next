@@ -63,6 +63,11 @@ object AppThemeColors {
         paletteStyle = PaletteStyle.fromStorageValue(AppSettingsStore.getPaletteStyleValue(context))
     }
 
+    /** 更新主题实际使用的种子色，并广播组合重组。 */
+    fun setEffectiveSeed(seed: Color) {
+        effectiveSeed = seed
+    }
+
     /**
      * 解析实际生效的种子色（供主题生成动态配色）：
      * - 动态取色关闭：返回手动轮盘色 [primary]
