@@ -47,7 +47,7 @@ android {
         }
     }
     defaultConfig {
-        applicationId = "com.tyranor.next.test"
+        applicationId = "com.tyranor.next"
         minSdk = 26
         targetSdk = 36
         versionCode = 1
