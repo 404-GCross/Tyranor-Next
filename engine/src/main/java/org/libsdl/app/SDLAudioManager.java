@@ -293,6 +293,9 @@ public class SDLAudioManager {
                     return null;
                 }
                 mAudioTrack.play();
+                // Watch headset/BT route changes so the static track gets re-routed
+                // instead of going silent until relaunch.
+                AudioRouteWatcher.ensureRegistered();
             }
             iArr[0] = mAudioTrack.getSampleRate();
             iArr[1] = mAudioTrack.getAudioFormat();
