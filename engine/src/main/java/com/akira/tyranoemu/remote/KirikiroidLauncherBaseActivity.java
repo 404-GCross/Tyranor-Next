@@ -833,8 +833,9 @@ public abstract class KirikiroidLauncherBaseActivity extends KR2Activity {
                 : getIntent().getIntExtra("orientation", ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
         if (!launchOrientationGuardEnabled) return requested;
         // Kirikiroid2/Cocos is fragile while startupFrom/doStartup is still loading XP3/TJS.
-        // During the launch mask, freeze 180-degree sensor flips to avoid rapid surface
-        // resize/pause/resume cycles; restore the caller's orientation once the game is ready.
+        // During the launch mask, always use a concrete landscape orientation.  Do not use
+        // SCREEN_ORIENTATION_LOCKED here: some tablets lock the transient portrait state and
+        // leave the loading overlay mismatched with the touch/surface coordinates.
         if (requested == ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE) {
             return ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE;
         }
