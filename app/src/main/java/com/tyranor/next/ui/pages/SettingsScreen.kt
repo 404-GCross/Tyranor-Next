@@ -7,6 +7,7 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.DrawableRes
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -125,10 +126,22 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                 item {
                     MiuixCard(modifier = Modifier.fillMaxWidth(), cornerRadius = 8.dp) {
                         Column(Modifier.padding(vertical = 4.dp)) {
-                            ArrowPreference(title = "应用设置", onClick = { startActivityWithPageTransition(ctx, AppSettingsActivity.createIntent(ctx)) })
-                            ArrowPreference(title = if (checkingUpdate) "正在检查更新" else "更新检查", onClick = { checkUpdate() })
+                            ArrowPreference(
+                                title = "应用设置",
+                                summary = "有关应用内的各项配置",
+                                startAction = { SettingsItemIcon(R.drawable.ic_settings_app) },
+                                onClick = { startActivityWithPageTransition(ctx, AppSettingsActivity.createIntent(ctx)) },
+                            )
+                            ArrowPreference(
+                                title = if (checkingUpdate) "正在检查更新" else "更新检查",
+                                summary = "对项目Github获取更新信息",
+                                startAction = { SettingsItemIcon(R.drawable.ic_settings_update) },
+                                onClick = { checkUpdate() },
+                            )
                             ArrowPreference(
                                 title = "加入群聊",
+                                summary = "跳转到官方聊天群组",
+                                startAction = { SettingsItemIcon(R.drawable.ic_settings_group) },
                                 onClick = {
                                     ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://qm.qq.com/q/M9JH8A9Yys")))
                                 },
@@ -302,10 +315,19 @@ internal fun EngineSettingsDetailScreen(kind: EngineSettingsKind) {
 }
 
 enum class EngineSettingsKind(val title: String, @param:DrawableRes val iconRes: Int) {
-    KRKR("KRKR引擎设置", R.drawable.ic_engine_item),
-    ONS("ONS引擎设置", R.drawable.ic_engine_item),
-    ARTEMIS("Artemis引擎设置", R.drawable.ic_engine_item),
-    TYRANO("Tyrano引擎设置", R.drawable.ic_engine_item),
+    KRKR("KRKR引擎设置", R.drawable.ic_settings_engine),
+    ONS("ONS引擎设置", R.drawable.ic_settings_engine),
+    ARTEMIS("Artemis引擎设置", R.drawable.ic_settings_engine),
+    TYRANO("Tyrano引擎设置", R.drawable.ic_settings_engine),
+}
+
+@Composable
+private fun SettingsItemIcon(@DrawableRes iconRes: Int) {
+    Image(
+        painter = painterResource(iconRes),
+        contentDescription = null,
+        modifier = Modifier.padding(end = 6.dp).size(24.dp),
+    )
 }
 
 /** 顶部栏：遵守全局规范（Column + 页面背景色 + statusBarsPadding + 64dp 标题区，沉浸式）。 */
