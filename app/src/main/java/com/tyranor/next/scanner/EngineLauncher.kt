@@ -32,7 +32,7 @@ import java.io.File
 object EngineLauncher {
     private const val TAG = "EngineLauncher"
 
-    /** 支持的引擎列表（用于引擎页展示）。 */
+    /** 支持的引擎列表（用于引擎页展示）。按名称长度从大到小排列。 */
     val supportedEngines: List<EngineType> = listOf(
         EngineType.KIRIKIRI,
         EngineType.ONS,
@@ -42,7 +42,7 @@ object EngineLauncher {
         EngineType.VN,
         EngineType.WEB_OTHER,
         EngineType.ARTEMIS,
-    )
+    ).sortedByDescending { it.displayName.length }
 
     /** Artemis 补丁确认弹窗的用户选择：
      *  本次 = 仅当次应用；总是 = 记住为全局 auto；不再 = 记住为全局 off。 */
