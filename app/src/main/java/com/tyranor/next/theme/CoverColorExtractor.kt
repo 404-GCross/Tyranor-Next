@@ -31,7 +31,11 @@ suspend fun extractSeedColorFromCover(
                 ?.use { BitmapFactory.decodeStream(it) }
                 ?: return@withContext null
             currentCoroutineContext().ensureActive()
-            extractSeedColor(decoded)
+            val seed = extractSeedColor(decoded)
+            // 量化是纯 CPU 计算无挂起点，取消不会中断；写回前最后确认一次，
+            // 避免快速切换封面时旧任务把陈旧种子色写入全局状态
+            currentCoroutineContext().ensureActive()
+            seed
         } catch (error: CancellationException) {
             throw error
         } catch (_: Exception) {

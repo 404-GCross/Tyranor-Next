@@ -5,7 +5,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.NonSkippableComposable
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
 /**
@@ -32,11 +31,11 @@ fun TyranorNextTheme(
     val dark = AppThemeColors.isDark
     val style = AppThemeColors.paletteStyle
 
+    // 仅动态取色相关状态变化时重新解析种子色；手动主色作为回退由 resolveSeedColor 实时读取
     LaunchedEffect(
         AppThemeColors.monetEnabled,
         AppThemeColors.monetSource,
         AppThemeColors.currentCoverUri,
-        manual,
     ) {
         if (AppThemeColors.monetEnabled) {
             AppThemeColors.updateEffectiveSeed(AppThemeColors.resolveSeedColor(context))

@@ -492,13 +492,15 @@ private fun BottomInsetSpacer() {
 }
 
 /**
+ * 迷你莫奈色卡缓存：(种子色, 风格, 深浅) → ColorScheme，避免每次进入设置页重复计算。
+ */
+private val swatchSchemeCache = ConcurrentHashMap<Triple<Int, PaletteStyle, Boolean>, ColorScheme>()
+
+/**
  * 调色盘网格：预设种子色色卡，每个色卡用当前配色风格渲染迷你莫奈色卡预览
  * （InstallerX 同款：主色圆 + 主/次/辅容器弧形环），点击直接设为手动主色。
  * 仅动态取色关闭时显示。
  */
-/** 迷你莫奈色卡缓存：(种子色, 风格, 深浅) → ColorScheme，避免每次进入设置页重复计算。 */
-private val swatchSchemeCache = ConcurrentHashMap<Triple<Int, PaletteStyle, Boolean>, ColorScheme>()
-
 @Composable
 private fun PaletteGrid() {
     val ctx = LocalContext.current
@@ -545,6 +547,10 @@ private fun ColorSwatch(
         key3 = AppThemeColors.isDark,
     ) {
         val cacheKey = Triple(preset.color.toArgb(), style, AppThemeColors.isDark)
+        swatchSchemeCache[cacheKey]?.let {
+            value = it
+            return@produceState
+        }
         value = withContext(Dispatchers.Default) {
             monetColorScheme(seedColor = preset.color, isDark = cacheKey.third, style = style)
         }.also { swatchSchemeCache[cacheKey] = it }
