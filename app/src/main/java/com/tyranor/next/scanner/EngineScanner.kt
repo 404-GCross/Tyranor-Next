@@ -13,7 +13,7 @@ import kotlin.math.abs
 
 /**
  * 精简版游戏扫描器，识别逻辑移植自 RinneMobile 的 EngineDetector/GameScanner。
- * 支持引擎：Kirikiri(kr/krkr2)、ONS、Tyrano(ty)、Artemis(ar)。
+ * 支持引擎：Kirikiri、ONS、Tyrano、RPG Maker MV/MZ、VN、WebOther、Artemis。
  */
 object EngineScanner {
 
@@ -22,6 +22,16 @@ object EngineScanner {
     private const val KEY_GAMES = "scan_games"      // 已有游戏 entry，按行；每行字段用 \u0001 分隔
     private const val KEY_RECENT_GAMES = "recent_games"
     private const val KEY_QUICK_LAUNCH = "quick_launch" // 首页快捷启动（最多 3 个）
+
+    // 主页面会在 Tab 动画中反复进入组合。将已解析的数据保留在进程内，避免每次切页都在
+    // 主线程重新读取 SharedPreferences、split 字符串并构造完整游戏列表。
+    private val cacheLock = Any()
+    @Volatile
+    private var gamesCache: List<ScanGame>? = null
+    @Volatile
+    private var recentGamesCache: List<ScanGame>? = null
+    @Volatile
+    private var quickLaunchCache: List<ScanGame>? = null
 
     /**
      * 将 SAF tree/document URI 映射为真实文件路径（用于引擎 native 启动）。
@@ -75,9 +85,16 @@ object EngineScanner {
 
     // ============ 游戏结果持久化 ============
 
-    fun saveGames(context: Context, games: List<ScanGame>) = saveList(context, KEY_GAMES, games)
+    fun saveGames(context: Context, games: List<ScanGame>) {
+        val snapshot = games.toList()
+        gamesCache = snapshot
+        saveList(context, KEY_GAMES, snapshot)
+    }
 
-    fun loadGames(context: Context): List<ScanGame> = loadList(context, KEY_GAMES)
+    fun loadGames(context: Context): List<ScanGame> =
+        gamesCache ?: synchronized(cacheLock) {
+            gamesCache ?: loadList(context, KEY_GAMES).also { gamesCache = it }
+        }
 
     fun recordRecentGame(context: Context, game: ScanGame) {
         val touched = game.copy(openTime = System.currentTimeMillis())
@@ -85,7 +102,10 @@ object EngineScanner {
         saveRecentGames(context, next)
     }
 
-    fun loadRecentGames(context: Context): List<ScanGame> = loadList(context, KEY_RECENT_GAMES)
+    fun loadRecentGames(context: Context): List<ScanGame> =
+        recentGamesCache ?: synchronized(cacheLock) {
+            recentGamesCache ?: loadList(context, KEY_RECENT_GAMES).also { recentGamesCache = it }
+        }
 
     /** 删除游戏时从最近游戏列表中移除对应条目。 */
     fun removeRecentGame(context: Context, uri: String) {
@@ -104,12 +124,18 @@ object EngineScanner {
         return name.replace(Regex("[\\\\/:*?\"<>|]"), "_").trim().ifEmpty { "default" }
     }
 
-internal fun saveRecentGames(context: Context, games: List<ScanGame>) =
-        saveList(context, KEY_RECENT_GAMES, games)
+    internal fun saveRecentGames(context: Context, games: List<ScanGame>) {
+        val snapshot = games.toList()
+        recentGamesCache = snapshot
+        saveList(context, KEY_RECENT_GAMES, snapshot)
+    }
 
     // ============ 首页快捷启动（最多 3 个） ============
 
-    fun loadQuickLaunch(context: Context): List<ScanGame> = loadList(context, KEY_QUICK_LAUNCH)
+    fun loadQuickLaunch(context: Context): List<ScanGame> =
+        quickLaunchCache ?: synchronized(cacheLock) {
+            quickLaunchCache ?: loadList(context, KEY_QUICK_LAUNCH).also { quickLaunchCache = it }
+        }
 
     fun isQuickLaunched(context: Context, uri: String): Boolean =
         loadQuickLaunch(context).any { it.uri == uri }
@@ -139,8 +165,11 @@ internal fun saveRecentGames(context: Context, games: List<ScanGame>) =
         return refreshed
     }
 
-    internal fun saveQuickLaunch(context: Context, games: List<ScanGame>) =
-        saveList(context, KEY_QUICK_LAUNCH, games)
+    internal fun saveQuickLaunch(context: Context, games: List<ScanGame>) {
+        val snapshot = games.toList()
+        quickLaunchCache = snapshot
+        saveList(context, KEY_QUICK_LAUNCH, snapshot)
+    }
 
     // ---------- 通用存取助手 ----------
 
@@ -499,6 +528,9 @@ internal fun saveRecentGames(context: Context, games: List<ScanGame>) =
         var hasIndex = false
         var hasAppAsar = false
         var hasTyranoDir = false
+        var hasRpgMvCore = false
+        var hasRpgMzCore = false
+        var hasVnData = false
         var hasSystemIni = false
         var hasFirstIet = false
         var hasRootPfs = false
@@ -517,7 +549,7 @@ internal fun saveRecentGames(context: Context, games: List<ScanGame>) =
                 // resources/app.asar 可能是文件，也可能是已解包目录，需继续下钻识别父级游戏目录。
                 if (lower == "data" || lower == "tyrano" || lower == "scenario" ||
                     lower == "system" || lower == "app" || lower == "game" ||
-                    lower == "resources" || lower == "app.asar"
+                    lower == "resources" || lower == "app.asar" || lower == "www" || lower == "js"
                 ) {
                     val sub = f.listFiles()
                     sub.forEach { collect(it, childRel) }
@@ -526,6 +558,9 @@ internal fun saveRecentGames(context: Context, games: List<ScanGame>) =
             }
             when {
                 lower == "index.html" || lower == "index.htm" -> hasIndex = true
+                childRel == "js/rpg_core.js" || childRel.endsWith("/js/rpg_core.js") -> hasRpgMvCore = true
+                childRel == "js/rmmz_core.js" || childRel.endsWith("/js/rmmz_core.js") -> hasRpgMzCore = true
+                lower == "globaldata.vndata" -> hasVnData = true
                 lower == "app.asar" || childRel.endsWith("/app.asar") -> hasAppAsar = true
                 lower == "startup.tjs" -> hasStartupTjs = true
                 lower == "config.tjs" -> hasConfigTjs = true
@@ -545,12 +580,26 @@ internal fun saveRecentGames(context: Context, games: List<ScanGame>) =
         if ((hasSystemIni && hasFirstIet) || hasRootPfs || hasAnyPfs) {
             return Detection(EngineType.ARTEMIS, if ((hasSystemIni && hasFirstIet) || hasRootPfs) 95 else 90, "[游戏目录]")
         }
-        // Tyrano（Ty）：浏览器结构（index.html + data/tyrano）或 asar 打包（app.asar / resources/app.asar）
-        if ((hasIndex && hasTyranoDir) || hasAppAsar) {
-            return Detection(EngineType.TYRANO, if (hasAppAsar) 96 else 95, "[游戏目录]")
+        if (hasIndex && hasTyranoDir) {
+            return Detection(EngineType.TYRANO, 95, "[游戏目录]")
+        }
+        // RPG Maker 的 Windows/NW.js 发布目录通常是“游戏主目录/www/...”。
+        // 在主目录识别可避免继续下钻后把所有游戏都命名为 www。
+        if (hasIndex && hasRpgMvCore) {
+            return Detection(EngineType.RPG_MV, 95, "[游戏目录]")
+        }
+        if (hasIndex && hasRpgMzCore) {
+            return Detection(EngineType.RPG_MZ, 95, "[游戏目录]")
+        }
+        if (hasIndex && hasVnData) {
+            return Detection(EngineType.VN, 90, "[游戏目录]")
+        }
+        // 打包 ASAR 无法在 SAF 扫描阶段读取内部目录，启动后由 Web 宿主再次精确识别。
+        if (hasAppAsar) {
+            return Detection(EngineType.TYRANO, 80, "[游戏目录]")
         }
         if (hasIndex) {
-            return Detection(EngineType.TYRANO, 70, "[游戏目录]")
+            return Detection(EngineType.WEB_OTHER, 70, "[游戏目录]")
         }
         // Kirikiri（kr）
         if (xp3Files.isNotEmpty() || hasStartupTjs || hasConfigTjs) {
@@ -574,6 +623,9 @@ internal fun saveRecentGames(context: Context, games: List<ScanGame>) =
         var hasIndex = false
         var hasAppAsar = false
         var hasTyranoDir = false
+        var hasRpgMvCore = false
+        var hasRpgMzCore = false
+        var hasVnData = false
         var hasSystemIni = false
         var hasFirstIet = false
         var hasRootPfs = false
@@ -590,7 +642,7 @@ internal fun saveRecentGames(context: Context, games: List<ScanGame>) =
                 if (lower == "app.asar" || childRel.endsWith("/app.asar")) hasAppAsar = true
                 if (lower == "data" || lower == "tyrano" || lower == "scenario" ||
                     lower == "system" || lower == "app" || lower == "game" ||
-                    lower == "resources" || lower == "app.asar"
+                    lower == "resources" || lower == "app.asar" || lower == "www" || lower == "js"
                 ) {
                     f.listFiles()?.forEach { collect(it, childRel) }
                 }
@@ -598,6 +650,9 @@ internal fun saveRecentGames(context: Context, games: List<ScanGame>) =
             }
             when {
                 lower == "index.html" || lower == "index.htm" -> hasIndex = true
+                childRel == "js/rpg_core.js" || childRel.endsWith("/js/rpg_core.js") -> hasRpgMvCore = true
+                childRel == "js/rmmz_core.js" || childRel.endsWith("/js/rmmz_core.js") -> hasRpgMzCore = true
+                lower == "globaldata.vndata" -> hasVnData = true
                 lower == "app.asar" || childRel.endsWith("/app.asar") -> hasAppAsar = true
                 lower == "startup.tjs" -> hasStartupTjs = true
                 lower == "config.tjs" -> hasConfigTjs = true
@@ -616,11 +671,23 @@ internal fun saveRecentGames(context: Context, games: List<ScanGame>) =
         if ((hasSystemIni && hasFirstIet) || hasRootPfs || hasAnyPfs) {
             return Detection(EngineType.ARTEMIS, if ((hasSystemIni && hasFirstIet) || hasRootPfs) 95 else 90, "[游戏目录]")
         }
-        if ((hasIndex && hasTyranoDir) || hasAppAsar) {
-            return Detection(EngineType.TYRANO, if (hasAppAsar) 96 else 95, "[游戏目录]")
+        if (hasIndex && hasTyranoDir) {
+            return Detection(EngineType.TYRANO, 95, "[游戏目录]")
+        }
+        if (hasIndex && hasRpgMvCore) {
+            return Detection(EngineType.RPG_MV, 95, "[游戏目录]")
+        }
+        if (hasIndex && hasRpgMzCore) {
+            return Detection(EngineType.RPG_MZ, 95, "[游戏目录]")
+        }
+        if (hasIndex && hasVnData) {
+            return Detection(EngineType.VN, 90, "[游戏目录]")
+        }
+        if (hasAppAsar) {
+            return Detection(EngineType.TYRANO, 80, "[游戏目录]")
         }
         if (hasIndex) {
-            return Detection(EngineType.TYRANO, 70, "[游戏目录]")
+            return Detection(EngineType.WEB_OTHER, 70, "[游戏目录]")
         }
         if (xp3Files.isNotEmpty() || hasStartupTjs || hasConfigTjs) {
             return Detection(EngineType.KIRIKIRI, if (xp3Files.isNotEmpty()) 95 else 80, xp3Files.firstOrNull() ?: "[游戏目录]")

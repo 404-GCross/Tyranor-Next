@@ -47,11 +47,11 @@ android {
         }
     }
     defaultConfig {
-        applicationId = "com.tyranor.next.test"
+        applicationId = "com.tyranor.next"
         minSdk = 26
         targetSdk = 36
         versionCode = 1
-        versionName = "1.11"
+        versionName = "1.16"
     }
 
     signingConfigs {

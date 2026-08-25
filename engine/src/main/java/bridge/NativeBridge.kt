@@ -14,7 +14,8 @@ import java.io.RandomAccessFile
 import java.util.Locale
 
 object NativeBridge {
-    private val OPEN_PFDS = ArrayList<ParcelFileDescriptor>()
+    @Volatile
+    private var SAF_DOCUMENTS: Map<String, Uri> = emptyMap()
     @Volatile
     private var krkrGameReadyListener: Runnable? = null
 
@@ -22,7 +23,7 @@ object NativeBridge {
     @JvmStatic external fun isLaunchSceneReady(so: String?): Boolean
     @JvmStatic external fun launch(so: String?, path: String?, useMaps: Boolean): Boolean
     @JvmStatic external fun interceptor(prefix: String?): Unit
-    @JvmStatic external fun relocate(): Unit
+    @JvmStatic external fun relocate(): Int
     @JvmStatic external fun write(path: String?, data: ByteArray?): Boolean
 
     @JvmStatic
@@ -37,11 +38,25 @@ object NativeBridge {
         krkrGameReadyListener = listener
     }
 
+    @JvmStatic
+    fun configureSafMirror(indexPath: String?) {
+        SAF_DOCUMENTS = try {
+            KrSafMirror.loadIndex(indexPath)
+        } catch (t: Throwable) {
+            Log.e("NativeBridge", "load SAF mirror index failed path=$indexPath", t)
+            emptyMap()
+        }
+        Log.i("NativeBridge", "SAF mirror index entries=${SAF_DOCUMENTS.size}")
+    }
+
     @Synchronized
     @JvmStatic
     fun open(path: String?, mode: Int): Int {
         val normalized = KrPathUtils.canonicalizeKrStoragePath(KrPathUtils.normalizeFilePath(path))
         val redirected = KrPathUtils.redirectScopedSavePath(normalized)
+        // The native hook uses the stable storage-volume prefix because KRKR may lowercase
+        // the game path. Keep regular asset I/O native; only scoped saves need Java redirection.
+        if (redirected == null && !isSafFallbackEnabled()) return -1
         val target = if (redirected != null) redirected else normalized ?: return -1
         val javaMode: String = try {
             toJavaMode(mode)
@@ -49,10 +64,21 @@ object NativeBridge {
             Log.e("NativeBridge", "bad open mode=$mode path=$path", t)
             return -1
         }
+        val mirrorUri = SAF_DOCUMENTS[target.lowercase(Locale.ROOT)]
+        val readOnly = (mode and OsConstants.O_ACCMODE) == OsConstants.O_RDONLY
+        if (readOnly && mirrorUri != null && File(target).length() == 0L) {
+            val mirrorFd = openDocumentUri(mirrorUri, mode)
+            if (mirrorFd >= 0) return mirrorFd
+        }
         return try {
             val raf = RandomAccessFile(File(target), javaMode)
+            if ((mode and OsConstants.O_TRUNC) == OsConstants.O_TRUNC) raf.setLength(0)
+            if ((mode and OsConstants.O_APPEND) == OsConstants.O_APPEND) raf.seek(raf.length())
             val fd = getFd(raf)
             raf.close()
+            if (redirected != null) recordOpenDiagnostic(
+                "ok path=$path target=$target flags=$mode mode=$javaMode fd=$fd",
+            )
             Log.i("NativeBridge", "open $fd $javaMode $path")
             fd
         } catch (directError: Throwable) {
@@ -60,8 +86,26 @@ object NativeBridge {
                 val safFd = openViaSaf(target, mode, directError)
                 if (safFd >= 0) return safFd
             }
+            if (redirected != null) recordOpenDiagnostic(
+                "failed path=$path target=$target flags=$mode mode=$javaMode " +
+                    "error=${directError.javaClass.simpleName}:${directError.message}",
+            )
             Log.e("NativeBridge", "open failed mode=$mode path=$path", directError)
             -1
+        }
+    }
+
+    @JvmStatic
+    fun redirect(path: String?): String? {
+        val normalized = KrPathUtils.canonicalizeKrStoragePath(KrPathUtils.normalizeFilePath(path))
+        return KrPathUtils.redirectScopedSavePath(normalized)
+    }
+
+    private fun recordOpenDiagnostic(value: String) {
+        try {
+            KrPathUtils.currentActivity()?.getSharedPreferences("krkr_bridge_diagnostics", 0)
+                ?.edit()?.putString("last_open", value)?.commit()
+        } catch (_: Throwable) {
         }
     }
 
@@ -78,17 +122,20 @@ object NativeBridge {
     private fun openViaSaf(path: String, mode: Int, directError: Throwable): Int {
         return try {
             val uri = storagePathToPersistedDocumentUri(path, mode) ?: return -1
-            val activity = KrPathUtils.currentActivity() ?: return -1
-            val pfdMode = toPfdMode(mode)
-            val pfd = activity.contentResolver.openFileDescriptor(uri, pfdMode) ?: return -1
-            OPEN_PFDS.add(pfd)
-            val fd = pfd.fd
-            Log.i("NativeBridge", "open SAF $fd $pfdMode $path -> $uri")
-            fd
+            openDocumentUri(uri, mode)
         } catch (safError: Throwable) {
             Log.w("NativeBridge", "open SAF fallback failed path=$path direct=$directError", safError)
             -1
         }
+    }
+
+    private fun openDocumentUri(uri: Uri, mode: Int): Int {
+        val activity = KrPathUtils.currentActivity() ?: return -1
+        val pfdMode = toPfdMode(mode)
+        val pfd = activity.contentResolver.openFileDescriptor(uri, pfdMode) ?: return -1
+        val fd = pfd.detachFd()
+        Log.i("NativeBridge", "open SAF $fd $pfdMode -> $uri")
+        return fd
     }
 
     @JvmStatic

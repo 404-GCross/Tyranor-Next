@@ -152,11 +152,42 @@ Column(fillMaxSize)                                // 页面根
 - 语义色：`colorScheme.error`（错误/删除）、引擎封面色（`EngineType.coverColor()`）、封面占位白字等。
 - 新增任何颜色先检查 `Color.kt` 是否已有现成常量；中性色必须统一收口到 `Color.kt`，不在页面内散落硬编码。
 
+### 3.5 组件容器/背景色的色调跟随
+
+组件（卡片、列表项、弹窗内容项、设置项容器等）的背景色**不得依赖**
+`colorScheme.surface*` / `surfaceContainer` 等 scheme 颜色来自动跟随色调切换——这些 scheme
+颜色可能被主题函数固定写死（如 `MiuixSettingsTheme` 深浅色分支都设为 `NavWhite`），且弹窗等
+`Dialog` 组合可能不在目标 Miuix/Material 主题作用域内，导致背景色不随「外观模式 / 色调切换」变化。
+
+统一做法：需要随「色调切换」变色的组件容器，**直接引用 `theme/Color.kt` 的计算常量**（`get()`
+读取 `AppThemeColors.isDark` / `toneSwitchEnabled` 的 snapshot state，变化即触发重组）：
+
+- 卡片/导航栏/组件容器 → `NavWhite`
+- 页面背景 → `PageGrey`
+- 文字 → `TextColor`
+
+通过 `MiuixTheme`/`MaterialTheme` 的 `colorScheme` 取容器背景属于**反例**（例：弹窗内项目用
+`MiuixTheme.colorScheme.surfaceContainer` 不会随色调切换变色，应改用 `NavWhite`）。
+仅当某 scheme 颜色确为实时计算且随色调切换变化时才允许引用。
+
 ### 4. 层级要求
 
 - 任何页面根组件必须包在 `TyranorNextTheme {}` 或 `MiuixSettingsTheme {}` 内，且主题必须最外层（Activity `setContent` 中包裹）。
 - `MiuixSettingsTheme` 只提供 Miuix 主题，页面内部若用到 `MaterialTheme.*`（如弹窗、typography），外层仍须有 `TyranorNextTheme`（所有现有 Activity 均已满足，新增页面须遵循）。
 - XML / drawable 资源中**禁止**出现主题色（启动图标等除外）。
+
+---
+
+## 测试与审核
+
+必须让Agent使用阅读 Android CLI 中的审查技能
+
+应由多个相互独立的 Agent 或 子Agent 从不同角度重新检查代码，例如：
+代码逻辑审核：检查实现逻辑、状态流转、边界条件以及潜在逻辑错误。
+架构审核：检查模块职责、依赖关系、代码耦合以及是否破坏现有架构。
+代码健壮性审核：检查异常处理、空值、资源释放、线程安全、生命周期以及极端输入。
+回归风险审核：分析修改是否可能影响现有功能、其他引擎或既有调用链。
+代码规范审核：检查代码风格、命名、重复代码、无效代码以及是否符合 AGENT.md 和项目现有规范。
 
 ---
 

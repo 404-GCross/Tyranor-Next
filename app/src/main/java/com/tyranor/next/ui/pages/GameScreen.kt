@@ -2,9 +2,11 @@ package com.tyranor.next.ui.pages
 
 import android.app.Activity
 import android.app.ActivityOptions
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.util.LruCache
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import android.graphics.BitmapFactory
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -95,8 +97,6 @@ import java.util.Locale
 fun GameScreen(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    AppSettingsStore.initGameSort(context)
-
     var games by remember { mutableStateOf(EngineScanner.loadGames(context)) }
     var scanning by remember { mutableStateOf(false) }
     var selectedGame by remember { mutableStateOf<ScanGame?>(null) }
@@ -195,7 +195,7 @@ fun GameScreen(modifier: Modifier = Modifier) {
             if (EngineLauncher.needsArtemisPatchConfirm(context, game)) {
                 patchLaunchTarget = game
             } else {
-                launchError = EngineLauncher.launch(context, game)
+                scope.launch { launchError = EngineLauncher.launch(context, game) }
             }
         },
     )
@@ -236,9 +236,11 @@ fun GameScreen(modifier: Modifier = Modifier) {
             },
             confirmButton = {
                 TextButton(
-                    onClick = {
-                        patchLaunchTarget = null
-                        launchError = EngineLauncher.launch(context, game, EngineLauncher.ArtemisPatchChoice.ALWAYS)
+                        onClick = {
+                            patchLaunchTarget = null
+                            scope.launch {
+                                launchError = EngineLauncher.launch(context, game, EngineLauncher.ArtemisPatchChoice.ALWAYS)
+                            }
                     },
                 ) { Text("总是") }
             },
@@ -247,13 +249,17 @@ fun GameScreen(modifier: Modifier = Modifier) {
                     TextButton(
                         onClick = {
                             patchLaunchTarget = null
-                            launchError = EngineLauncher.launch(context, game, EngineLauncher.ArtemisPatchChoice.NEVER)
+                            scope.launch {
+                                launchError = EngineLauncher.launch(context, game, EngineLauncher.ArtemisPatchChoice.NEVER)
+                            }
                         },
                     ) { Text("不再") }
                     TextButton(
                         onClick = {
                             patchLaunchTarget = null
-                            launchError = EngineLauncher.launch(context, game, EngineLauncher.ArtemisPatchChoice.ONCE)
+                            scope.launch {
+                                launchError = EngineLauncher.launch(context, game, EngineLauncher.ArtemisPatchChoice.ONCE)
+                            }
                         },
                     ) { Text("本次") }
                 }
@@ -448,8 +454,10 @@ internal fun GameActionsSheet(
 
     // 发起启动；Artemis 需要 PFS 基础补丁且策略为“启动时询问”时，先弹窗确认再带选择启动
     fun startLaunch(patchChoice: EngineLauncher.ArtemisPatchChoice? = null) {
-        launchError = EngineLauncher.launch(context, game, patchChoice)
-        if (launchError == null) onDismiss()
+        scope.launch {
+            launchError = EngineLauncher.launch(context, game, patchChoice)
+            if (launchError == null) onDismiss()
+        }
     }
 
     // 打开相册选择自定义封面
@@ -1004,22 +1012,50 @@ internal fun GameCard(
 @Composable
 internal fun rememberCoverBitmap(coverUri: String?): androidx.compose.runtime.State<ImageBitmap?> {
     val context = LocalContext.current
-    return produceState<ImageBitmap?>(initialValue = null, coverUri) {
+    val cached = coverUri?.let(CoverBitmapCache::get)
+    return produceState<ImageBitmap?>(initialValue = cached?.asImageBitmap(), coverUri) {
+        if (cached != null || coverUri.isNullOrBlank()) return@produceState
         value = withContext(Dispatchers.IO) {
-            if (coverUri.isNullOrBlank()) return@withContext null
-            runCatching {
-                context.contentResolver.openInputStream(android.net.Uri.parse(coverUri))?.use { input ->
-                    BitmapFactory.decodeStream(input)?.asImageBitmap()
-                }
-            }.getOrNull()
+            decodeCoverThumbnail(context, coverUri)?.also { CoverBitmapCache.put(coverUri, it) }?.asImageBitmap()
         }
     }
+}
+
+/** 封面只按卡片实际需要的尺寸解码，避免切页时上传原始大图；已解码缩略图跨页面复用。 */
+private fun decodeCoverThumbnail(context: android.content.Context, uriText: String): Bitmap? = runCatching {
+    val uri = android.net.Uri.parse(uriText)
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return@runCatching null
+
+    var sampleSize = 1
+    while (bounds.outWidth / (sampleSize * 2) >= CoverDecodeMaxWidthPx &&
+        bounds.outHeight / (sampleSize * 2) >= CoverDecodeMaxHeightPx
+    ) {
+        sampleSize *= 2
+    }
+    val options = BitmapFactory.Options().apply {
+        inSampleSize = sampleSize
+        inPreferredConfig = Bitmap.Config.ARGB_8888
+    }
+    context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
+}.getOrNull()
+
+private const val CoverDecodeMaxWidthPx = 512
+private const val CoverDecodeMaxHeightPx = 683
+
+private object CoverBitmapCache : LruCache<String, Bitmap>(24 * 1024 * 1024) {
+    override fun sizeOf(key: String, value: Bitmap): Int = value.allocationByteCount
 }
 
 internal fun EngineType.coverColor(): Color = when (this) {
     EngineType.KIRIKIRI -> Color(0xFF3B5998)
     EngineType.ONS -> Color(0xFF43A047)
     EngineType.TYRANO -> Color(0xFFC6443C)
+    EngineType.RPG_MV -> Color(0xFF2E7D6E)
+    EngineType.RPG_MZ -> Color(0xFF1976D2)
+    EngineType.VN -> Color(0xFF8E5A9E)
+    EngineType.WEB_OTHER -> Color(0xFF546E7A)
     EngineType.ARTEMIS -> Color(0xFF7E57C2)
     EngineType.UNKNOWN -> Color(0xFF607D8B)
 }
