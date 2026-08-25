@@ -49,7 +49,6 @@ public final class KrGLSurfaceView extends Cocos2dxGLSurfaceView {
     }
 
     @Override public final boolean onKeyDown(int keyCode, KeyEvent keyEvent) {
-        if (keyCode == KeyEvent.KEYCODE_BACK) android.util.Log.d("BackKeyTrace", "GLView BACK down (view layer)");
         if (keyCode != KeyEvent.KEYCODE_BACK && keyCode != KeyEvent.KEYCODE_ENTER && keyCode != KeyEvent.KEYCODE_MENU && keyCode != KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE) {
             switch (keyCode) {
                 case KeyEvent.KEYCODE_DPAD_UP:
@@ -67,7 +66,6 @@ public final class KrGLSurfaceView extends Cocos2dxGLSurfaceView {
     }
 
     @Override public final boolean onKeyUp(int keyCode, KeyEvent keyEvent) {
-        if (keyCode == KeyEvent.KEYCODE_BACK) android.util.Log.d("BackKeyTrace", "GLView BACK up (view layer)");
         if (keyCode != KeyEvent.KEYCODE_BACK && keyCode != KeyEvent.KEYCODE_ENTER && keyCode != KeyEvent.KEYCODE_MENU && keyCode != KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE) {
             switch (keyCode) {
                 case KeyEvent.KEYCODE_DPAD_UP:

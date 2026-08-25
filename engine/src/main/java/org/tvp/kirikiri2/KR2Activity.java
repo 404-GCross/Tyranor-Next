@@ -302,7 +302,6 @@ public class KR2Activity extends Cocos2dxActivity {
         msgHandler = new Handler(Looper.getMainLooper()) { @Override public void handleMessage(Message msg) { KR2Activity.this.handleMessage(msg); } };
         Sp = PreferenceManager.getDefaultSharedPreferences(this);
         super.onCreate(savedInstanceState);
-        android.util.Log.i("BackKeyTrace", "host=" + getClass().getName());
         // 1.2.6 libgame126.so 缺失 initDump/nativeOnLowMemory 的 JNI 实现，
         // 此处用 try-catch 兜底以兼容该版本；1.3.4/1.3.9 的 .so 都有这两个方法，不会进入 catch。
         try {
@@ -409,29 +408,19 @@ public class KR2Activity extends Cocos2dxActivity {
         // BACK 不经视图层：首按直接透传给游戏（同原版模拟器，native 侧映射为 ESC），
         // 双击退出仅作兜底；文本输入激活时放行，让 KrTextInputView.onKeyPreIme 优先收起键盘。
         if (event != null && event.getKeyCode() == KeyEvent.KEYCODE_BACK && !isTextInputActive()) {
-            android.util.Log.d("BackKeyTrace", "KR2 dispatch BACK action=" + event.getAction() + " repeat=" + event.getRepeatCount());
             switch (event.getAction()) {
                 case KeyEvent.ACTION_DOWN:
                     if (event.getRepeatCount() == 0) {
-                        if (DoubleBackExit.shouldExit(this)) {
-                            android.util.Log.d("BackKeyTrace", "KR2 -> double-back exit");
-                            exit();
-                        } else {
-                            android.util.Log.d("BackKeyTrace", "KR2 -> nativeKeyAction DOWN");
-                            nativeKeyAction(KeyEvent.KEYCODE_BACK, true);
-                        }
+                        if (DoubleBackExit.shouldExit(this)) exit();
+                        else nativeKeyAction(KeyEvent.KEYCODE_BACK, true);
                     }
                     return true;
                 case KeyEvent.ACTION_UP:
-                    android.util.Log.d("BackKeyTrace", "KR2 -> nativeKeyAction UP");
                     nativeKeyAction(KeyEvent.KEYCODE_BACK, false);
                     return true;
                 default:
                     return true;
             }
-        }
-        if (event != null && event.getKeyCode() == KeyEvent.KEYCODE_BACK) {
-            android.util.Log.d("BackKeyTrace", "KR2 BACK passthrough to super (textInput active)");
         }
         return super.dispatchKeyEvent(event);
     }
@@ -443,7 +432,6 @@ public class KR2Activity extends Cocos2dxActivity {
 
     @Override public void onBackPressed() {
         // 无视图消费 BACK 时的兜底路径（如键盘收起后的残余事件）：只布防退出窗口，不向引擎透传
-        android.util.Log.d("BackKeyTrace", "KR2 onBackPressed fallback");
         if (DoubleBackExit.shouldExit(this)) exit();
     }
 
