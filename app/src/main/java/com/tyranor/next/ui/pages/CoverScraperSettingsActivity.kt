@@ -147,22 +147,6 @@ internal fun CoverScraperSettingsScreen() {
                 item {
                     MiuixCard(modifier = Modifier.fillMaxWidth(), cornerRadius = 8.dp) {
                         Column(Modifier.background(NavWhite).padding(vertical = 4.dp)) {
-                            SwitchPreference(
-                                title = "仅处理缺少封面的游戏",
-                                summary = "避免覆盖用户手动设置的封面",
-                                checked = onlyMissing,
-                                onCheckedChange = { checked ->
-                                    onlyMissing = checked
-                                    AppSettingsStore.setCoverScraperOnlyMissing(ctx, checked)
-                                },
-                            )
-                        }
-                    }
-                }
-
-                item {
-                    MiuixCard(modifier = Modifier.fillMaxWidth(), cornerRadius = 8.dp) {
-                        Column(Modifier.background(NavWhite).padding(vertical = 4.dp)) {
                             sources.forEachIndexed { index, source ->
                                 CoverSourceRow(
                                     index = index,
@@ -193,6 +177,22 @@ internal fun CoverScraperSettingsScreen() {
                                     },
                                 )
                             }
+                        }
+                    }
+                }
+
+                item {
+                    MiuixCard(modifier = Modifier.fillMaxWidth(), cornerRadius = 8.dp) {
+                        Column(Modifier.background(NavWhite).padding(vertical = 4.dp)) {
+                            SwitchPreference(
+                                title = "仅处理缺少封面的游戏",
+                                summary = "避免覆盖用户手动设置的封面",
+                                checked = onlyMissing,
+                                onCheckedChange = { checked ->
+                                    onlyMissing = checked
+                                    AppSettingsStore.setCoverScraperOnlyMissing(ctx, checked)
+                                },
+                            )
                         }
                     }
                 }

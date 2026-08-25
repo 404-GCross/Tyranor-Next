@@ -71,15 +71,16 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.tyranor.next.R
+import com.tyranor.next.scanner.CoverSearchCandidate
 import com.tyranor.next.scanner.CoverScraperService
 import com.tyranor.next.scanner.EngineLauncher
 import com.tyranor.next.scanner.EngineScanner
 import com.tyranor.next.scanner.EngineType
 import com.tyranor.next.scanner.GameSaveManager
 import com.tyranor.next.scanner.ScanGame
-import com.tyranor.next.scanner.VndbCandidate
 import com.tyranor.next.scanner.VndbCoverService
 import com.tyranor.next.settings.AppSettingsStore
+import com.tyranor.next.settings.HikarinagiAuthStore
 import com.tyranor.next.settings.PerGameSettingsStore
 import com.tyranor.next.theme.NavWhite
 import com.tyranor.next.ui.common.AppSearchField
@@ -438,7 +439,8 @@ internal fun GameActionsSheet(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var launchError by remember { mutableStateOf<String?>(null) }
-    var showVndbSearch by remember { mutableStateOf(false) }
+    var showCoverSourcePicker by remember { mutableStateOf(false) }
+    var coverSearchSource by remember { mutableStateOf<String?>(null) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var showLaunchFilePicker by remember { mutableStateOf(false) }
     var showRenameDialog by remember { mutableStateOf(false) }
@@ -525,7 +527,7 @@ internal fun GameActionsSheet(
                     }
                 }
             }
-            item { GameActionRow(R.drawable.ic_sheet_search_cover, "搜索封面") { showVndbSearch = true } }
+            item { GameActionRow(R.drawable.ic_sheet_search_cover, "搜索封面") { showCoverSourcePicker = true } }
             item { GameActionRow(R.drawable.ic_sheet_edit_cover, "修改封面") { imagePicker.launch("image/*") } }
             item { GameActionRow(R.drawable.ic_sheet_rename, "名称修改") { showRenameDialog = true } }
             item {
@@ -600,20 +602,31 @@ internal fun GameActionsSheet(
         )
     }
 
-    if (showVndbSearch) {
-        VndbSearchDialog(
+    if (showCoverSourcePicker) {
+        CoverSourcePickerDialog(
+            onDismiss = { showCoverSourcePicker = false },
+            onSelect = { source ->
+                showCoverSourcePicker = false
+                coverSearchSource = source
+            },
+        )
+    }
+
+    coverSearchSource?.let { source ->
+        CoverSearchDialog(
             game = game,
-            onDismiss = { showVndbSearch = false },
+            source = source,
+            onDismiss = { coverSearchSource = null },
             onBind = { candidate ->
                 scope.launch {
                     launchError = "正在绑定封面…"
                     val updated = withContext(Dispatchers.IO) {
-                        runCatching { VndbCoverService.bindCandidate(context, game, candidate) }.getOrNull()
+                        runCatching { CoverScraperService.bindCoverCandidate(context, game, candidate) }.getOrNull()
                     }
                     if (updated != null) {
                         onGameUpdated(updated)
                         launchError = null
-                        showVndbSearch = false
+                        coverSearchSource = null
                         onDismiss()
                     } else {
                         launchError = "封面下载失败"
@@ -706,15 +719,84 @@ private fun RenameGameDialog(
 }
 
 @Composable
-private fun VndbSearchDialog(
-    game: ScanGame,
+private fun CoverSourcePickerDialog(
     onDismiss: () -> Unit,
-    onBind: (VndbCandidate) -> Unit,
+    onSelect: (String) -> Unit,
 ) {
-    var keyword by remember { mutableStateOf(game.title) }
+    val context = LocalContext.current
+    val authVersion = HikarinagiAuthStore.statusVersion.value
+    val sources = remember(AppSettingsStore.coverScraperSettingsVersion.value) {
+        AppSettingsStore.getCoverScraperSourceOrder(context)
+    }
+    val authStatus = remember(authVersion) { HikarinagiAuthStore.getStatus(context) }
+
+    AppAlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("选择封面来源", style = MaterialTheme.typography.titleMedium) },
+        text = {
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth().heightIn(max = 320.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                lazyItems(sources, key = { it }) { source ->
+                    val enabled = AppSettingsStore.isCoverScraperSourceEnabled(context, source)
+                    val needsHikarinagiLogin = source == AppSettingsStore.COVER_SOURCE_HIKARINAGI &&
+                        (!authStatus.authorized || authStatus.needsReauth)
+                    val selectable = enabled && !needsHikarinagiLogin
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(PageGrey)
+                            .clickable(enabled = selectable) { onSelect(source) }
+                            .padding(horizontal = 8.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(
+                            selected = false,
+                            onClick = if (selectable) ({ onSelect(source) }) else null,
+                            enabled = selectable,
+                        )
+                        Column(
+                            modifier = Modifier.padding(start = 10.dp).weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(2.dp),
+                        ) {
+                            Text(
+                                coverSourceTitle(source),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = if (selectable) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                coverSourcePickerSummary(source, enabled, needsHikarinagiLogin),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+    )
+}
+
+@Composable
+private fun CoverSearchDialog(
+    game: ScanGame,
+    source: String,
+    onDismiss: () -> Unit,
+    onBind: (CoverSearchCandidate) -> Unit,
+) {
+    val context = LocalContext.current
+    var keyword by remember(source, game.uri) { mutableStateOf(game.title) }
     var searching by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
-    var candidates by remember { mutableStateOf<List<VndbCandidate>>(emptyList()) }
+    var candidates by remember { mutableStateOf<List<CoverSearchCandidate>>(emptyList()) }
     val scope = rememberCoroutineScope()
 
     fun search() {
@@ -724,10 +806,10 @@ private fun VndbSearchDialog(
             searching = true
             error = null
             val result = withContext(Dispatchers.IO) {
-                runCatching { VndbCoverService.searchCandidates(query, 8) }
+                runCatching { CoverScraperService.searchCoverCandidates(context, source, query, 8) }
             }
             candidates = result.getOrDefault(emptyList())
-            result.exceptionOrNull()?.let { error = it.message ?: "VNDB 搜索失败" }
+            result.exceptionOrNull()?.let { error = it.message ?: "封面搜索失败" }
             if (candidates.isEmpty() && error == null) error = "未找到匹配结果"
             searching = false
         }
@@ -735,7 +817,7 @@ private fun VndbSearchDialog(
 
     AppAlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("搜索 VNDB 封面", style = MaterialTheme.typography.titleMedium) },
+        title = { Text("搜索${coverSourceTitle(source)}封面", style = MaterialTheme.typography.titleMedium) },
         text = {
             Column {
                 AppSearchField(
@@ -763,7 +845,7 @@ private fun VndbSearchDialog(
                         modifier = Modifier.fillMaxWidth().height(220.dp).padding(top = 8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        lazyItems(candidates, key = { it.id }) { candidate ->
+                        lazyItems(candidates, key = { "${it.source}:${it.id}:${it.coverUrl}" }) { candidate ->
                             Column(
                                 Modifier
                                     .fillMaxWidth()
@@ -772,17 +854,30 @@ private fun VndbSearchDialog(
                                     .clickable { onBind(candidate) }
                                     .padding(10.dp),
                             ) {
-                                Text(candidate.title.ifBlank { candidate.originalTitle }, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                if (candidate.originalTitle.isNotBlank()) {
-                                    Text(candidate.originalTitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                }
                                 Text(
-                                    listOf(candidate.id, candidate.released, candidate.developer).filter { it.isNotBlank() }.joinToString(" · "),
+                                    candidate.title.ifBlank { coverSourceTitle(candidate.source) },
                                     style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
+                                if (candidate.subtitle.isNotBlank() && candidate.subtitle != candidate.title) {
+                                    Text(
+                                        candidate.subtitle,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                                if (candidate.detail.isNotBlank()) {
+                                    Text(
+                                        candidate.detail,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
                             }
                         }
                     }
@@ -791,6 +886,24 @@ private fun VndbSearchDialog(
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text("关闭") } },
     )
+}
+
+private fun coverSourceTitle(source: String): String = when (source) {
+    AppSettingsStore.COVER_SOURCE_HIKARINAGI -> "Hikarinagi"
+    AppSettingsStore.COVER_SOURCE_BANGUMI -> "Bangumi"
+    AppSettingsStore.COVER_SOURCE_STEAM -> "Steam"
+    AppSettingsStore.COVER_SOURCE_VNDB -> "VNDB"
+    else -> source
+}
+
+private fun coverSourcePickerSummary(source: String, enabled: Boolean, needsHikarinagiLogin: Boolean): String = when {
+    !enabled -> "已在封面刮削设置中关闭"
+    needsHikarinagiLogin -> "需要先在封面刮削设置中登录"
+    source == AppSettingsStore.COVER_SOURCE_HIKARINAGI -> "使用已授权账号搜索 Hikarinagi 封面"
+    source == AppSettingsStore.COVER_SOURCE_BANGUMI -> "搜索 Bangumi 条目封面"
+    source == AppSettingsStore.COVER_SOURCE_STEAM -> "搜索 Steam 商店竖版封面"
+    source == AppSettingsStore.COVER_SOURCE_VNDB -> "搜索 VNDB 封面"
+    else -> "搜索此来源"
 }
 
 /** KRKR 专属：选择游戏启动入口文件（目录内 xp3 / exe）。 */

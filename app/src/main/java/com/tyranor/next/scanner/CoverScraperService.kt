@@ -21,6 +21,15 @@ data class CoverScrapeResult(
     val failedCount: Int,
 )
 
+data class CoverSearchCandidate(
+    val source: String,
+    val id: String,
+    val title: String,
+    val subtitle: String,
+    val detail: String,
+    val coverUrl: String,
+)
+
 object CoverScraperService {
     fun scrapeLibraryCovers(context: Context, games: List<ScanGame>): CoverScrapeResult {
         val onlyMissing = AppSettingsStore.isCoverScraperOnlyMissing(context)
@@ -60,6 +69,43 @@ object CoverScraperService {
         return CoverScrapeResult(updatedGames, updatedCount, skippedCount, failedCount)
     }
 
+    fun searchCoverCandidates(
+        context: Context,
+        source: String,
+        keyword: String,
+        limit: Int = 8,
+    ): List<CoverSearchCandidate> {
+        val query = keyword.trim()
+        if (query.isBlank()) return emptyList()
+        if (source !in AppSettingsStore.DEFAULT_COVER_SCRAPER_SOURCES) return emptyList()
+        if (!AppSettingsStore.isCoverScraperSourceEnabled(context, source)) return emptyList()
+        return runCatching { searchWithSource(context, source, query, limit.coerceIn(1, 10)) }
+            .getOrDefault(emptyList())
+    }
+
+    fun bindCoverCandidate(context: Context, game: ScanGame, candidate: CoverSearchCandidate): ScanGame? {
+        val prefix = "${candidate.source}_${stableKey(game.uri)}"
+        val cover = if (candidate.source == AppSettingsStore.COVER_SOURCE_STEAM) {
+            val appId = candidate.id.toIntOrNull()
+            CoverImageCache.download(context, candidate.coverUrl, prefix, referer = refererForSource(candidate.source))
+                ?: appId?.let { SteamCoverSource.downloadSteamHeader(context, game, it) }
+        } else {
+            CoverImageCache.download(
+                context = context,
+                imageUrl = candidate.coverUrl,
+                prefix = prefix,
+                referer = refererForSource(candidate.source),
+                cookie = cookieForSource(candidate.source),
+            )
+        }
+        return cover?.let {
+            game.copy(
+                coverUri = it,
+                coverSource = candidate.source,
+            )
+        }
+    }
+
     private fun scrapeWithSource(context: Context, game: ScanGame, source: String): ScanGame? =
         when (source) {
             AppSettingsStore.COVER_SOURCE_HIKARINAGI -> HikarinagiCoverSource.fetchBestCover(context, game)
@@ -68,6 +114,30 @@ object CoverScraperService {
             AppSettingsStore.COVER_SOURCE_VNDB -> VndbCoverService.fetchBestCover(context, game)
             else -> null
         }
+
+    private fun searchWithSource(
+        context: Context,
+        source: String,
+        keyword: String,
+        limit: Int,
+    ): List<CoverSearchCandidate> =
+        when (source) {
+            AppSettingsStore.COVER_SOURCE_HIKARINAGI -> HikarinagiCoverSource.searchCandidates(context, keyword, limit)
+            AppSettingsStore.COVER_SOURCE_BANGUMI -> BangumiCoverSource.searchCandidates(keyword, limit)
+            AppSettingsStore.COVER_SOURCE_STEAM -> SteamCoverSource.searchCandidates(keyword, limit)
+            AppSettingsStore.COVER_SOURCE_VNDB -> VndbCoverService.searchCandidates(keyword, limit).map {
+                CoverSearchCandidate(
+                    source = AppSettingsStore.COVER_SOURCE_VNDB,
+                    id = it.id,
+                    title = it.title.ifBlank { it.originalTitle },
+                    subtitle = it.originalTitle,
+                    detail = detailText("VNDB", it.id, it.released, it.developer),
+                    coverUrl = it.coverUrl,
+                )
+            }
+            else -> emptyList()
+        }
+
 }
 
 private object HikarinagiCoverSource {
@@ -79,23 +149,7 @@ private object HikarinagiCoverSource {
         val query = cleanTitle(game.title)
         if (query.isBlank()) return null
 
-        val url = "$SEARCH_URL?q=${query.urlEncode()}&types=galgame&page=1&page_size=5"
-        val json = httpJson(url, headers = mapOf("Authorization" to "Bearer $token")) ?: return null
-        if (!json.optBoolean("success", false)) return null
-        val items = json.optJSONObject("data")?.optJSONArray("items") ?: return null
-
-        val candidate = (0 until items.length()).asSequence()
-            .mapNotNull { items.optJSONObject(it) }
-            .filter { it.optString("type") == "galgame" }
-            .mapNotNull { item ->
-                val cover = item.optJSONObject("cover") ?: return@mapNotNull null
-                val coverUrl = resolveHikarinagiImageUrl(cover.optString("url", ""))
-                if (coverUrl.isBlank()) return@mapNotNull null
-                CoverCandidate(
-                    coverUrl = coverUrl,
-                    score = cover.optInt("votes", 0),
-                )
-            }
+        val candidate = searchRawCandidates(token, query, 5)
             .maxByOrNull { it.score }
             ?: return null
 
@@ -105,6 +159,44 @@ private object HikarinagiCoverSource {
             coverUri = cover,
             coverSource = AppSettingsStore.COVER_SOURCE_HIKARINAGI,
         )
+    }
+
+    fun searchCandidates(context: Context, keyword: String, limit: Int): List<CoverSearchCandidate> {
+        val token = HikarinagiAuthService.getValidAccessToken(context) ?: return emptyList()
+        val query = cleanTitle(keyword)
+        if (query.isBlank()) return emptyList()
+        return searchRawCandidates(token, query, limit).map {
+            CoverSearchCandidate(
+                source = AppSettingsStore.COVER_SOURCE_HIKARINAGI,
+                id = it.id,
+                title = it.title,
+                subtitle = "",
+                detail = detailText("Hikarinagi", it.id, "票数 ${it.score}"),
+                coverUrl = it.coverUrl,
+            )
+        }
+    }
+
+    private fun searchRawCandidates(token: String, query: String, limit: Int): List<CoverCandidate> {
+        val url = "$SEARCH_URL?q=${query.urlEncode()}&types=galgame&page=1&page_size=${limit.coerceIn(1, 10)}"
+        val json = httpJson(url, headers = mapOf("Authorization" to "Bearer $token")) ?: return emptyList()
+        if (!json.optBoolean("success", false)) return emptyList()
+        val items = json.optJSONObject("data")?.optJSONArray("items") ?: return emptyList()
+        return (0 until items.length()).asSequence()
+            .mapNotNull { items.optJSONObject(it) }
+            .filter { it.optString("type") == "galgame" }
+            .mapNotNull { item ->
+                val cover = item.optJSONObject("cover") ?: return@mapNotNull null
+                val coverUrl = resolveHikarinagiImageUrl(cover.optString("url", ""))
+                if (coverUrl.isBlank()) return@mapNotNull null
+                CoverCandidate(
+                    id = item.optString("id", ""),
+                    title = firstNonEmpty(item.optString("subtitle", ""), item.optString("title", "")),
+                    coverUrl = coverUrl,
+                    score = cover.optInt("votes", 0),
+                )
+            }
+            .toList()
     }
 
     private fun resolveHikarinagiImageUrl(raw: String): String {
@@ -117,11 +209,23 @@ private object HikarinagiCoverSource {
 }
 
 private object BangumiCoverSource {
-    private const val SEARCH_URL = "https://api.bgm.tv/v0/search/subjects?limit=5&offset=0"
+    private const val SEARCH_URL = "https://api.bgm.tv/v0/search/subjects"
 
     fun fetchBestCover(context: Context, game: ScanGame): ScanGame? {
         val query = cleanTitle(game.title)
         if (query.isBlank()) return null
+        val candidate = searchCandidates(query, 1).firstOrNull() ?: return null
+        val cover = CoverImageCache.download(context, candidate.coverUrl, "bangumi_${stableKey(game.uri)}", referer = "https://bgm.tv/")
+            ?: return null
+        return game.copy(
+            coverUri = cover,
+            coverSource = AppSettingsStore.COVER_SOURCE_BANGUMI,
+        )
+    }
+
+    fun searchCandidates(keyword: String, limit: Int): List<CoverSearchCandidate> {
+        val query = cleanTitle(keyword)
+        if (query.isBlank()) return emptyList()
         val body = JSONObject()
             .put("keyword", query)
             .put("sort", "rank")
@@ -132,21 +236,28 @@ private object BangumiCoverSource {
                     .put("nsfw", true),
             )
             .toString()
-        val json = httpJson(SEARCH_URL, method = "POST", body = body) ?: return null
-        val item = json.optJSONArray("data")?.let { data ->
-            (0 until data.length()).asSequence()
-                .mapNotNull { data.optJSONObject(it) }
-                .firstOrNull { it.optInt("type") == 4 }
-        } ?: return null
-        val images = item.optJSONObject("images") ?: return null
-        val coverUrl = firstNonEmpty(images.optString("large", ""), images.optString("common", ""))
-        if (coverUrl.isBlank()) return null
-        val cover = CoverImageCache.download(context, coverUrl, "bangumi_${stableKey(game.uri)}", referer = "https://bgm.tv/")
-            ?: return null
-        return game.copy(
-            coverUri = cover,
-            coverSource = AppSettingsStore.COVER_SOURCE_BANGUMI,
-        )
+        val url = "$SEARCH_URL?limit=${limit.coerceIn(1, 10)}&offset=0"
+        val json = httpJson(url, method = "POST", body = body) ?: return emptyList()
+        val data = json.optJSONArray("data") ?: return emptyList()
+        return (0 until data.length()).asSequence()
+            .mapNotNull { data.optJSONObject(it) }
+            .filter { it.optInt("type") == 4 }
+            .mapNotNull { item ->
+                val images = item.optJSONObject("images") ?: return@mapNotNull null
+                val coverUrl = firstNonEmpty(images.optString("large", ""), images.optString("common", ""))
+                if (coverUrl.isBlank()) return@mapNotNull null
+                val name = item.optString("name", "")
+                val nameCn = item.optString("name_cn", "")
+                CoverSearchCandidate(
+                    source = AppSettingsStore.COVER_SOURCE_BANGUMI,
+                    id = item.optString("id", ""),
+                    title = firstNonEmpty(nameCn, name),
+                    subtitle = name,
+                    detail = detailText("Bangumi", item.optString("id", ""), item.optString("date", "")),
+                    coverUrl = coverUrl,
+                )
+            }
+            .toList()
     }
 }
 
@@ -157,14 +268,9 @@ private object SteamCoverSource {
     fun fetchBestCover(context: Context, game: ScanGame): ScanGame? {
         val query = cleanTitle(game.title)
         if (query.isBlank()) return null
-        val search = httpJson("$SEARCH_URL?term=${query.urlEncode()}&l=schinese&cc=CN") ?: return null
-        val items = search.optJSONArray("items") ?: return null
-        for (i in 0 until minOf(items.length(), 3)) {
-            val item = items.optJSONObject(i) ?: continue
-            val appId = item.optInt("id", 0)
-            if (appId <= 0) continue
-            val portrait = "https://cdn.akamai.steamstatic.com/steam/apps/$appId/library_600x900.jpg"
-            val cover = CoverImageCache.download(context, portrait, "steam_${stableKey(game.uri)}", referer = "https://store.steampowered.com/")
+        for (candidate in searchCandidates(query, 3)) {
+            val appId = candidate.id.toIntOrNull() ?: continue
+            val cover = CoverImageCache.download(context, candidate.coverUrl, "steam_${stableKey(game.uri)}", referer = "https://store.steampowered.com/")
                 ?: downloadSteamHeader(context, game, appId)
             if (cover != null) {
                 return game.copy(
@@ -176,7 +282,27 @@ private object SteamCoverSource {
         return null
     }
 
-    private fun downloadSteamHeader(context: Context, game: ScanGame, appId: Int): String? {
+    fun searchCandidates(keyword: String, limit: Int): List<CoverSearchCandidate> {
+        val query = cleanTitle(keyword)
+        if (query.isBlank()) return emptyList()
+        val search = httpJson("$SEARCH_URL?term=${query.urlEncode()}&l=schinese&cc=CN") ?: return emptyList()
+        val items = search.optJSONArray("items") ?: return emptyList()
+        return (0 until minOf(items.length(), limit.coerceIn(1, 10))).mapNotNull { index ->
+            val item = items.optJSONObject(index) ?: return@mapNotNull null
+            val appId = item.optInt("id", 0)
+            if (appId <= 0) return@mapNotNull null
+            CoverSearchCandidate(
+                source = AppSettingsStore.COVER_SOURCE_STEAM,
+                id = appId.toString(),
+                title = item.optString("name", ""),
+                subtitle = "",
+                detail = detailText("Steam", appId.toString()),
+                coverUrl = "https://cdn.akamai.steamstatic.com/steam/apps/$appId/library_600x900.jpg",
+            )
+        }
+    }
+
+    fun downloadSteamHeader(context: Context, game: ScanGame, appId: Int): String? {
         val details = httpJson("$DETAILS_URL?appids=$appId&l=schinese&cc=CN") ?: return null
         val header = details.optJSONObject(appId.toString())
             ?.optJSONObject("data")
@@ -188,6 +314,8 @@ private object SteamCoverSource {
 }
 
 private data class CoverCandidate(
+    val id: String,
+    val title: String,
     val coverUrl: String,
     val score: Int,
 )
@@ -201,7 +329,13 @@ private fun ScanGame.asCoverOnlyUpdateFrom(base: ScanGame): ScanGame =
 private object CoverImageCache {
     private const val MAX_COVER_BYTES = 20L * 1024L * 1024L
 
-    fun download(context: Context, imageUrl: String, prefix: String, referer: String? = null): String? {
+    fun download(
+        context: Context,
+        imageUrl: String,
+        prefix: String,
+        referer: String? = null,
+        cookie: String? = null,
+    ): String? {
         if (imageUrl.isBlank()) return null
         val dir = File(context.filesDir, "covers_remote")
         if (!dir.exists() && !dir.mkdirs()) return null
@@ -216,6 +350,7 @@ private object CoverImageCache {
                 setRequestProperty("Accept", "image/avif,image/webp,image/apng,image/*,*/*;q=0.8")
                 setRequestProperty("User-Agent", "Mozilla/5.0")
                 referer?.let { setRequestProperty("Referer", it) }
+                cookie?.let { setRequestProperty("Cookie", it) }
             }
             if (conn.responseCode !in 200..299) return null
             if (conn.contentLengthLong > MAX_COVER_BYTES) return null
@@ -296,6 +431,21 @@ private fun firstNonEmpty(a: String?, b: String?): String {
         !b.isNullOrBlank() && b != "null" -> b
         else -> ""
     }
+}
+
+private fun detailText(vararg values: String?): String =
+    values.filter { !it.isNullOrBlank() && it != "null" }.joinToString(" · ")
+
+private fun refererForSource(source: String): String? = when (source) {
+    AppSettingsStore.COVER_SOURCE_BANGUMI -> "https://bgm.tv/"
+    AppSettingsStore.COVER_SOURCE_STEAM -> "https://store.steampowered.com/"
+    AppSettingsStore.COVER_SOURCE_VNDB -> "https://vndb.org/"
+    else -> null
+}
+
+private fun cookieForSource(source: String): String? = when (source) {
+    AppSettingsStore.COVER_SOURCE_VNDB -> "vndb_img=1; vndb_samesite=1"
+    else -> null
 }
 
 private fun String.urlEncode(): String =
