@@ -36,6 +36,7 @@ object EngineSettingsStore {
     // Tyrano
     const val KEY_TYRANO_EXTERNAL_NETWORK = "tyrano_external_network"
     const val KEY_TYRANO_SCOPED_SAVE_DIR = "tyrano_scoped_save_dir"
+    const val KEY_RPG_MAKER_MOD_ENABLED = "rpg_maker_mod_enabled"
 
     // 取值常量
     const val KR_AUTO = "auto"
@@ -200,4 +201,6 @@ object EngineSettingsStore {
     fun setTyranoExternalNetwork(c: Context, b: Boolean) = prefs(c).edit().putBoolean(KEY_TYRANO_EXTERNAL_NETWORK, b).apply()
     fun isTyranoScopedSaveDir(c: Context): Boolean = prefs(c).getBoolean(KEY_TYRANO_SCOPED_SAVE_DIR, true)
     fun setTyranoScopedSaveDir(c: Context, b: Boolean) = prefs(c).edit().putBoolean(KEY_TYRANO_SCOPED_SAVE_DIR, b).apply()
+    fun isRpgMakerModEnabled(c: Context): Boolean = prefs(c).getBoolean(KEY_RPG_MAKER_MOD_ENABLED, true)
+    fun setRpgMakerModEnabled(c: Context, b: Boolean) = prefs(c).edit().putBoolean(KEY_RPG_MAKER_MOD_ENABLED, b).apply()
 }

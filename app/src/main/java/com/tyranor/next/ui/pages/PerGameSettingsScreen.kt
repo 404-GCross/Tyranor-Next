@@ -80,6 +80,11 @@ fun PerGameSettingsScreen(game: ScanGame) {
 
     var tyExternal by remember { mutableStateOf(PerGameSettingsStore.getBool(ctx, gid, "ty_external")) }
     var tyScoped by remember { mutableStateOf(PerGameSettingsStore.getBool(ctx, gid, "ty_scoped")) }
+    var rpgMakerMod by remember {
+        mutableStateOf(
+            PerGameSettingsStore.getBool(ctx, gid, PerGameSettingsStore.F_RPG_MAKER_MOD_ENABLED),
+        )
+    }
 
     val fontLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
@@ -100,6 +105,7 @@ fun PerGameSettingsScreen(game: ScanGame) {
     val globalArtPatch = EngineSettingsStore.getArtAutoPatch(ctx)
     val globalTyExternal = EngineSettingsStore.isTyranoExternalNetwork(ctx)
     val globalTyScoped = EngineSettingsStore.isTyranoScopedSaveDir(ctx)
+    val globalRpgMakerMod = EngineSettingsStore.isRpgMakerModEnabled(ctx)
 
     val isSdl3 = (krKernel ?: globalKrKernel) == EngineSettingsStore.KERNEL_KRKRSDL3
     val effVersion = krVersion ?: globalKrVersion
@@ -136,6 +142,12 @@ fun PerGameSettingsScreen(game: ScanGame) {
         PerGameSettingsStore.setOnsOverride(ctx, gid, onsObj)
         PerGameSettingsStore.setBool(ctx, gid, "ty_external", tyExternal)
         PerGameSettingsStore.setBool(ctx, gid, "ty_scoped", tyScoped)
+        PerGameSettingsStore.setBool(
+            ctx,
+            gid,
+            PerGameSettingsStore.F_RPG_MAKER_MOD_ENABLED,
+            rpgMakerMod,
+        )
     }
 
     MiuixSettingsTheme {
@@ -246,6 +258,9 @@ fun PerGameSettingsScreen(game: ScanGame) {
                             OverrideSwitch("允许外部网络", globalTyExternal, tyExternal) { tyExternal = it }
                             if (game.engine !in setOf(EngineType.VN, EngineType.WEB_OTHER)) {
                                 OverrideSwitch("独立存档目录", globalTyScoped, tyScoped) { tyScoped = it }
+                            }
+                            if (game.engine == EngineType.RPG_MV || game.engine == EngineType.RPG_MZ) {
+                                OverrideSwitch("游戏修改器", globalRpgMakerMod, rpgMakerMod) { rpgMakerMod = it }
                             }
                         }
                     }

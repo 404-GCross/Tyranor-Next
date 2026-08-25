@@ -543,6 +543,11 @@ object EngineLauncher {
     private fun buildWebIntent(context: Context, path: String, game: ScanGame): Intent {
         val scoped = PerGameSettingsStore.getBool(context, game.uri, "ty_scoped")
             ?: EngineSettingsStore.isTyranoScopedSaveDir(context)
+        val rpgMakerModEnabled = effectiveRpgMakerModEnabled(
+            game.engine,
+            PerGameSettingsStore.getBool(context, game.uri, PerGameSettingsStore.F_RPG_MAKER_MOD_ENABLED),
+            EngineSettingsStore.isRpgMakerModEnabled(context),
+        )
         val scopedSaveRoot = if (scoped) {
             context.getExternalFilesDir(null)?.let { external ->
                 File(File(File(external, "save"), "tyrano"), EngineScanner.safeSaveName(path)).absolutePath
@@ -569,6 +574,8 @@ object EngineLauncher {
             putExtra("orientation", 6)
             putExtra("scopedSaveDir", scoped)
             scopedSaveRoot?.let { putExtra("scopedSaveRoot", it) }
+            putExtra("rpgMakerModEnabled", rpgMakerModEnabled)
+            putExtra("rpgMakerModGameId", game.uri)
         }
     }
 
@@ -700,3 +707,10 @@ object EngineLauncher {
         }
     }
 }
+
+internal fun effectiveRpgMakerModEnabled(
+    engine: EngineType,
+    perGameOverride: Boolean?,
+    globalDefault: Boolean,
+): Boolean = engine in setOf(EngineType.RPG_MV, EngineType.RPG_MZ) &&
+    (perGameOverride ?: globalDefault)
