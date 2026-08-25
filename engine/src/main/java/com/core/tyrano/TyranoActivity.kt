@@ -61,7 +61,6 @@ class TyranoActivity : Activity() {
     private var allowExternalNetwork = false
     private var rpgMakerModEnabled = false
     private var rpgMakerModGameId = ""
-    private var backInvokedCallback: Any? = null
     private val processExitScheduled = AtomicBoolean(false)
 
     override fun attachBaseContext(newBase: Context) {
@@ -70,7 +69,6 @@ class TyranoActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        backInvokedCallback = DoubleBackExit.registerPredictiveBack(this, ::handleBackRequest)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         enterFullscreen()
         allowExternalNetwork = getSharedPreferences(EnginePrefs.APP_PREFS, Context.MODE_PRIVATE)
@@ -536,7 +534,6 @@ class TyranoActivity : Activity() {
     }
 
     override fun onDestroy() {
-        DoubleBackExit.unregisterPredictiveBack(this, backInvokedCallback)
         DoubleBackExit.clear(this)
         runCatching {
             webView?.stopLoading()

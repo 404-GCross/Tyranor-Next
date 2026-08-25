@@ -27,6 +27,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -51,6 +55,7 @@ import com.tyranor.next.settings.AppSettingsStore
 import com.tyranor.next.scanner.EngineScanner
 import com.tyranor.next.theme.AppThemeColors
 import com.tyranor.next.theme.MiuixSettingsTheme
+import com.tyranor.next.theme.NavWhite
 import com.tyranor.next.theme.TyranorNextTheme
 import com.tyranor.next.ui.common.WithoutPressIndication
 import kotlin.math.roundToInt
@@ -317,7 +322,7 @@ internal fun AppSettingsScreen() {
             onDismissRequest = { showScanDirs = false },
             title = { Text("扫描目录", style = MaterialTheme.typography.titleMedium) },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (scanDirs.isEmpty()) {
                         Text(
                             "暂无扫描目录",
@@ -326,15 +331,26 @@ internal fun AppSettingsScreen() {
                         )
                     }
                     scanDirs.forEach { dir ->
+                        // 目录被改名/删除或权限失效后标记为已失效，提示用户手动清理。
+                        // DocumentFile.isDirectory 可能触发 binder 调用，放到 IO 线程执行。
+                        val valid by produceState(initialValue = false, dir) {
+                            value = withContext(Dispatchers.IO) { isScanDirValid(ctx, dir) }
+                        }
+                        // Miuix 风格条目：圆角卡片 + 文件夹图标 + 目录名 + 删除按钮
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(NavWhite)
+                                .padding(start = 16.dp, end = 4.dp, top = 2.dp, bottom = 2.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            // 目录被改名/删除或权限失效后标记为已失效，提示用户手动清理。
-                            // DocumentFile.isDirectory 可能触发 binder 调用，放到 IO 线程执行。
-                            val valid by produceState(initialValue = false, dir) {
-                                value = withContext(Dispatchers.IO) { isScanDirValid(ctx, dir) }
-                            }
+                            Icon(
+                                imageVector = Icons.Filled.Folder,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(22.dp),
+                            )
                             Text(
                                 if (valid) scanDirName(ctx, dir) else "${scanDirName(ctx, dir)}（已失效）",
                                 style = MaterialTheme.typography.bodyMedium,
@@ -345,7 +361,7 @@ internal fun AppSettingsScreen() {
                                 },
                                 maxLines = 1,
                                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f),
+                                modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
                             )
                             TextButton(
                                 onClick = {
@@ -357,13 +373,17 @@ internal fun AppSettingsScreen() {
                             }
                         }
                     }
-                    TextButton(
-                        onClick = { dirPicker.launch(null) },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) { Text("添加目录") }
                 }
             },
-            confirmButton = { TextButton(onClick = { showScanDirs = false }) { Text("完成") } },
+            confirmButton = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(
+                        onClick = { dirPicker.launch(null) },
+                        modifier = Modifier.padding(end = 8.dp),
+                    ) { Text("添加目录") }
+                    TextButton(onClick = { showScanDirs = false }) { Text("完成") }
+                }
+            },
         )
     }
 }

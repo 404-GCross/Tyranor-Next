@@ -1,11 +1,8 @@
 package com.core.engine;
 
 import android.app.Activity;
-import android.os.Build;
 import android.view.KeyEvent;
 import android.widget.Toast;
-import android.window.OnBackInvokedCallback;
-import android.window.OnBackInvokedDispatcher;
 
 import java.util.Map;
 import java.util.WeakHashMap;
@@ -22,6 +19,15 @@ public final class DoubleBackExit {
     }
 
     public static boolean shouldExit(Activity activity) {
+        return shouldExit(activity, true);
+    }
+
+    /**
+     * @param feedback 首次按压是否弹"再按一次返回退出游戏"提示。返回键已透传给游戏的
+     *                 引擎（krkr 双内核）应传 false，避免每次游戏内返回都弹 toast；
+     *                 首按无可见效果的引擎（Tyrano/Artemis/SDL2/ONS）保持提示。
+     */
+    public static boolean shouldExit(Activity activity, boolean feedback) {
         if (activity == null) return true;
         long now = android.os.SystemClock.elapsedRealtime();
         Long last = LAST_BACK_TIME.get(activity);
@@ -30,7 +36,7 @@ public final class DoubleBackExit {
             return true;
         }
         LAST_BACK_TIME.put(activity, now);
-        Toast.makeText(activity, "再按一次返回退出游戏", Toast.LENGTH_SHORT).show();
+        if (feedback) Toast.makeText(activity, "再按一次返回退出游戏", Toast.LENGTH_SHORT).show();
         return false;
     }
 
@@ -51,20 +57,6 @@ public final class DoubleBackExit {
             return true;
         }
         return event.getAction() == KeyEvent.ACTION_MULTIPLE;
-    }
-
-    public static Object registerPredictiveBack(Activity activity, ExitAction action) {
-        if (activity == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return null;
-        OnBackInvokedCallback callback = () -> handleBack(activity, action);
-        activity.getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
-                OnBackInvokedDispatcher.PRIORITY_DEFAULT,
-                callback);
-        return callback;
-    }
-
-    public static void unregisterPredictiveBack(Activity activity, Object callback) {
-        if (activity == null || callback == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return;
-        activity.getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback((OnBackInvokedCallback) callback);
     }
 
     public static void clear(Activity activity) {

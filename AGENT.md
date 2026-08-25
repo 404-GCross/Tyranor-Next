@@ -82,11 +82,11 @@ Column(fillMaxSize)                                // 页面根
 
 页面内容（顶部栏除外）只允许使用**两种**文字尺寸，与引擎设置页保持一致：
 
-1. `MaterialTheme.typography.titleMedium` —— 卡片头、对话框标题、列表项主标题（可加粗）。
+1. `MaterialTheme.typography.titleMedium`（大字号，15sp，在 `theme/Type.kt` 中全局覆盖，Material 默认 16sp）—— 卡片头、对话框标题、列表项主标题（可加粗）。
 2. `MaterialTheme.typography.bodyMedium` —— 正文、行值、辅助描述、按钮文字、空态/错误提示。
 
 - **禁止**使用 `bodySmall` / `bodyLarge` / `labelMedium` / `labelLarge` / `headlineMedium` / `headlineSmall` 等其它排版尺寸。
-- Miuix preference 组件标题默认用 `headline1`(17sp)，已在 `MiuixSettingsTheme` 中全局覆盖为 16sp（`defaultTextStyles(headline1 = TextStyle(fontSize = 16.sp))`），使其严格落入两档；不要自行在单行上改字号。
+- Miuix preference 组件标题默认用 `headline1`(17sp)，已在 `MiuixSettingsTheme` 中全局覆盖为 15sp（`defaultTextStyles(headline1 = TextStyle(fontSize = 15.sp))`），使其严格落入两档并匹配 `titleMedium`；不要自行在单行上改字号。
 - 顶部栏标题不受此限制，仍用 `MaterialTheme.typography.titleLarge` Bold。
 
 ---
