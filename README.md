@@ -1,7 +1,7 @@
 # Tyranor Next
 
 <p align="center">
-  <img src="screenshots/home-index.png" alt="RinneMobile" width="750" />
+  <img src="screenshots/index.png" alt="Tyranor Next" width="850" />
 </p>
 
 基于 **Tyranor 模拟器逆向重写**的多引擎视觉小说（Galgame）聚合启动器，面向 Android 平台。内置 Kirikiri / ONScripter / Tyrano / Artemis 四套引擎运行环境，可识别和启动八类游戏，提供游戏库管理、封面获取、存档镜像、引擎参数调节等一体化体验。
