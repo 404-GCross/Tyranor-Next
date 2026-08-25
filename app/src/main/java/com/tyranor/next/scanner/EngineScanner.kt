@@ -127,8 +127,9 @@ object EngineScanner {
 
     fun recordRecentGame(context: Context, game: ScanGame) {
         val touched = game.copy(openTime = System.currentTimeMillis())
-        val next = (listOf(touched) + loadRecentGames(context).filterNot { it.uri == game.uri }).take(20)
-        saveRecentGames(context, next)
+        updateRecentGames(context) { current ->
+            (listOf(touched) + current.filterNot { it.uri == game.uri }).take(20)
+        }
     }
 
     fun loadRecentGames(context: Context): List<ScanGame> =
@@ -138,7 +139,7 @@ object EngineScanner {
 
     /** 删除游戏时从最近游戏列表中移除对应条目。 */
     fun removeRecentGame(context: Context, uri: String) {
-        saveRecentGames(context, loadRecentGames(context).filterNot { it.uri == uri })
+        updateRecentGames(context) { games -> games.filterNot { it.uri == uri } }
     }
 
     /** 从持久游戏库中移除指定游戏（在游戏页或首页删除游戏时调用，保证库与最近列表一致）。 */
@@ -154,9 +155,24 @@ object EngineScanner {
     }
 
     internal fun saveRecentGames(context: Context, games: List<ScanGame>) {
-        val snapshot = games.toList()
-        recentGamesCache = snapshot
-        saveList(context, KEY_RECENT_GAMES, snapshot)
+        synchronized(cacheLock) {
+            saveRecentGamesLocked(context, games.toList())
+        }
+    }
+
+    internal fun updateRecentGames(
+        context: Context,
+        transform: (List<ScanGame>) -> List<ScanGame>,
+    ): List<ScanGame> = synchronized(cacheLock) {
+        val current = recentGamesCache ?: loadList(context, KEY_RECENT_GAMES).also { recentGamesCache = it }
+        val updated = transform(current).toList()
+        if (updated != current) saveRecentGamesLocked(context, updated)
+        updated
+    }
+
+    private fun saveRecentGamesLocked(context: Context, games: List<ScanGame>) {
+        recentGamesCache = games
+        saveList(context, KEY_RECENT_GAMES, games)
     }
 
     // ============ 首页快捷启动（最多 3 个） ============

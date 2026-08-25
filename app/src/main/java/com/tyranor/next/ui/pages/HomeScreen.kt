@@ -1,6 +1,5 @@
 package com.tyranor.next.ui.pages
 
-import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -32,13 +31,14 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -59,66 +59,50 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.tyranor.next.R
 import com.tyranor.next.scanner.EngineLauncher
-import com.tyranor.next.scanner.EngineScanner
 import com.tyranor.next.scanner.ScanGame
 import com.tyranor.next.theme.NavWhite
 import com.tyranor.next.ui.common.TimeFormats
 import com.tyranor.next.ui.common.glassNavBottomInset
+import com.tyranor.next.ui.main.MainLibraryUiState
 import kotlin.math.roundToInt
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 @Composable
-fun HomeScreen(modifier: Modifier = Modifier) {
+fun HomeScreen(
+    modifier: Modifier = Modifier,
+    libraryState: MainLibraryUiState,
+    onGameUpdated: (ScanGame) -> Unit,
+    onGameDeleted: (ScanGame) -> Unit,
+    onRecentRemoved: (ScanGame) -> Unit,
+    onQuickLaunchToggle: (ScanGame) -> Boolean,
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    // 首页数据每次进入重组时重新加载，保证游戏页改动后切回立即生效；
-    // 快捷启动用主库最新数据刷新，封面等修改实时同步
-    var quickLaunch by remember { mutableStateOf(EngineScanner.refreshQuickLaunch(context)) }
-    var recentGames by remember { mutableStateOf(EngineScanner.loadRecentGames(context).take(10)) }
+    val quickLaunch = libraryState.quickLaunch
+    val recentGames = libraryState.recentGames
     var selectedGame by remember { mutableStateOf<ScanGame?>(null) }
     var launchError by remember { mutableStateOf<String?>(null) }
     var patchLaunchTarget by remember { mutableStateOf<ScanGame?>(null) }
 
-    // 首页与游戏页同驻 Pager（beyondViewportPageCount=1），本地 state 不会因切页重建；
-    // 监听 EngineScanner 的快捷启动版本号，游戏抽屉增删后实时刷新三个快捷启动卡片。
-    val quickLaunchRevision by EngineScanner.quickLaunchRevision.collectAsState()
-    LaunchedEffect(quickLaunchRevision) {
-        quickLaunch = EngineScanner.refreshQuickLaunch(context)
+    LaunchedEffect(libraryState.games) {
+        selectedGame = selectedGame?.let { selected ->
+            libraryState.games.firstOrNull { it.uri == selected.uri }
+        }
     }
 
     fun replaceGame(updated: ScanGame) {
-        quickLaunch = quickLaunch.map { if (it.uri == updated.uri) updated else it }
-        recentGames = recentGames.map { if (it.uri == updated.uri) updated else it }
         selectedGame = selectedGame?.let { if (it.uri == updated.uri) updated else it }
-        // 同步持久化最近记录、快捷启动与主游戏库，避免修改丢失
-        EngineScanner.saveRecentGames(context, recentGames)
-        EngineScanner.saveQuickLaunch(context, quickLaunch)
-        EngineScanner.saveGames(
-            context,
-            EngineScanner.loadGames(context).map { if (it.uri == updated.uri) updated else it },
-        )
+        onGameUpdated(updated)
     }
 
     fun deleteGame(target: ScanGame) {
-        quickLaunch = quickLaunch.filterNot { it.uri == target.uri }
-        recentGames = recentGames.filterNot { it.uri == target.uri }
         selectedGame = null
-        // 从持久游戏库一并移除，避免首页删了但「游戏」页仍显示（复活）
-        EngineScanner.removeGame(context, target.uri)
-        // 最近记录/快捷启动同步持久化移除，避免切页取消 IO 清理协程后残留脏数据
-        EngineScanner.removeRecentGame(context, target.uri)
-        EngineScanner.removeQuickLaunch(context, target.uri)
-        // 仅清理应用内数据（每游戏设置、最近记录、封面缓存、应用内存档镜像）；不触碰游戏文件
-        scope.launch(Dispatchers.IO) {
-            cleanupDeletedGame(context, target)
-        }
+        onGameDeleted(target)
     }
 
     /** 仅删除该条最近游玩记录，不影响游戏库。 */
     fun removeRecentRecord(target: ScanGame) {
-        recentGames = recentGames.filterNot { it.uri == target.uri }
-        EngineScanner.removeRecentGame(context, target.uri)
+        onRecentRemoved(target)
     }
 
     // 点按直接启动游戏；Artemis 按既有策略弹出补丁确认（与游戏页长按启动一致）。
@@ -170,7 +154,11 @@ fun HomeScreen(modifier: Modifier = Modifier) {
         }
 
         // ===== 快捷启动下方：最近打开列表（最多 10 条，圆角长矩形） =====
-        if (recentGames.isEmpty()) {
+        if (!libraryState.loaded) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+        } else if (recentGames.isEmpty()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(
                     "暂无最近打开的游戏",
@@ -184,7 +172,11 @@ fun HomeScreen(modifier: Modifier = Modifier) {
                 contentPadding = PaddingValues(top = 8.dp, bottom = 16.dp + glassNavBottomInset()),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                items(recentGames, key = { it.uri }) { game ->
+                items(
+                    items = recentGames,
+                    key = { it.uri },
+                    contentType = { "recent_game" },
+                ) { game ->
                     RecentGameRow(
                         game = game,
                         onClick = { selectedGame = game },
@@ -203,6 +195,8 @@ fun HomeScreen(modifier: Modifier = Modifier) {
             onDismiss = { selectedGame = null },
             onGameUpdated = { replaceGame(it) },
             onDeleteGame = { deleteGame(game) },
+            quickLaunched = quickLaunch.any { it.uri == game.uri },
+            onQuickLaunchToggle = { onQuickLaunchToggle(game) },
             onEngineSettings = {
                 startActivityWithPageTransition(context, PerGameSettingsActivity.createIntent(context, game))
                 selectedGame = null
@@ -323,7 +317,17 @@ private fun RecentGameRow(
     BoxWithConstraints {
         val revealPx = with(LocalDensity.current) { (maxWidth / 6f).toPx() }
         val scope = rememberCoroutineScope()
-        val offset = remember { Animatable(0f) }
+        var offset by remember { mutableFloatStateOf(0f) }
+        val settleJob = remember { arrayOfNulls<kotlinx.coroutines.Job>(1) }
+        fun settleOffset(target: Float) {
+            settleJob[0]?.cancel()
+            settleJob[0] = scope.launch {
+                androidx.compose.animation.core.Animatable(offset).animateTo(target) {
+                    offset = value
+                }
+            }
+        }
+        val formattedOpenTime = remember(game.openTime) { TimeFormats.formatDateTime(game.openTime) }
         // 统一裁切圆角：红色删除层与白色内容层圆角一致，内容左移越界部分被裁掉
         Box(Modifier.clip(RoundedCornerShape(8.dp))) {
             // 删除层：主题色背景 + 白色删除图标，仅滑出约 1/6 时露出右侧「删除」区域
@@ -350,13 +354,13 @@ private fun RecentGameRow(
             }
             Row(
                 modifier = Modifier
-                    .offset { IntOffset(offset.value.roundToInt(), 0) }
+                    .offset { IntOffset(offset.roundToInt(), 0) }
                     .fillMaxWidth()
                     .background(NavWhite)
                     .combinedClickable(
                         onClick = {
-                            if (offset.value != 0f) {
-                                scope.launch { offset.animateTo(0f) }
+                            if (offset != 0f) {
+                                settleOffset(0f)
                             } else {
                                 onClick()
                             }
@@ -366,19 +370,14 @@ private fun RecentGameRow(
                     .pointerInput(revealPx) {
                         detectHorizontalDragGestures(
                             onDragEnd = {
-                                scope.launch {
-                                    offset.animateTo(if (offset.value < -revealPx / 2f) -revealPx else 0f)
-                                }
+                                settleOffset(if (offset < -revealPx / 2f) -revealPx else 0f)
                             },
                             onDragCancel = {
-                                scope.launch {
-                                    offset.animateTo(if (offset.value < -revealPx / 2f) -revealPx else 0f)
-                                }
+                                settleOffset(if (offset < -revealPx / 2f) -revealPx else 0f)
                             },
                         ) { _, dragAmount ->
-                            scope.launch {
-                                offset.snapTo((offset.value + dragAmount).coerceIn(-revealPx, 0f))
-                            }
+                            settleJob[0]?.cancel()
+                            offset = (offset + dragAmount).coerceIn(-revealPx, 0f)
                         }
                     }
                     .padding(horizontal = 16.dp, vertical = 23.dp),
@@ -398,7 +397,7 @@ private fun RecentGameRow(
                     modifier = Modifier.weight(1f).padding(start = 14.dp),
                 )
                 Text(
-                    TimeFormats.formatDateTime(game.openTime),
+                    formattedOpenTime,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(start = 12.dp),
