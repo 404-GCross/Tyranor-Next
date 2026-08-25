@@ -311,24 +311,25 @@ object EngineScanner {
 
     /** 全量刷新游戏库：以当前扫描结果为准，移除已删除/改名路径的旧缓存条目。 */
     suspend fun rescanLibrary(context: Context): List<ScanGame> = withContext(Dispatchers.IO) {
-        val existingByUri = loadGames(context).associateBy { it.uri }
         val scanned = scanAll(context)
-        val refreshed = scanned.map { current ->
-            existingByUri[current.uri]?.let { previous ->
-                current.copy(
-                    coverUri = previous.coverUri ?: current.coverUri,
-                    coverSource = previous.coverSource
-                        ?: current.coverSource?.takeIf {
-                            previous.coverUri == null || previous.coverUri == current.coverUri
-                        },
-                    vndbId = previous.vndbId,
-                    metadataTitle = previous.metadataTitle,
-                    launchFile = previous.launchFile,
-                    openTime = previous.openTime,
-                )
-            } ?: current
+        val refreshed = updateGames(context) { currentGames ->
+            val existingByUri = currentGames.associateBy { it.uri }
+            scanned.map { current ->
+                existingByUri[current.uri]?.let { previous ->
+                    current.copy(
+                        coverUri = previous.coverUri ?: current.coverUri,
+                        coverSource = previous.coverSource
+                            ?: current.coverSource?.takeIf {
+                                previous.coverUri == null || previous.coverUri == current.coverUri
+                            },
+                        vndbId = previous.vndbId,
+                        metadataTitle = previous.metadataTitle,
+                        launchFile = previous.launchFile,
+                        openTime = previous.openTime,
+                    )
+                } ?: current
+            }
         }
-        saveGames(context, refreshed)
         val validUris = refreshed.mapTo(HashSet()) { it.uri }
         saveRecentGames(context, loadRecentGames(context).filter { it.uri in validUris })
         saveQuickLaunch(context, loadQuickLaunch(context).filter { it.uri in validUris })
