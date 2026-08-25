@@ -411,7 +411,7 @@ public class KR2Activity extends Cocos2dxActivity {
             switch (event.getAction()) {
                 case KeyEvent.ACTION_DOWN:
                     if (event.getRepeatCount() == 0) {
-                        if (DoubleBackExit.shouldExit(this, false)) exit();
+                        if (DoubleBackExit.shouldExit(this)) exit();
                         else nativeKeyAction(KeyEvent.KEYCODE_BACK, true);
                     }
                     return true;
@@ -432,7 +432,7 @@ public class KR2Activity extends Cocos2dxActivity {
 
     @Override public void onBackPressed() {
         // 无视图消费 BACK 时的兜底路径（如键盘收起后的残余事件）：只布防退出窗口，不向引擎透传
-        if (DoubleBackExit.shouldExit(this, false)) exit();
+        if (DoubleBackExit.shouldExit(this)) exit();
     }
 
     @Override public void onWindowFocusChanged(boolean hasFocus) {
