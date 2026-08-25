@@ -29,10 +29,10 @@ object AppSettingsStore {
     const val COVER_SOURCE_CUSTOM = "custom"
 
     val DEFAULT_COVER_SCRAPER_SOURCES = listOf(
+        COVER_SOURCE_VNDB,
         COVER_SOURCE_HIKARINAGI,
         COVER_SOURCE_BANGUMI,
         COVER_SOURCE_STEAM,
-        COVER_SOURCE_VNDB,
     )
 
     /** 默认主题色：#307DEF，与 theme/Color.kt 的 Blue40 一致。 */
