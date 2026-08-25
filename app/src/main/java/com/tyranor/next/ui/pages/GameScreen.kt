@@ -46,7 +46,6 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.material3.RadioButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -70,6 +69,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import top.yukonga.miuix.kmp.basic.RadioButton
 import com.tyranor.next.R
 import com.tyranor.next.scanner.EngineLauncher
 import com.tyranor.next.scanner.EngineScanner
@@ -80,6 +80,7 @@ import com.tyranor.next.scanner.VndbCandidate
 import com.tyranor.next.scanner.VndbCoverService
 import com.tyranor.next.settings.AppSettingsStore
 import com.tyranor.next.settings.PerGameSettingsStore
+import com.tyranor.next.theme.MiuixSettingsTheme
 import com.tyranor.next.theme.NavWhite
 import com.tyranor.next.ui.common.AppSearchField
 import com.tyranor.next.ui.common.glassNavBottomInset
@@ -509,7 +510,7 @@ internal fun GameActionsSheet(
                     GameActionRow(
                         iconRes = R.drawable.ic_sheet_launch_file,
                         label = "启动文件",
-                        subtitle = game.launchFile ?: "自动",
+                        subtitle = game.launchFile ?: "自动 - 无法打开请手动选择游戏启动文件",
                     ) { showLaunchFilePicker = true }
                 }
             }
@@ -833,30 +834,33 @@ private fun LaunchFileDialog(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                else -> LazyColumn(
-                    modifier = Modifier.fillMaxWidth().height(260.dp),
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
-                ) {
-                    lazyItems(files) { name ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable { selected = name }
-                                .padding(horizontal = 8.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            RadioButton(
-                                selected = selected == name,
-                                onClick = { selected = name },
-                            )
-                            Text(
-                                name,
-                                style = MaterialTheme.typography.bodyMedium,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.padding(start = 10.dp),
-                            )
+                else -> MiuixSettingsTheme {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxWidth().height(260.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        lazyItems(files) { name ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(NavWhite)
+                                    .clickable { selected = name }
+                                    .padding(horizontal = 12.dp, vertical = 9.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    name,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                RadioButton(
+                                    selected = selected == name,
+                                    onClick = { selected = name },
+                                )
+                            }
                         }
                     }
                 }
