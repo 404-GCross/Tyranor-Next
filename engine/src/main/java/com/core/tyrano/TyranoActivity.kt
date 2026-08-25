@@ -38,6 +38,7 @@ import java.io.ByteArrayInputStream
 import java.io.File
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
+import org.json.JSONObject
 
 /**
  * Tyrano WebView 宿主；资源服务与存档沙箱分别由独立组件负责。
@@ -58,6 +59,8 @@ class TyranoActivity : Activity() {
     private var firstResume = true
     private var localServer: TyranoLocalHttpServer? = null
     private var allowExternalNetwork = false
+    private var rpgMakerModEnabled = false
+    private var rpgMakerModGameId = ""
     private var backInvokedCallback: Any? = null
     private val processExitScheduled = AtomicBoolean(false)
 
@@ -67,7 +70,7 @@ class TyranoActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        backInvokedCallback = DoubleBackExit.registerPredictiveBack(this) { finish() }
+        backInvokedCallback = DoubleBackExit.registerPredictiveBack(this, ::handleBackRequest)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         enterFullscreen()
         allowExternalNetwork = getSharedPreferences(EnginePrefs.APP_PREFS, Context.MODE_PRIVATE)
@@ -109,6 +112,11 @@ class TyranoActivity : Activity() {
             }
         }
         webGameType = detectWebGameType(intent.getStringExtra("type"), contentRoot, asarArchive)
+        rpgMakerModEnabled = intent.getBooleanExtra(EXTRA_RPG_MAKER_MOD_ENABLED, true) &&
+            (webGameType == WebGameType.RPG_MV || webGameType == WebGameType.RPG_MZ)
+        rpgMakerModGameId = intent.getStringExtra(EXTRA_RPG_MAKER_MOD_GAME_ID)
+            ?.takeIf(String::isNotBlank)
+            ?: resolvedGameDir
         Log.i(TAG, "entry mode=${if (gameUsesAsar) "asar" else "dir"} type=${webGameType.intentValue} asar=$asarPath contentRoot=${contentRoot.absolutePath}")
         val needsSaveBridge = webGameType == WebGameType.TYRANO ||
             webGameType == WebGameType.RPG_MV || webGameType == WebGameType.RPG_MZ
@@ -136,12 +144,27 @@ class TyranoActivity : Activity() {
             } else {
                 emptyMap()
             }
+            val modResources = if (rpgMakerModEnabled) {
+                mapOf(
+                    RPG_MAKER_MOD_CORE_PATH to loadAsset(RPG_MAKER_MOD_CORE_ASSET),
+                    RPG_MAKER_MOD_UI_PATH to loadAsset(RPG_MAKER_MOD_UI_ASSET),
+                    RPG_MAKER_MOD_CSS_PATH to loadAsset(RPG_MAKER_MOD_CSS_ASSET),
+                    RPG_MAKER_MOD_ICON_PATH to loadAsset(RPG_MAKER_MOD_ICON_ASSET),
+                )
+            } else {
+                emptyMap()
+            }
+            val modHtml = if (rpgMakerModEnabled) buildRpgMakerModHtml() else ""
             Log.i(TAG, "asset loaded ${hookAsset ?: "none"} bytes=${hook.size} scriptAppends=${scriptAppends.keys}")
             val injectBeforeBody = webGameType == WebGameType.RPG_MV || webGameType == WebGameType.RPG_MZ
             localServer = if (gameUsesAsar) {
-                TyranoLocalHttpServer(contentRoot, asarArchive, hook, injectBeforeBody, scriptAppends)
+                TyranoLocalHttpServer(
+                    contentRoot, asarArchive, hook, injectBeforeBody, scriptAppends, modHtml, modResources,
+                )
             } else {
-                TyranoLocalHttpServer(contentRoot, hook, injectBeforeBody, scriptAppends)
+                TyranoLocalHttpServer(
+                    contentRoot, hook, injectBeforeBody, scriptAppends, modHtml, modResources,
+                )
             }.also { it.start() }
         } catch (error: Throwable) {
             Log.e(TAG, "start local server failed", error)
@@ -163,8 +186,15 @@ class TyranoActivity : Activity() {
 
         configureWebView(browser)
         when (webGameType) {
-            WebGameType.RPG_MV, WebGameType.RPG_MZ ->
+            WebGameType.RPG_MV, WebGameType.RPG_MZ -> {
                 browser.addJavascriptInterface(RpgMakerSaveBridge(saves), RPG_MAKER_SAVE_BRIDGE_NAME)
+                if (rpgMakerModEnabled) {
+                    browser.addJavascriptInterface(
+                        RpgMakerModBridge(rpgMakerModGameId),
+                        RPG_MAKER_MOD_BRIDGE_NAME,
+                    )
+                }
+            }
             WebGameType.TYRANO -> browser.addJavascriptInterface(TyranoJsBridge(saves), JS_BRIDGE_NAME)
             WebGameType.VN, WebGameType.WEB_OTHER -> Unit
         }
@@ -179,6 +209,17 @@ class TyranoActivity : Activity() {
     }
 
     private fun loadAsset(name: String): ByteArray = assets.open(name).buffered().use { it.readBytes() }
+
+    private fun buildRpgMakerModHtml(): String {
+        val colors = EngineThemeColors.fromIntent(intent)
+        fun cssColor(color: Int): String = String.format(Locale.US, "#%06X", color and 0xFFFFFF)
+        return """
+            <style>:root{--tm-primary:${cssColor(colors.primary)};--tm-on-primary:${cssColor(colors.onPrimary)};}</style>
+            <link rel="stylesheet" href="/__tyranor__/rpgmaker_mod.css">
+            <script src="/__tyranor__/rpgmaker_mod_core.js"></script>
+            <script src="/__tyranor__/rpgmaker_mod_ui.js"></script>
+        """.trimIndent()
+    }
 
     private fun detectWebGameType(explicitType: String?, contentRoot: File, asar: AsarArchive?): WebGameType {
         if (asar != null) {
@@ -453,12 +494,30 @@ class TyranoActivity : Activity() {
 
     @Deprecated("Deprecated in Android")
     override fun onBackPressed() {
-        DoubleBackExit.handleBack(this) { finish() }
+        handleBackRequest()
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        if (DoubleBackExit.dispatchBackKey(this, event) { finish() }) return true
+        if (event.keyCode == KeyEvent.KEYCODE_BACK) {
+            if (event.action == KeyEvent.ACTION_UP) handleBackRequest()
+            return true
+        }
         return super.dispatchKeyEvent(event)
+    }
+
+    private fun handleBackRequest() {
+        val browser = webView
+        if (!rpgMakerModEnabled || browser == null) {
+            DoubleBackExit.handleBack(this) { finish() }
+            return
+        }
+        browser.evaluateJavascript(
+            "(function(){if(window.TyranorModUI&&window.TyranorModUI.isOpen()){window.TyranorModUI.close();return true;}return false;})()",
+        ) { handled ->
+            if (!handled.equals("true", ignoreCase = true)) {
+                DoubleBackExit.handleBack(this) { finish() }
+            }
+        }
     }
 
     override fun onPause() {
@@ -727,6 +786,28 @@ class TyranoActivity : Activity() {
 
         @JavascriptInterface
         fun Exists(key: String?): Boolean = TyranoStorage.exists(saveDirectory, key, RPG_MV_SAVE_EXTENSION)
+
+        @JavascriptInterface
+        fun Remove(key: String?): Boolean = TyranoStorage.remove(saveDirectory, key, RPG_MV_SAVE_EXTENSION)
+    }
+
+    /** 修改器仅能读写当前游戏的布尔开关，不暴露文件系统或其他游戏的状态键。 */
+    inner class RpgMakerModBridge(private val gameId: String) {
+        private val preferences
+            get() = getSharedPreferences(RPG_MAKER_MOD_PREFS, Context.MODE_PRIVATE)
+
+        @JavascriptInterface
+        fun getState(): String = preferences.getString(gameId, null).orEmpty()
+
+        @JavascriptInterface
+        fun setState(raw: String?) {
+            val input = runCatching { JSONObject(raw.orEmpty()) }.getOrNull() ?: return
+            val sanitized = JSONObject()
+            RPG_MAKER_MOD_FLAGS.forEach { key ->
+                if (input.has(key)) sanitized.put(key, input.optBoolean(key, false))
+            }
+            preferences.edit().putString(gameId, sanitized.toString()).apply()
+        }
     }
 
     private enum class WebGameType(val intentValue: String) {
@@ -752,9 +833,24 @@ class TyranoActivity : Activity() {
         private const val RPG_MZ_MANAGERS_HOOK_ASSET = "__hook_rmmz_managers.js"
         private const val JS_BRIDGE_NAME = "appJsInterface"
         private const val RPG_MAKER_SAVE_BRIDGE_NAME = "saveDataManager"
+        private const val RPG_MAKER_MOD_BRIDGE_NAME = "TyranorModNative"
         private const val RPG_MV_SAVE_EXTENSION = ".bin"
         private const val EXTRA_SCOPED_SAVE_DIR = "scopedSaveDir"
         private const val EXTRA_SCOPED_SAVE_ROOT = "scopedSaveRoot"
+        private const val EXTRA_RPG_MAKER_MOD_ENABLED = "rpgMakerModEnabled"
+        private const val EXTRA_RPG_MAKER_MOD_GAME_ID = "rpgMakerModGameId"
+        private const val RPG_MAKER_MOD_PREFS = "tyranor_rpgmaker_mod_state"
+        private const val RPG_MAKER_MOD_CORE_ASSET = "__rpgmaker_mod_core.js"
+        private const val RPG_MAKER_MOD_UI_ASSET = "__rpgmaker_mod_ui.js"
+        private const val RPG_MAKER_MOD_CSS_ASSET = "__rpgmaker_mod.css"
+        private const val RPG_MAKER_MOD_ICON_ASSET = "__rpgmaker_mod_icon.png"
+        private const val RPG_MAKER_MOD_CORE_PATH = "__tyranor__/rpgmaker_mod_core.js"
+        private const val RPG_MAKER_MOD_UI_PATH = "__tyranor__/rpgmaker_mod_ui.js"
+        private const val RPG_MAKER_MOD_CSS_PATH = "__tyranor__/rpgmaker_mod.css"
+        private const val RPG_MAKER_MOD_ICON_PATH = "__tyranor__/rpgmaker_mod_icon.png"
+        private val RPG_MAKER_MOD_FLAGS = arrayOf(
+            "godMode", "oneHit", "alwaysCrit", "noclip", "eventSpeed", "msgSkip",
+        )
         private const val PROCESS_EXIT_DELAY_MS = 500L
         private const val MAX_ENTRY_SEARCH_DEPTH = 2
         private val WEB_ENTRY_SUBDIRS = arrayOf("www", "resources", "app.asar", "app", "tyrano", "data", "scenario", "system", "game")

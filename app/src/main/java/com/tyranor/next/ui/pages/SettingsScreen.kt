@@ -249,6 +249,7 @@ internal fun EngineSettingsDetailScreen(kind: EngineSettingsKind) {
 
     var tyExternal by remember { mutableStateOf(EngineSettingsStore.isTyranoExternalNetwork(ctx)) }
     var tyScoped by remember { mutableStateOf(EngineSettingsStore.isTyranoScopedSaveDir(ctx)) }
+    var rpgMakerMod by remember { mutableStateOf(EngineSettingsStore.isRpgMakerModEnabled(ctx)) }
 
     val fontLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
@@ -283,6 +284,7 @@ internal fun EngineSettingsDetailScreen(kind: EngineSettingsKind) {
         EngineSettingsStore.setArtAutoPatch(ctx, artPatch)
         EngineSettingsStore.setTyranoExternalNetwork(ctx, tyExternal)
         EngineSettingsStore.setTyranoScopedSaveDir(ctx, tyScoped)
+        EngineSettingsStore.setRpgMakerModEnabled(ctx, rpgMakerMod)
     }
 
     MiuixSettingsTheme {
@@ -319,7 +321,7 @@ internal fun EngineSettingsDetailScreen(kind: EngineSettingsKind) {
                 kind,
                 krVersion, krKernel, krScoped, krFont, krForceFont, krRenderer, krDrawThread,
                 krSwCompress, krOglCompress, krMem, krTexsize, krAccurate, krFps, isSdl3, krIs134126,
-                ons, artVersion, artRotate, artPatch, tyExternal, tyScoped, fontLauncher,
+                ons, artVersion, artRotate, artPatch, tyExternal, tyScoped, rpgMakerMod, fontLauncher,
                 topInset = innerPadding.calculateTopPadding(),
                 onKrVersion = { krVersion = it },
                 onKrKernel = { krKernel = it },
@@ -340,6 +342,7 @@ internal fun EngineSettingsDetailScreen(kind: EngineSettingsKind) {
                 onArtPatch = { artPatch = it },
                 onTyExternal = { tyExternal = it },
                 onTyScoped = { tyScoped = it },
+                onRpgMakerMod = { rpgMakerMod = it },
             )
         }
     }
@@ -349,6 +352,7 @@ enum class EngineSettingsKind(val title: String, @param:DrawableRes val iconRes:
     KRKR("KRKR引擎设置", R.drawable.ic_settings_engine),
     ONS("ONS引擎设置", R.drawable.ic_settings_engine),
     ARTEMIS("Artemis引擎设置", R.drawable.ic_settings_engine),
+    RPG_MAKER("RPG Maker引擎设置", R.drawable.ic_settings_engine),
     TYRANO("Tyrano引擎设置", R.drawable.ic_settings_engine),
 }
 
@@ -421,7 +425,7 @@ private fun LazyListPlaceholder(
     krRenderer: String, krDrawThread: String, krSwCompress: String, krOglCompress: String,
     krMem: String, krTexsize: String, krAccurate: String, krFps: String, isSdl3: Boolean, krIs134126: Boolean,
     ons: EngineSettingsStore.Ons, artVersion: String, artRotate: Boolean, artPatch: String,
-    tyExternal: Boolean, tyScoped: Boolean, fontLauncher: FontPickerLauncher,
+    tyExternal: Boolean, tyScoped: Boolean, rpgMakerMod: Boolean, fontLauncher: FontPickerLauncher,
     topInset: Dp,
     onKrVersion: (String) -> Unit, onKrKernel: (String) -> Unit, onKrScoped: (Boolean) -> Unit,
     onKrForceFont: (Boolean) -> Unit, onKrRenderer: (String) -> Unit, onKrDrawThread: (String) -> Unit,
@@ -429,7 +433,7 @@ private fun LazyListPlaceholder(
     onKrTexsize: (String) -> Unit, onKrAccurate: (String) -> Unit, onKrFps: (String) -> Unit,
     onResetKrFont: () -> Unit, onOns: (EngineSettingsStore.Ons) -> Unit,
     onArtVersion: (String) -> Unit, onArtRotate: (Boolean) -> Unit, onArtPatch: (String) -> Unit,
-    onTyExternal: (Boolean) -> Unit, onTyScoped: (Boolean) -> Unit,
+    onTyExternal: (Boolean) -> Unit, onTyScoped: (Boolean) -> Unit, onRpgMakerMod: (Boolean) -> Unit,
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
@@ -504,6 +508,14 @@ private fun LazyListPlaceholder(
             EngineCard("Tyrano") {
                 SwitchPreference(title = "允许加载外部网络资源", checked = tyExternal, onCheckedChange = onTyExternal)
                 SwitchPreference(title = "独立存档目录", checked = tyScoped, onCheckedChange = onTyScoped)
+            }
+        }
+
+        if (kind == EngineSettingsKind.RPG_MAKER) item {
+            EngineCard("RPG Maker MV/MZ") {
+                SwitchPreference(title = "允许加载外部网络资源", checked = tyExternal, onCheckedChange = onTyExternal)
+                SwitchPreference(title = "独立存档目录", checked = tyScoped, onCheckedChange = onTyScoped)
+                SwitchPreference(title = "游戏修改器", checked = rpgMakerMod, onCheckedChange = onRpgMakerMod)
             }
         }
 
