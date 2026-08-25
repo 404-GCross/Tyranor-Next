@@ -108,14 +108,7 @@ jobs:
           } >> "${GITHUB_ENV}"
 
       - name: Assemble release APK
-        env:
-          HIKARINAGI_CLIENT_ID: ${{ vars.HIKARINAGI_CLIENT_ID }}
-        run: |
-          if [[ -z "${HIKARINAGI_CLIENT_ID}" ]]; then
-            echo "::error::Missing repository variable: HIKARINAGI_CLIENT_ID"
-            exit 1
-          fi
-          ./gradlew assembleRelease --no-daemon
+        run: ./gradlew assembleRelease --no-daemon
 
       - name: Prepare release metadata
         id: meta
