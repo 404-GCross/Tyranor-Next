@@ -77,6 +77,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
     var checkingUpdate by remember { mutableStateOf(false) }
     var updateAvailable by remember { mutableStateOf<UpdateCheckResult.UpdateAvailable?>(null) }
     var showGroupDialog by remember { mutableStateOf(false) }
+    var backExitPrompt by remember { mutableStateOf(EngineSettingsStore.isBackExitPrompt(ctx)) }
 
     fun checkUpdate() {
         if (checkingUpdate) return
@@ -132,6 +133,15 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                 item {
                     MiuixCard(modifier = Modifier.fillMaxWidth(), cornerRadius = 8.dp) {
                         Column(Modifier.padding(vertical = 4.dp)) {
+                            SwitchPreference(
+                                title = "返回键退出提示",
+                                summary = "游戏内按返回时提示「再按一次返回退出游戏」",
+                                checked = backExitPrompt,
+                                onCheckedChange = { checked ->
+                                    backExitPrompt = checked
+                                    EngineSettingsStore.setBackExitPrompt(ctx, checked)
+                                },
+                            )
                             ArrowPreference(
                                 title = "应用设置",
                                 summary = "有关应用内的各项配置",

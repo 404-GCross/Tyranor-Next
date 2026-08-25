@@ -27,7 +27,6 @@ import android.view.ViewGroup;
 
 import org.libsdl.app.SDLActivity;
 
-import com.core.engine.DoubleBackExit;
 import com.core.ons.OnsLibLoader;
 import com.core.ons.OnsSettings;
 import com.core.ons.OnsVideoActivity;
@@ -106,28 +105,9 @@ public class ONScripter extends SDLActivity {
         if (hasFocus) fullscreen();
     }
 
-    @Override public boolean dispatchKeyEvent(KeyEvent event) {
-        if (DoubleBackExit.dispatchBackKey(this, event, this::sendEscToOns)) return true;
-        return super.dispatchKeyEvent(event);
-    }
-
-    @Override public void onBackPressed() {
-        DoubleBackExit.handleBack(this, this::sendEscToOns);
-    }
-
-    @Override protected void exitFromBack() {
-        sendEscToOns();
-    }
-
-    private void sendEscToOns() {
-        Log.d(TAG, "send ESC to ONS");
-        try {
-            SDLActivity.onNativeKeyDown(KeyEvent.KEYCODE_ESCAPE);
-            SDLActivity.onNativeKeyUp(KeyEvent.KEYCODE_ESCAPE);
-        } catch (Throwable t) {
-            Log.w(TAG, "send ESC failed", t);
-        }
-    }
+    // 返回键不在本类拦截：放行到 SDLSurface → SDLActivity.handleKeyEvent，
+    // 首次按下弹提示后作为 BACK 键送入 native（SDL 映射为 ESC，效果同旧的 sendEscToOns），
+    // 窗口内第二次按下由基类 exitFromBack 退出。
 
     public int getFD(byte[] pathbyte, int mode) {
         String utf8Path = null;

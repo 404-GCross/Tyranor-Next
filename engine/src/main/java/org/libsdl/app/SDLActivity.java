@@ -91,7 +91,8 @@ public class SDLActivity extends Activity implements View.OnSystemUiVisibilityCh
     protected static DummyEdit mTextEdit;
     Handler commandHandler = new SDLCommandHandler();
     protected final int[] messageboxSelection = new int[1];
-    private Object backInvokedCallback;
+    /** 返回键透传模式下，退出分支吞掉的 ACTION_UP（防止引擎收到孤立抬键）。 */
+    private static boolean sBackKeyUpSuppressed;
     private final Runnable rehideSystemUi = new Runnable() { // from class: org.libsdl.app.SDLActivity.7
         @Override // java.lang.Runnable
         public void run() {
@@ -354,6 +355,22 @@ public class SDLActivity extends Activity implements View.OnSystemUiVisibilityCh
             }
         }
         if ((source & 257) == 257) {
+            // 返回键透传 + 双击退出：4 = KEYCODE_BACK，0/1 = ACTION_DOWN/UP。
+            // 首次按下弹提示后照常送入 native 引擎；窗口内第二次按下退出且不送 native，
+            // 并吞掉后续 ACTION_UP 防止引擎收到孤立抬键。
+            if (i8 == 4 && !nativeGetHintBoolean("SDL_ANDROID_TRAP_BACK_BUTTON", false)) {
+                SDLActivity activity = mSingleton;
+                if (activity != null && keyEvent.getAction() == 0 && keyEvent.getRepeatCount() == 0
+                        && DoubleBackExit.shouldExit(activity)) {
+                    sBackKeyUpSuppressed = true;
+                    activity.exitFromBack();
+                    return true;
+                }
+                if (keyEvent.getAction() == 1 && sBackKeyUpSuppressed) {
+                    sBackKeyUpSuppressed = false;
+                    return true;
+                }
+            }
             if (keyEvent.getAction() == 0) {
                 if (isTextInputEvent(keyEvent)) {
                     if (inputConnection != null) {
@@ -736,9 +753,8 @@ public class SDLActivity extends Activity implements View.OnSystemUiVisibilityCh
         if (mBrokenLibraries || (keyCode = keyEvent.getKeyCode()) == 25 || keyCode == 24 || keyCode == 27 || keyCode == 168 || keyCode == 169) {
             return false;
         }
-        if (DoubleBackExit.dispatchBackKey(this, keyEvent, this::exitFromBack)) {
-            return true;
-        }
+        // 返回键不在 Activity 层拦截：放行到 SDLSurface → handleKeyEvent，
+        // 由它透传给 native 引擎并承担双击退出判定。
         return super.dispatchKeyEvent(keyEvent);
     }
 
@@ -951,7 +967,6 @@ return getContext().getApplicationInfo().nativeLibraryDir + "/" + (libraries.len
         }
         if (mBrokenLibraries) {
             mSingleton = this;
-            backInvokedCallback = DoubleBackExit.registerPredictiveBack(this, this::exitFromBack);
             AlertDialog.Builder builder = new AlertDialog.Builder(this);
             builder.setMessage("An error occurred while trying to start the application. Please try again and/or reinstall." + System.getProperty("line.separator") + System.getProperty("line.separator") + "Error: " + message);
             builder.setTitle("SDL Error");
@@ -968,7 +983,6 @@ return getContext().getApplicationInfo().nativeLibraryDir + "/" + (libraries.len
         SDL.setupJNI();
         SDL.initialize();
         mSingleton = this;
-        backInvokedCallback = DoubleBackExit.registerPredictiveBack(this, this::exitFromBack);
         SDL.setContext(this);
         mClipboardHandler = new SDLClipboardHandler();
         mHIDDeviceManager = HIDDeviceManager.acquire(this);
@@ -997,7 +1011,6 @@ return getContext().getApplicationInfo().nativeLibraryDir + "/" + (libraries.len
     @Override // i.AbstractActivityC1223l, androidx.fragment.app.B, android.app.Activity
     public void onDestroy() {
         Log.v(TAG, "onDestroy()");
-        DoubleBackExit.unregisterPredictiveBack(this, backInvokedCallback);
         DoubleBackExit.clear(this);
         HIDDeviceManager hIDDeviceManager = mHIDDeviceManager;
         if (hIDDeviceManager != null) {

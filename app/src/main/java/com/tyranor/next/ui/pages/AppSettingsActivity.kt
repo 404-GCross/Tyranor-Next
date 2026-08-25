@@ -3,6 +3,7 @@ package com.tyranor.next.ui.pages
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
+import android.os.Build
 import android.os.Bundle
 import android.provider.DocumentsContract
 import androidx.activity.ComponentActivity
@@ -11,11 +12,13 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -27,9 +30,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.Icon
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -42,6 +50,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color as ComposeColor
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -51,11 +60,16 @@ import com.tyranor.next.settings.AppSettingsStore
 import com.tyranor.next.scanner.EngineScanner
 import com.tyranor.next.theme.AppThemeColors
 import com.tyranor.next.theme.MiuixSettingsTheme
+import com.tyranor.next.theme.PaletteStyle
+import com.tyranor.next.theme.PresetSeedColor
+import com.tyranor.next.theme.PresetSeedColors
 import com.tyranor.next.theme.TyranorNextTheme
+import com.tyranor.next.theme.monetColorScheme
 import com.tyranor.next.ui.common.WithoutPressIndication
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.util.concurrent.ConcurrentHashMap
 import top.yukonga.miuix.kmp.basic.Card as MiuixCard
 import top.yukonga.miuix.kmp.basic.ColorPicker
 import top.yukonga.miuix.kmp.basic.Scaffold as MiuixScaffold
@@ -157,28 +171,83 @@ internal fun AppSettingsScreen() {
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 item {
+                    // 莫奈动态取色总开关：开启后主题色来自壁纸/封面，关闭时用手动轮盘色
                     MiuixCard(modifier = Modifier.fillMaxWidth(), cornerRadius = 8.dp) {
                         Column(Modifier.padding(vertical = 4.dp)) {
-                            ArrowPreference(
-                                title = "色调轮盘",
-                                startAction = {
-                                    Box(
-                                        modifier = Modifier
-                                            .padding(end = 6.dp)
-                                            .size(24.dp)
-                                            .clip(CircleShape)
-                                            .background(AppThemeColors.primary),
-                                    )
+                            SwitchPreference(
+                                title = "动态取色",
+                                checked = AppThemeColors.monetEnabled,
+                                onCheckedChange = { checked ->
+                                    AppSettingsStore.setMonetEnabled(ctx, checked)
+                                    AppThemeColors.refresh(ctx)
                                 },
-                                endActions = {
-                                    Text(
-                                        AppThemeColors.primary.toHex(),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                },
-                                onClick = { showColorPicker = true },
                             )
+                            if (AppThemeColors.monetEnabled) {
+                                val paletteStyles = PaletteStyle.entries
+                                val paletteIndex = paletteStyles
+                                    .indexOf(AppThemeColors.paletteStyle)
+                                    .coerceAtLeast(0)
+                                OverlayDropdownPreference(
+                                    title = "配色风格",
+                                    items = paletteStyles.map { it.displayName },
+                                    selectedIndex = paletteIndex,
+                                    onSelectedIndexChange = { index ->
+                                        paletteStyles.getOrNull(index)?.let { style ->
+                                            AppSettingsStore.setPaletteStyleValue(ctx, style.storageValue)
+                                            AppThemeColors.refresh(ctx)
+                                        }
+                                    },
+                                )
+                                val sources = buildList {
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                                        add(AppSettingsStore.MONET_SOURCE_SYSTEM to "跟随系统壁纸")
+                                    }
+                                    add(AppSettingsStore.MONET_SOURCE_COVER to "游戏封面")
+                                }
+                                val sourceIndex = sources
+                                    .indexOfFirst { it.first == AppThemeColors.monetSource }
+                                    .coerceAtLeast(0)
+                                OverlayDropdownPreference(
+                                    title = "取色来源",
+                                    items = sources.map { it.second },
+                                    selectedIndex = sourceIndex,
+                                    onSelectedIndexChange = { index ->
+                                        sources.getOrNull(index)?.first?.let { source ->
+                                            AppSettingsStore.setMonetSource(ctx, source)
+                                            AppThemeColors.refresh(ctx)
+                                        }
+                                    },
+                                )
+                            }
+                        }
+                    }
+                }
+                if (!AppThemeColors.monetEnabled) {
+                    item {
+                        MiuixCard(modifier = Modifier.fillMaxWidth(), cornerRadius = 8.dp) {
+                            Column(Modifier.padding(vertical = 4.dp)) {
+                                ArrowPreference(
+                                    title = "色调轮盘",
+                                    startAction = {
+                                        Box(
+                                            modifier = Modifier
+                                                .padding(end = 6.dp)
+                                                .size(24.dp)
+                                                .clip(CircleShape)
+                                                .background(AppThemeColors.primary),
+                                        )
+                                    },
+                                    endActions = {
+                                        Text(
+                                            AppThemeColors.primary.toHex(),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    },
+                                    onClick = { showColorPicker = true },
+                                )
+                                PaletteGrid()
+                            }
                         }
                     }
                 }
@@ -437,4 +506,121 @@ private fun ComposeColor.toHex(): String {
 @Composable
 private fun BottomInsetSpacer() {
     Box(Modifier.fillMaxWidth().height(WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()))
+}
+
+/**
+ * 迷你莫奈色卡缓存：(种子色, 风格, 深浅) → ColorScheme，避免每次进入设置页重复计算。
+ */
+private val swatchSchemeCache = ConcurrentHashMap<Triple<Int, PaletteStyle, Boolean>, ColorScheme>()
+
+/**
+ * 调色盘网格：预设种子色色卡，每个色卡用当前配色风格渲染迷你莫奈色卡预览
+ * （InstallerX 同款：主色圆 + 主/次/辅容器弧形环），点击直接设为手动主色。
+ * 仅动态取色关闭时显示。
+ */
+@Composable
+private fun PaletteGrid() {
+    val ctx = LocalContext.current
+    val selectedColor = AppThemeColors.primary
+    val style = AppThemeColors.paletteStyle
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        PresetSeedColors.chunked(5).forEach { row ->
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                row.forEach { preset ->
+                    ColorSwatch(
+                        preset = preset,
+                        style = style,
+                        isSelected = preset.color == selectedColor,
+                        onClick = {
+                            AppSettingsStore.setThemeColorHex(ctx, preset.color.toHex())
+                            AppThemeColors.refresh(ctx)
+                        },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                repeat(5 - row.size) { Spacer(Modifier.weight(1f)) }
+            }
+        }
+    }
+}
+
+/** 单个预设种子色卡：外圈主/次/辅容器色环 + 中间主色圆，选中打勾。 */
+@Composable
+private fun ColorSwatch(
+    preset: PresetSeedColor,
+    style: PaletteStyle,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    // 用当前配色风格生成迷你色卡配色（后台线程计算 + 进程内缓存）
+    val swatchScheme by produceState<ColorScheme?>(
+        initialValue = swatchSchemeCache[Triple(preset.color.toArgb(), style, AppThemeColors.isDark)],
+        key1 = preset.color.toArgb(),
+        key2 = style,
+        key3 = AppThemeColors.isDark,
+    ) {
+        val cacheKey = Triple(preset.color.toArgb(), style, AppThemeColors.isDark)
+        swatchSchemeCache[cacheKey]?.let {
+            value = it
+            return@produceState
+        }
+        value = withContext(Dispatchers.Default) {
+            monetColorScheme(seedColor = preset.color, isDark = cacheKey.third, style = style)
+        }.also { swatchSchemeCache[cacheKey] = it }
+    }
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier.clip(RoundedCornerShape(8.dp)),
+    ) {
+        Box(
+            modifier = Modifier
+                .padding(top = 6.dp, bottom = 4.dp)
+                .size(44.dp)
+                .clip(CircleShape)
+                .background(preset.color.copy(alpha = 0.18f))
+                .clickable(onClick = onClick),
+            contentAlignment = Alignment.Center,
+        ) {
+            val scheme = swatchScheme
+            if (scheme != null) {
+                Box(
+                    modifier = Modifier.size(32.dp).clip(CircleShape).background(scheme.primary),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (isSelected) {
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = null,
+                            tint = ComposeColor.White,
+                            modifier = Modifier.size(14.dp),
+                        )
+                    }
+                }
+            } else {
+                Box(
+                    modifier = Modifier.size(32.dp).clip(CircleShape).background(preset.color.copy(alpha = 0.5f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (isSelected) {
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = null,
+                            tint = ComposeColor.White,
+                            modifier = Modifier.size(14.dp),
+                        )
+                    }
+                }
+            }
+        }
+        Text(
+            preset.displayName,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+        )
+    }
 }

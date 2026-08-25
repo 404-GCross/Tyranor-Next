@@ -80,6 +80,7 @@ import com.tyranor.next.scanner.VndbCandidate
 import com.tyranor.next.scanner.VndbCoverService
 import com.tyranor.next.settings.AppSettingsStore
 import com.tyranor.next.settings.PerGameSettingsStore
+import com.tyranor.next.theme.AppThemeColors
 import com.tyranor.next.theme.NavWhite
 import com.tyranor.next.ui.common.AppSearchField
 import com.tyranor.next.ui.common.glassNavBottomInset
@@ -200,6 +201,9 @@ fun GameScreen(modifier: Modifier = Modifier) {
     )
 
     // ===== 点击游戏卡片的底部抽屉栏 =====
+    LaunchedEffect(selectedGame?.uri, selectedGame?.coverUri) {
+        AppThemeColors.currentCoverUri = selectedGame?.coverUri
+    }
     selectedGame?.let { game ->
         GameActionsSheet(
             game = game,

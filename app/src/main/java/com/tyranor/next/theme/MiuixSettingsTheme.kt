@@ -1,9 +1,9 @@
 package com.tyranor.next.theme
 
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.NonSkippableComposable
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.sp
 import com.tyranor.next.ui.common.WithoutPressIndication
@@ -22,41 +22,46 @@ private val TyranorMiuixTextStyles = defaultTextStyles(
 )
 
 /**
- * 设置页专用 Miuix 主题：配色与 TyranorNextTheme 对齐，深/浅色由应用设置「外观模式」控制
- * 页面背景与组件色由应用设置「色调切换」控制是否互换。
- * primaryColor 由应用设置「色调轮盘」提供，默认蓝与 TyranorNextTheme 一致。
+ * 设置页专用 Miuix 主题：直接复用外层 TyranorNextTheme 提供的动态 ColorScheme
+ * （主/次/辅色与容器色来自莫奈动态配色，背景/表面/文字来自「色调切换」），
+ * 把对应角色映射到 Miuix 配色，保证设置页与主 UI 完全同色。
+ * 必须在 TyranorNextTheme 内部调用（AppSettingsActivity 已包裹）。
  */
 @Composable
 @NonSkippableComposable
 fun MiuixSettingsTheme(
-    primaryColor: Color? = null,
     content: @Composable () -> Unit,
 ) {
-    AppThemeColors.ensureLoaded(LocalContext.current)
-    // 与 TyranorNextTheme 同理：在函数体内直接读取全局主题色，
-    // 配合 @NonSkippableComposable 保证轮盘切换主题色时本主题必然重组，
-    // 使设置类页面与其余页面同步跟随主题色。
-    val primary = primaryColor ?: AppThemeColors.primary
+    // 复用外层 TyranorNextTheme 计算好的动态配色，不在此重复取色
+    val scheme = MaterialTheme.colorScheme
     val dark = AppThemeColors.isDark
     val colors = if (dark) {
         darkColorScheme(
-            primary = primary,
-            background = PageGrey,
-            surface = PageGrey,
+            primary = scheme.primary,
+            onPrimary = scheme.onPrimary,
+            primaryContainer = scheme.primaryContainer,
+            onPrimaryContainer = scheme.onPrimaryContainer,
+            secondary = scheme.secondary,
+            background = scheme.background,
+            surface = scheme.surface,
             surfaceContainer = NavWhite,
-            onBackground = TextColor,
-            onSurface = TextColor,
+            onBackground = scheme.onBackground,
+            onSurface = scheme.onSurface,
             onSurfaceContainer = TextColor,
             sliderKeyPointForeground = Color.White,
         )
     } else {
         lightColorScheme(
-            primary = primary,
-            background = PageGrey,
-            surface = PageGrey,
+            primary = scheme.primary,
+            onPrimary = scheme.onPrimary,
+            primaryContainer = scheme.primaryContainer,
+            onPrimaryContainer = scheme.onPrimaryContainer,
+            secondary = scheme.secondary,
+            background = scheme.background,
+            surface = scheme.surface,
             surfaceContainer = NavWhite,
-            onBackground = TextColor,
-            onSurface = TextColor,
+            onBackground = scheme.onBackground,
+            onSurface = scheme.onSurface,
             onSurfaceContainer = TextColor,
             sliderKeyPointForeground = Color.White,
         )

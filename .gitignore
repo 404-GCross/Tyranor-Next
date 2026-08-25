@@ -36,3 +36,5 @@ captures/
 *.keystore
 *.p12
 *.pfx
+
+plan*.md

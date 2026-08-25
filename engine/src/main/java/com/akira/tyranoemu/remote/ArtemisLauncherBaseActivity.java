@@ -14,7 +14,6 @@ public abstract class ArtemisLauncherBaseActivity extends com.ies_net.artemis.Ar
     private static final String KEY_ARTEMIS_ENGINE_PREFIX = "artemis_engine.";
     private long createdAtElapsed;
     private boolean userRequestedFinish;
-    private Object backInvokedCallback;
     /** Loads the revision-specific Artemis native library (e.g. libartemis.so). Called once from onCreate. */
     public abstract void loadEngineLibrary();
 
@@ -36,7 +35,6 @@ public abstract class ArtemisLauncherBaseActivity extends com.ies_net.artemis.Ar
     public final void onCreate(Bundle bundle) {
         super.onCreate(bundle);
         createdAtElapsed = SystemClock.elapsedRealtime();
-        backInvokedCallback = DoubleBackExit.registerPredictiveBack(this, this::exitFromBack);
         Log.i("YukiArtemis", "onCreate path=" + (getIntent() == null ? null : getIntent().getStringExtra("path")) + " scoped=" + (getIntent() != null && getIntent().getBooleanExtra("scopedSaveDir", false)) + " saveName=" + (getIntent() == null ? null : getIntent().getStringExtra("scopedSaveName")));
         loadEngineLibrary();
     }
@@ -56,7 +54,15 @@ public abstract class ArtemisLauncherBaseActivity extends com.ies_net.artemis.Ar
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
-        if (DoubleBackExit.dispatchBackKey(this, event, this::exitFromBack)) return true;
+        // NativeActivity 下返回键没有可消费的焦点视图，系统默认行为是直接退出；
+        // 因此在此统一拦截：首次按下弹提示（是否提示由设置控制），窗口内第二次按下才退出。
+        if (event.getKeyCode() == KeyEvent.KEYCODE_BACK) {
+            if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0
+                    && DoubleBackExit.shouldExit(this)) {
+                exitFromBack();
+            }
+            return true;
+        }
         return super.dispatchKeyEvent(event);
     }
 
@@ -72,7 +78,6 @@ public abstract class ArtemisLauncherBaseActivity extends com.ies_net.artemis.Ar
 
     @Override
     protected void onDestroy() {
-        DoubleBackExit.unregisterPredictiveBack(this, backInvokedCallback);
         DoubleBackExit.clear(this);
         // 兼容回退改为「先写 pref + 拉起下一版本（独立进程），再终结当前进程」：
         // V2/V3 在各自独立进程（:artemis.compat / :artemis.compat.v2）启动，当前进程
