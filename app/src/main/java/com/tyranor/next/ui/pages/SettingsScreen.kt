@@ -512,6 +512,7 @@ private fun LazyListPlaceholder(
 
         if (kind == EngineSettingsKind.TYRANO) item {
             EngineCard("Tyrano") {
+                // RPG Maker Web 与 Tyrano 共用同一套 WebView 宿主开关，避免同类引擎重复配置。
                 SwitchPreference(title = "允许加载外部网络资源", checked = tyExternal, onCheckedChange = onTyExternal)
                 SwitchPreference(title = "独立存档目录", checked = tyScoped, onCheckedChange = onTyScoped)
             }

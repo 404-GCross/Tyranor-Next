@@ -1,7 +1,7 @@
 package com.tyranor.next.scanner
 
 import android.content.Context
-import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -20,7 +20,8 @@ data class CoverScrapeTaskState(
 )
 
 object CoverScrapeTaskManager {
-    val state: MutableState<CoverScrapeTaskState> = mutableStateOf(CoverScrapeTaskState())
+    private val _state = mutableStateOf(CoverScrapeTaskState())
+    val state: State<CoverScrapeTaskState> = _state
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val lock = Any()
@@ -31,15 +32,16 @@ object CoverScrapeTaskManager {
         val appContext = context.applicationContext
         synchronized(lock) {
             if (job?.isActive == true) return false
-            state.value = CoverScrapeTaskState(running = true)
+            _state.value = CoverScrapeTaskState(running = true)
             job = scope.launch {
                 try {
                     val input = games ?: EngineScanner.loadGames(appContext)
                     val result = CoverScraperService.scrapeLibraryCovers(appContext, input)
+                    val mergedGames = mergeWithCurrentLibrary(appContext, input, result.games)
                     withContext(NonCancellable + Dispatchers.IO) {
-                        EngineScanner.saveGames(appContext, result.games)
+                        EngineScanner.saveGames(appContext, mergedGames)
                     }
-                    postFinished(result = result, error = null)
+                    postFinished(result = result.copy(games = mergedGames), error = null)
                 } catch (e: CancellationException) {
                     postFinished(result = null, error = "批量刮削已取消")
                     throw e
@@ -56,9 +58,35 @@ object CoverScrapeTaskManager {
     }
 
     fun clearFinished(eventId: Long) {
-        val current = state.value
+        val current = _state.value
         if (!current.running && current.eventId == eventId) {
-            state.value = current.copy(result = null, error = null)
+            _state.value = current.copy(result = null, error = null)
+        }
+    }
+
+    private fun mergeWithCurrentLibrary(
+        context: Context,
+        originalGames: List<ScanGame>,
+        scrapedGames: List<ScanGame>,
+    ): List<ScanGame> {
+        val currentGames = EngineScanner.loadGames(context)
+        if (currentGames.isEmpty()) return emptyList()
+        val originalByUri = originalGames.associateBy { it.uri }
+        val scrapedByUri = scrapedGames.associateBy { it.uri }
+        return currentGames.map { current ->
+            val original = originalByUri[current.uri]
+            val scraped = scrapedByUri[current.uri] ?: return@map current
+            val coverUnchanged = original != null &&
+                current.coverUri == original.coverUri &&
+                current.coverSource == original.coverSource
+            if (coverUnchanged) {
+                current.copy(
+                    coverUri = scraped.coverUri,
+                    coverSource = scraped.coverSource,
+                )
+            } else {
+                current
+            }
         }
     }
 
@@ -68,7 +96,7 @@ object CoverScrapeTaskManager {
             nextEventId
         }
         withContext(Dispatchers.Main.immediate) {
-            state.value = CoverScrapeTaskState(
+            _state.value = CoverScrapeTaskState(
                 running = false,
                 result = result,
                 error = error,

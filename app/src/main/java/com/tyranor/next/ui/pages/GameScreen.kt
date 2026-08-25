@@ -470,6 +470,12 @@ internal fun GameActionsSheet(
     var showRenameDialog by remember { mutableStateOf(false) }
     var showPatchConfirm by remember { mutableStateOf(false) }
 
+    fun isBatchScrapingActive(): Boolean {
+        if (!CoverScrapeTaskManager.state.value.running) return false
+        android.widget.Toast.makeText(context, "批量刮削正在进行", android.widget.Toast.LENGTH_SHORT).show()
+        return true
+    }
+
     // 发起启动；Artemis 需要 PFS 基础补丁且策略为“启动时询问”时，先弹窗确认再带选择启动
     fun startLaunch(patchChoice: EngineLauncher.ArtemisPatchChoice? = null) {
         scope.launch {
@@ -481,6 +487,7 @@ internal fun GameActionsSheet(
     // 打开相册选择自定义封面
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
+        if (isBatchScrapingActive()) return@rememberLauncherForActivityResult
         scope.launch {
             launchError = "正在设置封面…"
             val updated = withContext(Dispatchers.IO) {
@@ -551,8 +558,16 @@ internal fun GameActionsSheet(
                     }
                 }
             }
-            item { GameActionRow(R.drawable.ic_sheet_search_cover, "搜索封面") { showCoverSourcePicker = true } }
-            item { GameActionRow(R.drawable.ic_sheet_edit_cover, "修改封面") { imagePicker.launch("image/*") } }
+            item {
+                GameActionRow(R.drawable.ic_sheet_search_cover, "搜索封面") {
+                    if (!isBatchScrapingActive()) showCoverSourcePicker = true
+                }
+            }
+            item {
+                GameActionRow(R.drawable.ic_sheet_edit_cover, "修改封面") {
+                    if (!isBatchScrapingActive()) imagePicker.launch("image/*")
+                }
+            }
             item { GameActionRow(R.drawable.ic_sheet_rename, "名称修改") { showRenameDialog = true } }
             item {
                 GameActionRow(R.drawable.ic_sheet_saves, "存档管理") {
@@ -630,9 +645,11 @@ internal fun GameActionsSheet(
         CoverSourcePickerDialog(
             onDismiss = { showCoverSourcePicker = false },
             onSelect = { source ->
-                showCoverSourcePicker = false
-                coverBindError = null
-                coverSearchSource = source
+                if (!isBatchScrapingActive()) {
+                    showCoverSourcePicker = false
+                    coverBindError = null
+                    coverSearchSource = source
+                }
             },
         )
     }
@@ -645,7 +662,7 @@ internal fun GameActionsSheet(
             bindError = coverBindError,
             onDismiss = { coverSearchSource = null },
             onBind = { candidate ->
-                if (!coverBinding) {
+                if (!coverBinding && !isBatchScrapingActive()) {
                     coverBinding = true
                     coverBindError = null
                     scope.launch {
@@ -1272,6 +1289,7 @@ private fun rememberCandidateCoverPreview(candidate: CoverSearchCandidate): andr
                 imageUrl = cacheKey,
                 prefix = "preview_${stableKey("${candidate.source}:$cacheKey")}",
                 source = candidate.source,
+                persistent = false,
             )
             val bitmap = uri?.let { decodeCoverThumbnail(context, it) }
             if (bitmap != null) {

@@ -8,6 +8,8 @@ import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.nio.charset.StandardCharsets
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 
 internal class CoverSearchException(message: String) : RuntimeException(message)
@@ -22,15 +24,17 @@ internal object CoverImageCache {
         source: String? = null,
         referer: String? = source?.let(::coverRefererForSource),
         cookie: String? = source?.let(::coverCookieForSource),
+        persistent: Boolean = true,
     ): String? {
         if (imageUrl.isBlank()) return null
-        val dir = coverCacheDir(context)
+        val dir = coverCacheDir(context, persistent)
         if (!dir.exists() && !dir.mkdirs()) return null
         val safePrefix = prefix.replace(Regex("[^A-Za-z0-9_.-]"), "_")
         val target = File(dir, "${safePrefix}_${stableKey(imageUrl)}.jpg")
         if (target.isFile && target.length() > 0) return Uri.fromFile(target).toString()
 
         var conn: HttpURLConnection? = null
+        var tmp: File? = null
         return try {
             conn = (URL(imageUrl).openConnection() as HttpURLConnection).apply {
                 connectTimeout = 15000
@@ -42,9 +46,11 @@ internal object CoverImageCache {
             }
             if (conn.responseCode !in 200..299) return null
             if (conn.contentLengthLong > MAX_COVER_BYTES) return null
+            val tempFile = File.createTempFile(target.nameWithoutExtension, ".tmp", dir)
+            tmp = tempFile
             var total = 0L
             conn.inputStream.use { input ->
-                FileOutputStream(target).use { output ->
+                FileOutputStream(tempFile).use { output ->
                     val buffer = ByteArray(8192)
                     while (true) {
                         val read = input.read(buffer)
@@ -55,12 +61,14 @@ internal object CoverImageCache {
                     }
                 }
             }
+            if (total <= 0L) error("empty cover")
+            moveTempCover(tempFile, target)
             Uri.fromFile(target).toString()
         } catch (_: Exception) {
-            target.delete()
             null
         } finally {
             conn?.disconnect()
+            tmp?.delete()
         }
     }
 
@@ -77,8 +85,25 @@ internal object CoverImageCache {
         }
     }
 
-    private fun coverCacheDir(context: Context): File =
-        File(context.applicationContext.filesDir, "covers_remote")
+    private fun moveTempCover(source: File, target: File) {
+        runCatching {
+            Files.move(
+                source.toPath(),
+                target.toPath(),
+                StandardCopyOption.ATOMIC_MOVE,
+                StandardCopyOption.REPLACE_EXISTING,
+            )
+        }.recoverCatching {
+            Files.move(source.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING)
+        }.getOrThrow()
+    }
+
+    private fun coverCacheDir(context: Context, persistent: Boolean = true): File =
+        if (persistent) {
+            File(context.applicationContext.filesDir, "covers_remote")
+        } else {
+            File(context.applicationContext.cacheDir, "covers_preview")
+        }
 }
 
 internal fun cleanTitle(s: String): String {

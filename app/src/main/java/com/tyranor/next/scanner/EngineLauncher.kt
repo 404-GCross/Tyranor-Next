@@ -541,6 +541,7 @@ object EngineLauncher {
     }
 
     private fun buildWebIntent(context: Context, path: String, game: ScanGame): Intent {
+        // Tyrano 与 RPG Maker Web 共用 TyranoActivity，因此沿用同一组 WebView 宿主设置。
         val scoped = PerGameSettingsStore.getBool(context, game.uri, "ty_scoped")
             ?: EngineSettingsStore.isTyranoScopedSaveDir(context)
         val rpgMakerModEnabled = effectiveRpgMakerModEnabled(

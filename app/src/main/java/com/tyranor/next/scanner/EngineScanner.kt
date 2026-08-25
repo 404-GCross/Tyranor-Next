@@ -304,7 +304,10 @@ object EngineScanner {
             existingByUri[current.uri]?.let { previous ->
                 current.copy(
                     coverUri = previous.coverUri ?: current.coverUri,
-                    coverSource = if (previous.coverUri != null) previous.coverSource else current.coverSource,
+                    coverSource = previous.coverSource
+                        ?: current.coverSource?.takeIf {
+                            previous.coverUri == null || previous.coverUri == current.coverUri
+                        },
                     vndbId = previous.vndbId,
                     metadataTitle = previous.metadataTitle,
                     launchFile = previous.launchFile,

@@ -33,7 +33,7 @@ object EngineSettingsStore {
     const val KEY_ARTEMIS_ROTATE_SCREEN = "artemis_rotate_screen"
     const val KEY_ARTEMIS_AUTO_PATCH = "artemis_auto_patch"
 
-    // Tyrano
+    // Tyrano 与 RPG Maker Web 共用同一套 WebView 宿主设置；启动链路按同一键读取。
     const val KEY_TYRANO_EXTERNAL_NETWORK = "tyrano_external_network"
     const val KEY_TYRANO_SCOPED_SAVE_DIR = "tyrano_scoped_save_dir"
     const val KEY_RPG_MAKER_MOD_ENABLED = "rpg_maker_mod_enabled"
