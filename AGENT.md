@@ -127,6 +127,29 @@ Column(fillMaxSize)                                // 页面根
 
 ---
 
+## 功能跳转条目统一规范
+
+所有「功能跳转列」——即点击后进入 / 跳转 / 打开下一级的条目（如封面来源列表、弹窗内的群聊/频道项、设置里的二级跳转项等），**必须**统一使用公共组件
+`com.tyranor.next.ui.common.AppNavItem`（`app/src/main/java/com/tyranor/next/ui/common/AppNavItem.kt`）。
+**禁止**在页面/弹窗内手写 `Row`/`Column` 拼装此类条目，也禁止混用 Material 的 `ListItem`/`ColumnItem` 等。
+
+### 1. 组件形态与参数
+
+- 排版固定：圆角 `RoundedCornerShape(8.dp)` + 背景取 `theme/Color.kt` 常量 `NavWhite` + 内边距（横向 16dp / 纵向 12dp）+ 左侧图标 24dp + 右侧指示箭头 `KeyboardArrowRight`。均由组件内部处理。
+- 标题用 `MaterialTheme.typography.bodyMedium`、颜色取 `TextColor`；摘要可选，用 `bodySmall` + 半透明辅助色。均不依赖 `colorScheme.surface*`（遵循「组件背景色统一规范」）。
+- `leadingIcon`：左侧图标 drawable；未提供时组件自动使用**默认占位图标** `DEFAULT_LEADING_ICON`，不允许调用方在不该出现空图标时留白。
+- `onClick`：点击回调；传 `null` 表示不可用（整条变灰且不可点击）。
+- 进入跳转的 icon 统一用 `KeyboardArrowRight`，组件内置，调用方不传。
+
+### 2. 现有调用点（新增场景照此对齐）
+
+| 场景 | 位置 | leadingIcon |
+|---|---|---|
+| 选择封面来源（四源统一） | `GameScreen.kt`（CoverSourcePickerDialog） | `ic_cover_source`（云端） |
+| 加入群聊（企鹅群聊/飞机频道） | `SettingsScreen.kt`（加入群聊弹窗） | `ic_group_qq` / `ic_group_telegram` |
+
+---
+
 ## 主题色调统一使用规范
 
 应用主题色（primary）由用户通过 **应用设置 → 色调轮盘** 修改，必须全局统一生效。规范如下：

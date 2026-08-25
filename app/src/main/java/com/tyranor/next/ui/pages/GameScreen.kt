@@ -89,6 +89,7 @@ import com.tyranor.next.theme.MiuixSettingsTheme
 import com.tyranor.next.theme.NavWhite
 import com.tyranor.next.theme.PageGrey
 import com.tyranor.next.theme.TextColor
+import com.tyranor.next.ui.common.AppNavItem
 import com.tyranor.next.ui.common.AppSearchField
 import com.tyranor.next.ui.common.TopBarIcon
 import com.tyranor.next.ui.common.glassNavBottomInset
@@ -791,41 +792,12 @@ private fun CoverSourcePickerDialog(
                     val needsHikarinagiLogin = source == AppSettingsStore.COVER_SOURCE_HIKARINAGI &&
                         (!authStatus.authorized || authStatus.needsReauth)
                     val selectable = enabled && !needsHikarinagiLogin
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(PageGrey)
-                            .clickable(enabled = selectable) { onSelect(source) }
-                            .padding(horizontal = 8.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        RadioButton(
-                            selected = false,
-                            onClick = if (selectable) ({ onSelect(source) }) else null,
-                            enabled = selectable,
-                        )
-                        Column(
-                            modifier = Modifier.padding(start = 10.dp).weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(2.dp),
-                        ) {
-                            Text(
-                                coverSourceTitle(source),
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = if (selectable) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            Text(
-                                coverSourcePickerSummary(source, enabled, needsHikarinagiLogin),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                    }
+                    AppNavItem(
+                        title = coverSourceTitle(source),
+                        summary = coverSourcePickerSummary(source, enabled, needsHikarinagiLogin),
+                        onClick = if (selectable) ({ onSelect(source) }) else null,
+                        leadingIcon = R.drawable.ic_cover_source,
+                    )
                 }
             }
         },
@@ -886,13 +858,6 @@ private fun CoverSearchDialog(
                     onQueryChange = { keyword = it },
                     onSearch = { search() },
                 )
-                Button(
-                    onClick = { search() },
-                    enabled = !searching && !binding,
-                    modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
-                ) {
-                    Text(if (searching) "搜索中…" else "搜索", style = MaterialTheme.typography.bodyMedium)
-                }
                 if (binding) {
                     Text(
                         "正在绑定封面…",
