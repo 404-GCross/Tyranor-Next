@@ -31,12 +31,15 @@
     el.dispatchEvent(ev);
   }
 
+  /** 暂停时取消：用于 50ms click timer + 释放按压状态。 */
+  var pendingClick = null;
+
   function mouseEvent(type, x, y, button) {
     fire(MouseEvent, {
       type: type, clientX: x, clientY: y,
       screenX: x, screenY: y,
       button: button || 0,
-      buttons: type === "mouseup" ? 0 : (button || 0) === 2 ? 2 : 1,
+      buttons: type === "mousedown" ? (button === 2 ? 2 : 1) : 0,
       bubbles: true, cancelable: true
     });
   }
@@ -54,7 +57,9 @@
     click: function (x, y) {
       var self = this;
       this.down(x, y, 0);
-      setTimeout(function () {
+      if (pendingClick) { clearTimeout(pendingClick); }
+      pendingClick = setTimeout(function () {
+        pendingClick = null;
         self.up(x, y, 0);
         fire(MouseEvent, { type: "click", clientX: x, clientY: y, button: 0, bubbles: true, cancelable: true });
       }, 50);
@@ -90,6 +95,13 @@
         }
         el = el.parentElement;
       }
+    },
+    /** 暂停/重载时调用：取消未完成的 click timer + 释放 DOM 按压状态。
+     *  VirtualMouseLayer.reset() 在退后台时触发。 */
+    cancel: function () {
+      if (pendingClick) { clearTimeout(pendingClick); pendingClick = null; }
+      this.up(0, 0, 0);
+      this.up(0, 0, 2);
     }
   };
 })();

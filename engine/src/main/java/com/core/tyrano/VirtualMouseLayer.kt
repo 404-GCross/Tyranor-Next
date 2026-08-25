@@ -134,7 +134,11 @@ class VirtualMouseLayer(
         state = STATE_IDLE
         pid1 = -1
         pid2 = -1
-        flushNow()
+        // 取消 JS 侧未完成的 click timer + 释放按压状态；跳过 flushNow
+        // 避免退后台后旧 move/wheel 事件在恢复时才派发。
+        js("cancel")
+        pendingCssX = Float.NaN
+        pendingWheelDelta = 0f
         invalidate()
     }
 
