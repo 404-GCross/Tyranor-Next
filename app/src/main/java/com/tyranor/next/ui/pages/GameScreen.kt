@@ -1165,7 +1165,9 @@ private fun GameGrid(
     ) {
         gridItems(
             items = games,
-            key = { it.uri },
+            // 封面批量任务逐项更新时强制重建对应卡片的封面状态；否则 LazyGrid 可能继续复用
+            // 以 uri 为身份的旧 item，直到卡片滚出屏幕后才重新读取新的 coverUri。
+            key = ::gameCardItemKey,
             contentType = { "game_card" },
         ) { game ->
             GameCard(
@@ -1176,6 +1178,9 @@ private fun GameGrid(
         }
     }
 }
+
+internal fun gameCardItemKey(game: ScanGame): String =
+    "${game.uri}\u0000${game.coverUri.orEmpty()}\u0000${game.coverSource.orEmpty()}"
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable

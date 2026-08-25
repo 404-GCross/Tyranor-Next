@@ -10,6 +10,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.withContext
 
 data class CoverScrapeTaskState(
@@ -22,6 +25,8 @@ data class CoverScrapeTaskState(
 object CoverScrapeTaskManager {
     private val _state = mutableStateOf(CoverScrapeTaskState())
     val state: State<CoverScrapeTaskState> = _state
+    private val _gameUpdates = MutableSharedFlow<ScanGame>()
+    val gameUpdates: SharedFlow<ScanGame> = _gameUpdates.asSharedFlow()
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val lock = Any()
@@ -36,7 +41,12 @@ object CoverScrapeTaskManager {
             job = scope.launch {
                 try {
                     val input = games ?: EngineScanner.loadGames(appContext)
-                    val result = CoverScraperService.scrapeLibraryCovers(appContext, input)
+                    val result = CoverScraperService.scrapeLibraryCovers(appContext, input) { original, scraped ->
+                        val persisted = withContext(NonCancellable + Dispatchers.IO) {
+                            persistScrapedCover(appContext, original, scraped)
+                        }
+                        persisted?.let { _gameUpdates.emit(it) }
+                    }
                     val mergedGames = withContext(NonCancellable + Dispatchers.IO) {
                         EngineScanner.updateGames(appContext) { currentGames ->
                             mergeWithCurrentLibrary(currentGames, input, result.games)
@@ -74,20 +84,28 @@ object CoverScrapeTaskManager {
         val originalByUri = originalGames.associateBy { it.uri }
         val scrapedByUri = scrapedGames.associateBy { it.uri }
         return currentGames.map { current ->
-            val original = originalByUri[current.uri]
+            val original = originalByUri[current.uri] ?: return@map current
             val scraped = scrapedByUri[current.uri] ?: return@map current
-            val coverUnchanged = original != null &&
-                current.coverUri == original.coverUri &&
-                current.coverSource == original.coverSource
-            if (coverUnchanged) {
-                current.copy(
-                    coverUri = scraped.coverUri,
-                    coverSource = scraped.coverSource,
-                )
-            } else {
-                current
+            mergeScrapedCover(current, original, scraped)
+        }
+    }
+
+    private fun persistScrapedCover(context: Context, original: ScanGame, scraped: ScanGame): ScanGame? {
+        var persisted: ScanGame? = null
+        EngineScanner.updateGames(context) { currentGames ->
+            currentGames.map { current ->
+                if (current.uri != original.uri) {
+                    current
+                } else {
+                    mergeScrapedCover(current, original, scraped).also { merged ->
+                        if (merged.coverUri != current.coverUri || merged.coverSource != current.coverSource) {
+                            persisted = merged
+                        }
+                    }
+                }
             }
         }
+        return persisted
     }
 
     private suspend fun postFinished(result: CoverScrapeResult?, error: String?) {
@@ -105,3 +123,14 @@ object CoverScrapeTaskManager {
         }
     }
 }
+
+/** 只在封面仍与任务启动快照一致时应用结果，避免覆盖用户同时进行的手动换封面。 */
+internal fun mergeScrapedCover(current: ScanGame, original: ScanGame, scraped: ScanGame): ScanGame =
+    if (current.coverUri == original.coverUri && current.coverSource == original.coverSource) {
+        current.copy(
+            coverUri = scraped.coverUri,
+            coverSource = scraped.coverSource,
+        )
+    } else {
+        current
+    }

@@ -36,7 +36,11 @@ sealed interface CoverSearchResult {
 }
 
 object CoverScraperService {
-    suspend fun scrapeLibraryCovers(context: Context, games: List<ScanGame>): CoverScrapeResult {
+    suspend fun scrapeLibraryCovers(
+        context: Context,
+        games: List<ScanGame>,
+        onCoverUpdated: suspend (original: ScanGame, updated: ScanGame) -> Unit = { _, _ -> },
+    ): CoverScrapeResult {
         val onlyMissing = AppSettingsStore.isCoverScraperOnlyMissing(context)
         val sources = AppSettingsStore.getCoverScraperSourceOrder(context)
             .filter { AppSettingsStore.isCoverScraperSourceEnabled(context, it) }
@@ -48,30 +52,34 @@ object CoverScraperService {
         val updatedGames = games.map { game ->
             coroutineContext.ensureActive()
             val local = runCatching { EngineScanner.applyLocalCover(context, game) }.getOrDefault(game)
-            if (onlyMissing && !local.coverUri.isNullOrBlank()) {
+            val updated = if (onlyMissing && !local.coverUri.isNullOrBlank()) {
                 if (local.coverUri != game.coverUri) updatedCount++ else skippedCount++
-                return@map local
-            }
-
-            val searchBase = if (onlyMissing) local else local.copy(coverUri = null)
-            val scraped = sources.firstNotNullOfOrNull { source ->
-                coroutineContext.ensureActive()
-                runCatching { scrapeWithSource(context, searchBase, source) }.getOrNull()
-                    ?.asCoverOnlyUpdateFrom(local)
-            }
-            if (scraped != null && !scraped.coverUri.isNullOrBlank()) {
-                updatedCount++
-                scraped
-            } else {
-                if (local.coverUri != game.coverUri) {
-                    updatedCount++
-                } else if (sources.isEmpty()) {
-                    skippedCount++
-                } else {
-                    failedCount++
-                }
                 local
+            } else {
+                val searchBase = if (onlyMissing) local else local.copy(coverUri = null)
+                val scraped = sources.firstNotNullOfOrNull { source ->
+                    coroutineContext.ensureActive()
+                    runCatching { scrapeWithSource(context, searchBase, source) }.getOrNull()
+                        ?.asCoverOnlyUpdateFrom(local)
+                }
+                if (scraped != null && !scraped.coverUri.isNullOrBlank()) {
+                    updatedCount++
+                    scraped
+                } else {
+                    if (local.coverUri != game.coverUri) {
+                        updatedCount++
+                    } else if (sources.isEmpty()) {
+                        skippedCount++
+                    } else {
+                        failedCount++
+                    }
+                    local
+                }
             }
+            if (updated.coverUri != game.coverUri || updated.coverSource != game.coverSource) {
+                onCoverUpdated(game, updated)
+            }
+            updated
         }
         return CoverScrapeResult(updatedGames, updatedCount, skippedCount, failedCount)
     }

@@ -57,6 +57,12 @@ class MainLibraryViewModel(application: Application) : AndroidViewModel(applicat
                 }
             }
         }
+        // 每张封面成功持久化后立即更新所有应用层列表，批量任务无需等到全部游戏完成。
+        viewModelScope.launch {
+            CoverScrapeTaskManager.gameUpdates.collect { updated ->
+                _uiState.update { MainLibraryStateReducer.replaceGame(it, updated) }
+            }
+        }
         // 刮削任务属于应用级长任务，即使 GameScreen 已离开组合，也要立即发布给首页与游戏页。
         viewModelScope.launch {
             var handledEventId = 0L
