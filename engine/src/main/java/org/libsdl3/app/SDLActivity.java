@@ -757,7 +757,7 @@ public class SDLActivity extends AppCompatActivity implements View.OnSystemUiVis
         }
 
         // Default system back button behavior.
-        if (!isFinishing() && DoubleBackExit.shouldExit(this)) {
+        if (!isFinishing() && DoubleBackExit.shouldExit(this, false)) {
             superOnBackPressed();
         }
     }
@@ -848,7 +848,7 @@ public class SDLActivity extends AppCompatActivity implements View.OnSystemUiVis
                 && (event.getSource() & InputDevice.SOURCE_MOUSE) == 0) {
             if (event.getAction() == KeyEvent.ACTION_DOWN) {
                 if (event.getRepeatCount() == 0) {
-                    if (DoubleBackExit.shouldExit(this)) {
+                    if (DoubleBackExit.shouldExit(this, false)) {
                         exitFromBack();
                     } else if (mSDLThread != null) {
                         onNativeKeyDown(KeyEvent.KEYCODE_ESCAPE);
