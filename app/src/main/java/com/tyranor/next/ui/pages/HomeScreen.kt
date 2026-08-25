@@ -190,18 +190,20 @@ fun HomeScreen(
 
     // ===== 与游戏页统一：点按打开操作抽屉，长按直接启动 =====
     selectedGame?.let { game ->
-        GameActionsSheet(
-            game = game,
-            onDismiss = { selectedGame = null },
-            onGameUpdated = { replaceGame(it) },
-            onDeleteGame = { deleteGame(game) },
-            quickLaunched = quickLaunch.any { it.uri == game.uri },
-            onQuickLaunchToggle = { onQuickLaunchToggle(game) },
-            onEngineSettings = {
-                startActivityWithPageTransition(context, PerGameSettingsActivity.createIntent(context, game))
-                selectedGame = null
-            },
-        )
+        key(game.uri) {
+            GameActionsSheet(
+                game = game,
+                onDismiss = { selectedGame = null },
+                onGameUpdated = { replaceGame(it) },
+                onDeleteGame = { deleteGame(game) },
+                quickLaunched = quickLaunch.any { it.uri == game.uri },
+                onQuickLaunchToggle = { onQuickLaunchToggle(game) },
+                onEngineSettings = {
+                    startActivityWithPageTransition(context, PerGameSettingsActivity.createIntent(context, game))
+                    selectedGame = null
+                },
+            )
+        }
     }
 
     // ===== Artemis 首次启动补丁确认（与游戏页一致） =====

@@ -48,6 +48,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -202,18 +203,20 @@ fun GameScreen(
 
     // ===== 点击游戏卡片的底部抽屉栏 =====
     selectedGame?.let { game ->
-        GameActionsSheet(
-            game = game,
-            onDismiss = { selectedGame = null },
-            onGameUpdated = { replaceGame(it) },
-            onDeleteGame = { deleteGame(game) },
-            quickLaunched = libraryState.quickLaunch.any { it.uri == game.uri },
-            onQuickLaunchToggle = { onQuickLaunchToggle(game) },
-            onEngineSettings = {
-                startActivityWithPageTransition(context, PerGameSettingsActivity.createIntent(context, game))
-                selectedGame = null
-            },
-        )
+        key(game.uri) {
+            GameActionsSheet(
+                game = game,
+                onDismiss = { selectedGame = null },
+                onGameUpdated = { replaceGame(it) },
+                onDeleteGame = { deleteGame(game) },
+                quickLaunched = libraryState.quickLaunch.any { it.uri == game.uri },
+                onQuickLaunchToggle = { onQuickLaunchToggle(game) },
+                onEngineSettings = {
+                    startActivityWithPageTransition(context, PerGameSettingsActivity.createIntent(context, game))
+                    selectedGame = null
+                },
+            )
+        }
     }
 
     // ===== 长按游戏卡片：启动游戏；Artemis 按既有策略弹出补丁确认 =====
