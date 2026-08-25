@@ -17,6 +17,8 @@ jobs:
     name: Assemble Debug
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout
@@ -39,6 +41,8 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Assemble debug APK
+        env:
+          HIKARINAGI_CLIENT_ID: ${{ vars.HIKARINAGI_CLIENT_ID }}
         run: ./gradlew assembleDebug --no-daemon
 
       - name: Upload debug APK

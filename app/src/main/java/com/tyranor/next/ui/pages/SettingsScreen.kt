@@ -139,6 +139,12 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                                 onClick = { startActivityWithPageTransition(ctx, AppSettingsActivity.createIntent(ctx)) },
                             )
                             ArrowPreference(
+                                title = "封面刮削",
+                                summary = "设置多源封面来源、顺序与授权",
+                                startAction = { SettingsItemIcon(R.drawable.ic_game_cover) },
+                                onClick = { startActivityWithPageTransition(ctx, CoverScraperSettingsActivity.createIntent(ctx)) },
+                            )
+                            ArrowPreference(
                                 title = if (checkingUpdate) "正在检查更新" else "更新检查",
                                 summary = "对项目Github获取更新信息",
                                 startAction = { SettingsItemIcon(R.drawable.ic_settings_update) },
@@ -506,6 +512,7 @@ private fun LazyListPlaceholder(
 
         if (kind == EngineSettingsKind.TYRANO) item {
             EngineCard("Tyrano") {
+                // RPG Maker Web 与 Tyrano 共用同一套 WebView 宿主开关，避免同类引擎重复配置。
                 SwitchPreference(title = "允许加载外部网络资源", checked = tyExternal, onCheckedChange = onTyExternal)
                 SwitchPreference(title = "独立存档目录", checked = tyScoped, onCheckedChange = onTyScoped)
             }

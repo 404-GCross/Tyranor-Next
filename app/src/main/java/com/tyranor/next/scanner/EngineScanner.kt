@@ -102,15 +102,28 @@ object EngineScanner {
     // ============ 游戏结果持久化 ============
 
     fun saveGames(context: Context, games: List<ScanGame>) {
-        val snapshot = games.toList()
-        gamesCache = snapshot
-        saveList(context, KEY_GAMES, snapshot)
+        synchronized(cacheLock) {
+            saveGamesLocked(context, games.toList())
+        }
     }
 
     fun loadGames(context: Context): List<ScanGame> =
         gamesCache ?: synchronized(cacheLock) {
             gamesCache ?: loadList(context, KEY_GAMES).also { gamesCache = it }
         }
+
+    fun updateGames(context: Context, transform: (List<ScanGame>) -> List<ScanGame>): List<ScanGame> =
+        synchronized(cacheLock) {
+            val current = gamesCache ?: loadList(context, KEY_GAMES).also { gamesCache = it }
+            val updated = transform(current).toList()
+            saveGamesLocked(context, updated)
+            updated
+        }
+
+    private fun saveGamesLocked(context: Context, games: List<ScanGame>) {
+        gamesCache = games
+        saveList(context, KEY_GAMES, games)
+    }
 
     fun recordRecentGame(context: Context, game: ScanGame) {
         val touched = game.copy(openTime = System.currentTimeMillis())
@@ -130,7 +143,7 @@ object EngineScanner {
 
     /** 从持久游戏库中移除指定游戏（在游戏页或首页删除游戏时调用，保证库与最近列表一致）。 */
     fun removeGame(context: Context, uri: String) {
-        saveGames(context, loadGames(context).filterNot { it.uri == uri })
+        updateGames(context) { games -> games.filterNot { it.uri == uri } }
     }
 
 /** 目录名 → 安全文件名（用于应用内镜像/独立存档目录），非法字符替换为下划线。 */
@@ -215,6 +228,7 @@ object EngineScanner {
             clean(g.metadataTitle.orEmpty()),
             g.launchFile.orEmpty(),
             g.openTime.toString(),
+            g.coverSource.orEmpty(),
         ).joinToString("\u0001")
     }
 
@@ -231,6 +245,7 @@ object EngineScanner {
             metadataTitle = p.getOrElse(6) { "" }.takeIf { it.isNotBlank() },
             launchFile = p.getOrElse(7) { "" }.takeIf { it.isNotBlank() },
             openTime = p.getOrElse(8) { "" }.toLongOrNull() ?: 0,
+            coverSource = p.getOrElse(9) { "" }.takeIf { it.isNotBlank() },
         )
     }
 
@@ -254,11 +269,14 @@ object EngineScanner {
     fun removeRootAndGames(context: Context, uri: Uri) {
         removeRoot(context, uri)
         val root = uri.toString()
-        val removedUris = loadGames(context)
-            .filter { isGameUnderRoot(root, it.uri) }
-            .mapTo(HashSet()) { it.uri }
+        var removedUris = emptySet<String>()
+        updateGames(context) { games ->
+            removedUris = games
+                .filter { isGameUnderRoot(root, it.uri) }
+                .mapTo(HashSet()) { it.uri }
+            games.filterNot { it.uri in removedUris }
+        }
         if (removedUris.isEmpty()) return
-        saveGames(context, loadGames(context).filterNot { it.uri in removedUris })
         saveRecentGames(context, loadRecentGames(context).filterNot { it.uri in removedUris })
         saveQuickLaunch(context, loadQuickLaunch(context).filterNot { it.uri in removedUris })
     }
@@ -326,20 +344,25 @@ object EngineScanner {
 
     /** 全量刷新游戏库：以当前扫描结果为准，移除已删除/改名路径的旧缓存条目。 */
     suspend fun rescanLibrary(context: Context): List<ScanGame> = withContext(Dispatchers.IO) {
-        val existingByUri = loadGames(context).associateBy { it.uri }
         val scanned = scanAll(context)
-        val refreshed = scanned.map { current ->
-            existingByUri[current.uri]?.let { previous ->
-                current.copy(
-                    coverUri = previous.coverUri ?: current.coverUri,
-                    vndbId = previous.vndbId,
-                    metadataTitle = previous.metadataTitle,
-                    launchFile = previous.launchFile,
-                    openTime = previous.openTime,
-                )
-            } ?: current
+        val refreshed = updateGames(context) { currentGames ->
+            val existingByUri = currentGames.associateBy { it.uri }
+            scanned.map { current ->
+                existingByUri[current.uri]?.let { previous ->
+                    current.copy(
+                        coverUri = previous.coverUri ?: current.coverUri,
+                        coverSource = previous.coverSource
+                            ?: current.coverSource?.takeIf {
+                                previous.coverUri == null || previous.coverUri == current.coverUri
+                            },
+                        vndbId = previous.vndbId,
+                        metadataTitle = previous.metadataTitle,
+                        launchFile = previous.launchFile,
+                        openTime = previous.openTime,
+                    )
+                } ?: current
+            }
         }
-        saveGames(context, refreshed)
         val validUris = refreshed.mapTo(HashSet()) { it.uri }
         saveRecentGames(context, loadRecentGames(context).filter { it.uri in validUris })
         saveQuickLaunch(context, loadQuickLaunch(context).filter { it.uri in validUris })
@@ -395,6 +418,7 @@ object EngineScanner {
                     engine = detected.engine,
                     launchTarget = detected.launchTarget,
                     coverUri = coverUri,
+                    coverSource = if (coverUri.isNullOrBlank()) null else AppSettingsStore.COVER_SOURCE_LOCAL,
                 )
             )
             return
@@ -448,6 +472,7 @@ object EngineScanner {
                     engine = detected.engine,
                     launchTarget = detected.launchTarget,
                     coverUri = coverUri,
+                    coverSource = if (coverUri.isNullOrBlank()) null else AppSettingsStore.COVER_SOURCE_LOCAL,
                 )
             )
             // 已识别为游戏，其子目录多为引擎内部资源，仅扫描直接文件层，不再深挖
@@ -546,7 +571,10 @@ object EngineScanner {
         if (!game.coverUri.isNullOrBlank()) return game
         val dir = DocumentFile.fromTreeUri(context.applicationContext, Uri.parse(game.uri)) ?: return game
         val coverUri = findLocalCoverUri(dir.listFiles())
-        return if (coverUri.isNullOrBlank()) game else game.copy(coverUri = coverUri)
+        return if (coverUri.isNullOrBlank()) game else game.copy(
+            coverUri = coverUri,
+            coverSource = AppSettingsStore.COVER_SOURCE_LOCAL,
+        )
     }
 
     private fun findLocalCoverUri(children: Array<DocumentFile>): String? {
@@ -587,13 +615,15 @@ object EngineScanner {
 
         val detected = detectEngine(dir, session)
         if (detected.engine != EngineType.UNKNOWN) {
+            val coverUri = findLocalCoverUri(children)
             out.add(
                 ScanGame(
                     title = dir.name.takeIf { it.isNotBlank() } ?: "未命名游戏",
                     uri = dir.absolutePath,
                     engine = detected.engine,
                     launchTarget = detected.launchTarget,
-                    coverUri = findLocalCoverUri(children),
+                    coverUri = coverUri,
+                    coverSource = if (coverUri.isNullOrBlank()) null else AppSettingsStore.COVER_SOURCE_LOCAL,
                 )
             )
             return
@@ -615,13 +645,15 @@ object EngineScanner {
 
         val detected = detectEngine(dir, session)
         if (detected.engine != EngineType.UNKNOWN) {
+            val coverUri = findLocalCoverUri(children)
             out.add(
                 ScanGame(
                     title = dir.name.takeIf { it.isNotBlank() } ?: "未命名游戏",
                     uri = dir.absolutePath,
                     engine = detected.engine,
                     launchTarget = detected.launchTarget,
-                    coverUri = findLocalCoverUri(children),
+                    coverUri = coverUri,
+                    coverSource = if (coverUri.isNullOrBlank()) null else AppSettingsStore.COVER_SOURCE_LOCAL,
                 )
             )
             return
