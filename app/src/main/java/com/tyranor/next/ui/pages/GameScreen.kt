@@ -64,6 +64,8 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -182,7 +184,8 @@ fun GameScreen(
         modifier = modifier,
         games = games,
         loaded = libraryState.loaded,
-        scanning = libraryState.scanning || scrapeTaskState.running,
+        scanning = libraryState.scanning,
+        scrapingCovers = scrapeTaskState.running,
         gridState = gridState,
         dirPickerLaunch = { dirPicker.launch(null) },
         syncMissingCovers = { syncMissingCovers() },
@@ -332,6 +335,7 @@ private fun GameLibraryContent(
     games: List<ScanGame>,
     loaded: Boolean,
     scanning: Boolean,
+    scrapingCovers: Boolean,
     gridState: LazyGridState,
     dirPickerLaunch: () -> Unit,
     syncMissingCovers: () -> Unit,
@@ -367,8 +371,23 @@ private fun GameLibraryContent(
                         showSearch = !showSearch
                         if (!showSearch) query = ""
                     }
-                    TopBarIcon(painterResource(R.drawable.ic_game_cover), "批量刮削封面", MaterialTheme.colorScheme.primary) {
-                        syncMissingCovers()
+                    if (scrapingCovers) {
+                        Box(
+                            modifier = Modifier.padding(start = 2.dp).size(34.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier
+                                    .size(22.dp)
+                                    .semantics { contentDescription = "正在批量刮削封面" },
+                                color = MaterialTheme.colorScheme.primary,
+                                strokeWidth = 2.dp,
+                            )
+                        }
+                    } else {
+                        TopBarIcon(painterResource(R.drawable.ic_game_cover), "批量刮削封面", MaterialTheme.colorScheme.primary) {
+                            syncMissingCovers()
+                        }
                     }
                     TopBarIcon(painterResource(R.drawable.ic_game_scan), "扫描游戏", MaterialTheme.colorScheme.primary) {
                         refreshGames()
