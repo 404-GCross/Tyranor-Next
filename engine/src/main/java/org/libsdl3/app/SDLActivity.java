@@ -751,6 +751,7 @@ public class SDLActivity extends AppCompatActivity implements View.OnSystemUiVis
         // but the mouse right click will work.
         //
         boolean trapBack = SDLActivity.nativeGetHintBoolean("SDL_ANDROID_TRAP_BACK_BUTTON", false);
+        Log.d("BackKeyTrace", "sdl onBackPressed fallback trap=" + trapBack);
         if (trapBack) {
             // Exit and let the mouse handler handle this button (if appropriate)
             return;
@@ -842,18 +843,27 @@ public class SDLActivity extends AppCompatActivity implements View.OnSystemUiVis
         // 鼠标来源的 BACK 维持 stock SDL 行为（由 SDLSurface 吞掉，不送 native）。
         if (keyCode == KeyEvent.KEYCODE_BACK
                 && (event.getSource() & InputDevice.SOURCE_MOUSE) == 0) {
+            Log.d("BackKeyTrace", "sdl BACK action=" + event.getAction() + " repeat=" + event.getRepeatCount()
+                    + " src=" + event.getSource() + " sdlThread=" + (mSDLThread != null));
             if (event.getAction() == KeyEvent.ACTION_DOWN) {
                 if (event.getRepeatCount() == 0) {
                     if (DoubleBackExit.shouldExit(this)) {
+                        Log.d("BackKeyTrace", "sdl -> double-back exit");
                         exitFromBack();
                     } else if (mSDLThread != null) {
+                        Log.d("BackKeyTrace", "sdl -> onNativeKeyDown");
                         onNativeKeyDown(keyCode);
+                    } else {
+                        Log.d("BackKeyTrace", "sdl -> skip forward (no sdl thread)");
                     }
                 }
                 return true;
             }
             if (event.getAction() == KeyEvent.ACTION_UP) {
-                if (mSDLThread != null) onNativeKeyUp(keyCode);
+                if (mSDLThread != null) {
+                    Log.d("BackKeyTrace", "sdl -> onNativeKeyUp");
+                    onNativeKeyUp(keyCode);
+                }
                 return true;
             }
             return true;
