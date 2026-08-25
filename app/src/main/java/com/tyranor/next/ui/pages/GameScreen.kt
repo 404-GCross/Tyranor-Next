@@ -69,6 +69,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import top.yukonga.miuix.kmp.basic.RadioButton
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 import com.tyranor.next.R
 import com.tyranor.next.scanner.CoverImageCache
 import com.tyranor.next.scanner.CoverScrapeTaskManager
@@ -857,6 +858,7 @@ private fun CoverSearchDialog(
                     query = keyword,
                     onQueryChange = { keyword = it },
                     onSearch = { search() },
+                    textStyle = MiuixTheme.textStyles.subtitle,
                 )
                 if (binding) {
                     Text(
