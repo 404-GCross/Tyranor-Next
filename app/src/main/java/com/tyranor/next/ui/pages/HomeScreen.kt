@@ -35,7 +35,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -76,6 +79,13 @@ fun HomeScreen(modifier: Modifier = Modifier) {
     var selectedGame by remember { mutableStateOf<ScanGame?>(null) }
     var launchError by remember { mutableStateOf<String?>(null) }
     var patchLaunchTarget by remember { mutableStateOf<ScanGame?>(null) }
+
+    // 首页与游戏页同驻 Pager（beyondViewportPageCount=1），本地 state 不会因切页重建；
+    // 监听 EngineScanner 的快捷启动版本号，游戏抽屉增删后实时刷新三个快捷启动卡片。
+    val quickLaunchRevision by EngineScanner.quickLaunchRevision.collectAsState()
+    LaunchedEffect(quickLaunchRevision) {
+        quickLaunch = EngineScanner.refreshQuickLaunch(context)
+    }
 
     fun replaceGame(updated: ScanGame) {
         quickLaunch = quickLaunch.map { if (it.uri == updated.uri) updated else it }
@@ -145,12 +155,16 @@ fun HomeScreen(modifier: Modifier = Modifier) {
             ) {
                 repeat(3) { i ->
                     val game = quickLaunch.getOrNull(i)
-                    QuickLaunchSlot(
-                        game = game,
-                        onClick = { if (game != null) selectedGame = game },
-                        onLongClick = { if (game != null) launchGame(game) },
-                        modifier = Modifier.weight(1f),
-                    )
+                    // 按游戏 uri 做 key：删除卡片后槽位状态跟随游戏移动而不是按位置复用，
+                    // 避免被顶上来那张卡复用被删卡的封面 MutableState（上一个封面串到另一张卡）。
+                    key(game?.uri ?: "quick_launch_empty_$i") {
+                        QuickLaunchSlot(
+                            game = game,
+                            onClick = { if (game != null) selectedGame = game },
+                            onLongClick = { if (game != null) launchGame(game) },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
                 }
             }
         }

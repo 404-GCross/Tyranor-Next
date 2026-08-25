@@ -6,6 +6,9 @@ import android.provider.DocumentsContract
 import androidx.documentfile.provider.DocumentFile
 import com.tyranor.next.settings.AppSettingsStore
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.Locale
@@ -32,6 +35,10 @@ object EngineScanner {
     private var recentGamesCache: List<ScanGame>? = null
     @Volatile
     private var quickLaunchCache: List<ScanGame>? = null
+
+    // 快捷启动版本号：任何增删/刷新后自增，供首页实时感知改动后重新加载
+    private val _quickLaunchRevision = MutableStateFlow(0)
+    val quickLaunchRevision: StateFlow<Int> = _quickLaunchRevision.asStateFlow()
 
     /**
      * 将 SAF tree/document URI 映射为真实文件路径（用于引擎 native 启动）。
@@ -169,6 +176,7 @@ object EngineScanner {
         val snapshot = games.toList()
         quickLaunchCache = snapshot
         saveList(context, KEY_QUICK_LAUNCH, snapshot)
+        _quickLaunchRevision.value++
     }
 
     // ---------- 通用存取助手 ----------
