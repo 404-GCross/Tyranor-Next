@@ -49,6 +49,7 @@ import org.json.JSONObject
  */
 class TyranoActivity : Activity() {
     private var webView: WebView? = null
+    private var virtualMouseLayer: VirtualMouseLayer? = null
     private var gameDir: String? = null
     private var gameRootFile: File? = null
     private var saveDirectory: File? = null
@@ -61,7 +62,6 @@ class TyranoActivity : Activity() {
     private var allowExternalNetwork = false
     private var rpgMakerModEnabled = false
     private var rpgMakerModGameId = ""
-    private var backInvokedCallback: Any? = null
     private val processExitScheduled = AtomicBoolean(false)
 
     override fun attachBaseContext(newBase: Context) {
@@ -70,7 +70,6 @@ class TyranoActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        backInvokedCallback = DoubleBackExit.registerPredictiveBack(this, ::handleBackRequest)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         enterFullscreen()
         allowExternalNetwork = getSharedPreferences(EnginePrefs.APP_PREFS, Context.MODE_PRIVATE)
@@ -182,6 +181,15 @@ class TyranoActivity : Activity() {
         }
         webView = browser
         root.addView(browser)
+        // 虚拟鼠标层（issue #25）：仅 RPG Maker MV/MZ 需要，叠在 WebView 之上
+        if (webGameType == WebGameType.RPG_MV || webGameType == WebGameType.RPG_MZ) {
+            val layer = VirtualMouseLayer(this) { js ->
+                webView?.let { v -> runCatching { v.evaluateJavascript(js, null) } }
+            }
+            virtualMouseLayer = layer
+            root.addView(layer, FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        }
         setContentView(root)
 
         configureWebView(browser)
@@ -209,6 +217,11 @@ class TyranoActivity : Activity() {
     }
 
     private fun loadAsset(name: String): ByteArray = assets.open(name).buffered().use { it.readBytes() }
+
+    /** 虚拟鼠标合成事件 API（懒加载缓存；见 assets/__tyranor_mouse.js）。 */
+    private val mouseJs: String by lazy {
+        runCatching { loadAsset(VIRTUAL_MOUSE_ASSET).toString(Charsets.UTF_8) }.getOrDefault("")
+    }
 
     private fun buildRpgMakerModHtml(): String {
         val colors = EngineThemeColors.fromIntent(intent)
@@ -264,6 +277,10 @@ class TyranoActivity : Activity() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
                 Log.i(TAG, "onPageFinished url=$url")
+                // 虚拟鼠标合成事件 API（幂等，页面每次加载后重新注入）
+                if (virtualMouseLayer != null && view != null) {
+                    runCatching { view.evaluateJavascript(mouseJs, null) }
+                }
             }
 
             override fun onReceivedError(
@@ -521,6 +538,7 @@ class TyranoActivity : Activity() {
     }
 
     override fun onPause() {
+        virtualMouseLayer?.reset()
         runCatching { webView?.loadUrl("javascript:if(window._tyrano_player){_tyrano_player.pauseAllAudio();}") }
         runCatching { webView?.onPause() }
         super.onPause()
@@ -536,7 +554,6 @@ class TyranoActivity : Activity() {
     }
 
     override fun onDestroy() {
-        DoubleBackExit.unregisterPredictiveBack(this, backInvokedCallback)
         DoubleBackExit.clear(this)
         runCatching {
             webView?.stopLoading()
@@ -844,6 +861,7 @@ class TyranoActivity : Activity() {
         private const val RPG_MAKER_MOD_UI_ASSET = "__rpgmaker_mod_ui.js"
         private const val RPG_MAKER_MOD_CSS_ASSET = "__rpgmaker_mod.css"
         private const val RPG_MAKER_MOD_ICON_ASSET = "__rpgmaker_mod_icon.png"
+        private const val VIRTUAL_MOUSE_ASSET = "__tyranor_mouse.js"
         private const val RPG_MAKER_MOD_CORE_PATH = "__tyranor__/rpgmaker_mod_core.js"
         private const val RPG_MAKER_MOD_UI_PATH = "__tyranor__/rpgmaker_mod_ui.js"
         private const val RPG_MAKER_MOD_CSS_PATH = "__tyranor__/rpgmaker_mod.css"

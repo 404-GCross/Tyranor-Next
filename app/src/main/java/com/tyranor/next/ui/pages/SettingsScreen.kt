@@ -52,7 +52,7 @@ import androidx.compose.ui.unit.dp
 import com.tyranor.next.R
 import com.tyranor.next.settings.EngineSettingsStore
 import com.tyranor.next.theme.MiuixSettingsTheme
-import com.tyranor.next.theme.NavWhite
+import com.tyranor.next.ui.common.AppNavItem
 import com.tyranor.next.ui.common.TopBarIcon
 import com.tyranor.next.ui.common.glassNavBottomInset
 import com.tyranor.next.updater.GitHubUpdateChecker
@@ -139,6 +139,12 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                                 onClick = { startActivityWithPageTransition(ctx, AppSettingsActivity.createIntent(ctx)) },
                             )
                             ArrowPreference(
+                                title = "封面刮削",
+                                summary = "设置多源封面来源、顺序与授权",
+                                startAction = { SettingsItemIcon(R.drawable.ic_game_cover) },
+                                onClick = { startActivityWithPageTransition(ctx, CoverScraperSettingsActivity.createIntent(ctx)) },
+                            )
+                            ArrowPreference(
                                 title = if (checkingUpdate) "正在检查更新" else "更新检查",
                                 summary = "对项目Github获取更新信息",
                                 startAction = { SettingsItemIcon(R.drawable.ic_settings_update) },
@@ -169,11 +175,11 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    GroupChannelItem("企鹅群聊", R.drawable.ic_group_qq) {
+                    AppNavItem("企鹅群聊", leadingIcon = R.drawable.ic_group_qq) {
                         showGroupDialog = false
                         ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://qm.qq.com/q/M9JH8A9Yys")))
                     }
-                    GroupChannelItem("飞机频道", R.drawable.ic_group_telegram) {
+                    AppNavItem("飞机频道", leadingIcon = R.drawable.ic_group_telegram) {
                         showGroupDialog = false
                         ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/tyranornext")))
                     }
@@ -365,36 +371,6 @@ private fun SettingsItemIcon(@DrawableRes iconRes: Int) {
     )
 }
 
-/** 统一弹窗内的群聊/频道选项项：左侧 logo + 名称 + 右侧指示箭头。 */
-@Composable
-private fun GroupChannelItem(label: String, iconRes: Int, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .clickable(onClick = onClick)
-            .background(NavWhite)
-            .padding(vertical = 12.dp, horizontal = 16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Image(
-            painter = painterResource(iconRes),
-            contentDescription = null,
-            modifier = Modifier.size(24.dp),
-        )
-        Text(
-            label,
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.padding(start = 12.dp).weight(1f),
-        )
-        Icon(
-            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-            contentDescription = null,
-            tint = MiuixTheme.colorScheme.onBackground,
-        )
-    }
-}
-
 /** 顶部栏：遵守全局规范（Column + 页面背景色 + statusBarsPadding + 64dp 标题区，沉浸式）。 */
 @Composable
 private fun SettingsTopBar(title: String) {
@@ -506,6 +482,7 @@ private fun LazyListPlaceholder(
 
         if (kind == EngineSettingsKind.TYRANO) item {
             EngineCard("Tyrano") {
+                // RPG Maker Web 与 Tyrano 共用同一套 WebView 宿主开关，避免同类引擎重复配置。
                 SwitchPreference(title = "允许加载外部网络资源", checked = tyExternal, onCheckedChange = onTyExternal)
                 SwitchPreference(title = "独立存档目录", checked = tyScoped, onCheckedChange = onTyScoped)
             }
