@@ -127,7 +127,7 @@ object EngineScanner {
 
     /** 从持久游戏库中移除指定游戏（在游戏页或首页删除游戏时调用，保证库与最近列表一致）。 */
     fun removeGame(context: Context, uri: String) {
-        saveGames(context, loadGames(context).filterNot { it.uri == uri })
+        updateGames(context) { games -> games.filterNot { it.uri == uri } }
     }
 
 /** 目录名 → 安全文件名（用于应用内镜像/独立存档目录），非法字符替换为下划线。 */
@@ -252,11 +252,14 @@ object EngineScanner {
     fun removeRootAndGames(context: Context, uri: Uri) {
         removeRoot(context, uri)
         val root = uri.toString()
-        val removedUris = loadGames(context)
-            .filter { isGameUnderRoot(root, it.uri) }
-            .mapTo(HashSet()) { it.uri }
+        var removedUris = emptySet<String>()
+        updateGames(context) { games ->
+            removedUris = games
+                .filter { isGameUnderRoot(root, it.uri) }
+                .mapTo(HashSet()) { it.uri }
+            games.filterNot { it.uri in removedUris }
+        }
         if (removedUris.isEmpty()) return
-        saveGames(context, loadGames(context).filterNot { it.uri in removedUris })
         saveRecentGames(context, loadRecentGames(context).filterNot { it.uri in removedUris })
         saveQuickLaunch(context, loadQuickLaunch(context).filterNot { it.uri in removedUris })
     }
