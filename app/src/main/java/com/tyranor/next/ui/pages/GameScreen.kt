@@ -896,6 +896,14 @@ private fun CoverSearchDialog(
                 }
             }
         },
+        dismissButton = {
+            TextButton(
+                onClick = { search() },
+                enabled = !searching && !binding,
+            ) {
+                Text(if (searching) "搜索中…" else "搜索")
+            }
+        },
         confirmButton = { TextButton(onClick = onDismiss) { Text("关闭") } },
     )
 }
