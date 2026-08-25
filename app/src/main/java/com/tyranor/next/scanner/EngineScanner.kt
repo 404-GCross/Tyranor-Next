@@ -86,15 +86,28 @@ object EngineScanner {
     // ============ 游戏结果持久化 ============
 
     fun saveGames(context: Context, games: List<ScanGame>) {
-        val snapshot = games.toList()
-        gamesCache = snapshot
-        saveList(context, KEY_GAMES, snapshot)
+        synchronized(cacheLock) {
+            saveGamesLocked(context, games.toList())
+        }
     }
 
     fun loadGames(context: Context): List<ScanGame> =
         gamesCache ?: synchronized(cacheLock) {
             gamesCache ?: loadList(context, KEY_GAMES).also { gamesCache = it }
         }
+
+    fun updateGames(context: Context, transform: (List<ScanGame>) -> List<ScanGame>): List<ScanGame> =
+        synchronized(cacheLock) {
+            val current = gamesCache ?: loadList(context, KEY_GAMES).also { gamesCache = it }
+            val updated = transform(current).toList()
+            saveGamesLocked(context, updated)
+            updated
+        }
+
+    private fun saveGamesLocked(context: Context, games: List<ScanGame>) {
+        gamesCache = games
+        saveList(context, KEY_GAMES, games)
+    }
 
     fun recordRecentGame(context: Context, game: ScanGame) {
         val touched = game.copy(openTime = System.currentTimeMillis())

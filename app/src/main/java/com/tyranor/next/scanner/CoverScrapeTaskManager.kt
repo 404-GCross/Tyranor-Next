@@ -37,9 +37,10 @@ object CoverScrapeTaskManager {
                 try {
                     val input = games ?: EngineScanner.loadGames(appContext)
                     val result = CoverScraperService.scrapeLibraryCovers(appContext, input)
-                    val mergedGames = mergeWithCurrentLibrary(appContext, input, result.games)
-                    withContext(NonCancellable + Dispatchers.IO) {
-                        EngineScanner.saveGames(appContext, mergedGames)
+                    val mergedGames = withContext(NonCancellable + Dispatchers.IO) {
+                        EngineScanner.updateGames(appContext) { currentGames ->
+                            mergeWithCurrentLibrary(currentGames, input, result.games)
+                        }
                     }
                     postFinished(result = result.copy(games = mergedGames), error = null)
                 } catch (e: CancellationException) {
@@ -65,11 +66,10 @@ object CoverScrapeTaskManager {
     }
 
     private fun mergeWithCurrentLibrary(
-        context: Context,
+        currentGames: List<ScanGame>,
         originalGames: List<ScanGame>,
         scrapedGames: List<ScanGame>,
     ): List<ScanGame> {
-        val currentGames = EngineScanner.loadGames(context)
         if (currentGames.isEmpty()) return emptyList()
         val originalByUri = originalGames.associateBy { it.uri }
         val scrapedByUri = scrapedGames.associateBy { it.uri }
