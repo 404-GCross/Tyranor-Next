@@ -37,6 +37,9 @@ object EngineSettingsStore {
     const val KEY_TYRANO_EXTERNAL_NETWORK = "tyrano_external_network"
     const val KEY_TYRANO_SCOPED_SAVE_DIR = "tyrano_scoped_save_dir"
 
+    // 双击返回退出提示（全引擎共享；引擎进程经 EnginePrefs.KEY_BACK_EXIT_PROMPT 读取）
+    const val KEY_BACK_EXIT_PROMPT = "engine_back_exit_prompt"
+
     // 取值常量
     const val KR_AUTO = "auto"
     const val KR_139 = "1.3.9"
@@ -200,4 +203,8 @@ object EngineSettingsStore {
     fun setTyranoExternalNetwork(c: Context, b: Boolean) = prefs(c).edit().putBoolean(KEY_TYRANO_EXTERNAL_NETWORK, b).apply()
     fun isTyranoScopedSaveDir(c: Context): Boolean = prefs(c).getBoolean(KEY_TYRANO_SCOPED_SAVE_DIR, true)
     fun setTyranoScopedSaveDir(c: Context, b: Boolean) = prefs(c).edit().putBoolean(KEY_TYRANO_SCOPED_SAVE_DIR, b).apply()
+
+    // ---------- 双击返回退出提示 ----------
+    fun isBackExitPrompt(c: Context): Boolean = prefs(c).getBoolean(KEY_BACK_EXIT_PROMPT, true)
+    fun setBackExitPrompt(c: Context, b: Boolean) = prefs(c).edit().putBoolean(KEY_BACK_EXIT_PROMPT, b).apply()
 }

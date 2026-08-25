@@ -13,6 +13,9 @@ object EnginePrefs {
     /** Tyrano 外部网络开关偏好键（镜像 app 模块 EngineSaveKeys.KEY_TYRANO_EXTERNAL_NETWORK）。 */
     const val KEY_TYRANO_EXTERNAL_NETWORK = "tyrano_external_network"
 
+    /** 双击返回退出时是否弹「再按一次退出」提示（镜像 app 模块 EngineSettingsStore.KEY_BACK_EXIT_PROMPT）。 */
+    const val KEY_BACK_EXIT_PROMPT = "engine_back_exit_prompt"
+
     const val KEY_NATIVE_PLUGIN_KIRIKIROID2_ENABLED = "native_plugin.kirikiroid2.enabled"
     const val KEY_NATIVE_PLUGIN_KIRIKIROID2_INSTALLED = "native_plugin.kirikiroid2.installed"
     const val KEY_NATIVE_PLUGIN_KIRIKIROID2_VERSION = "native_plugin.kirikiroid2.version"

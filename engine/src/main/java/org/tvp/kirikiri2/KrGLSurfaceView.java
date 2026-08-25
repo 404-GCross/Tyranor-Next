@@ -51,13 +51,15 @@ public final class KrGLSurfaceView extends Cocos2dxGLSurfaceView {
     }
 
     @Override public final boolean onKeyDown(int keyCode, KeyEvent keyEvent) {
-        if (keyCode == KeyEvent.KEYCODE_BACK) {
+        if (keyCode == KeyEvent.KEYCODE_BACK && keyEvent.getRepeatCount() == 0) {
             KR2Activity activity = KrPathUtils.currentActivity();
-            if (!DoubleBackExit.shouldExit(activity)) {
+            // 首次按下：shouldExit 已弹提示并记录时间，随后照常透传给引擎（与上游一致）；
+            // 窗口内第二次按下：退出引擎且不透传，并吞掉后续 ACTION_UP 防止引擎收到孤立抬键。
+            if (activity != null && DoubleBackExit.shouldExit(activity)) {
                 suppressBackUp = true;
+                activity.exit();
                 return true;
             }
-            suppressBackUp = false;
         }
         if (keyCode != KeyEvent.KEYCODE_BACK && keyCode != KeyEvent.KEYCODE_ENTER && keyCode != KeyEvent.KEYCODE_MENU && keyCode != KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE) {
             switch (keyCode) {
