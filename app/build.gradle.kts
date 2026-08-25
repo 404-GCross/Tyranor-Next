@@ -138,7 +138,10 @@ dependencies {
   // Core Android dependencies
   implementation(libs.androidx.core.ktx)
   implementation(libs.androidx.lifecycle.runtime.ktx)
+  implementation(libs.androidx.lifecycle.process)
   implementation(libs.androidx.activity.compose)
+  // 后台更新任务（WorkManager 按需初始化，见 Manifest）
+  implementation(libs.androidx.work.runtime.ktx)
 
   // Arch Components
   implementation(libs.androidx.lifecycle.runtime.compose)
