@@ -234,7 +234,6 @@ public class SDLActivity extends AppCompatActivity implements View.OnSystemUiVis
     protected static boolean mActivityCreated = false;
     private static SDLFileDialogState mFileDialogState = null;
     protected static boolean mDispatchingKeyEvent = false;
-    private Object backInvokedCallback;
 
     public static SDLGenericMotionListener_API14 getMotionListener() {
         if (mMotionListener == null) {
@@ -409,7 +408,6 @@ public class SDLActivity extends AppCompatActivity implements View.OnSystemUiVis
 
         if (mBrokenLibraries) {
             mSingleton = this;
-            backInvokedCallback = DoubleBackExit.registerPredictiveBack(this, this::exitFromBack);
             AlertDialog.Builder dlgAlert  = new AlertDialog.Builder(this);
             dlgAlert.setMessage("An error occurred while trying to start the application. Please try again and/or reinstall."
                   + System.getProperty("line.separator")
@@ -456,7 +454,6 @@ public class SDLActivity extends AppCompatActivity implements View.OnSystemUiVis
 
         // So we can call stuff from static callbacks
         mSingleton = this;
-        backInvokedCallback = DoubleBackExit.registerPredictiveBack(this, this::exitFromBack);
         SDL.setContext(this);
 
         // 耳机/蓝牙热插拔：SDL 3.1.x 预览版不会自动把音频流迁移到新输出设备，
@@ -710,7 +707,6 @@ public class SDLActivity extends AppCompatActivity implements View.OnSystemUiVis
         // The recovery lambda captures this Activity; drop the static reference so it
         // doesn't leak past destruction (re-registered on next onCreate if needed).
         AudioRouteWatcher.clearRecoveryAction();
-        DoubleBackExit.unregisterPredictiveBack(this, backInvokedCallback);
         DoubleBackExit.clear(this);
 
         if (mHIDDeviceManager != null) {
@@ -761,8 +757,8 @@ public class SDLActivity extends AppCompatActivity implements View.OnSystemUiVis
         }
 
         // Default system back button behavior.
-        if (!isFinishing()) {
-            DoubleBackExit.handleBack(this, this::superOnBackPressed);
+        if (!isFinishing() && DoubleBackExit.shouldExit(this)) {
+            superOnBackPressed();
         }
     }
 
@@ -842,7 +838,24 @@ public class SDLActivity extends AppCompatActivity implements View.OnSystemUiVis
             ) {
             return false;
         }
-        if (DoubleBackExit.dispatchBackKey(this, event, this::exitFromBack)) {
+        // BACK 首按透传给 SDL native 事件循环（同原版），双击退出仅作兜底；
+        // 鼠标来源的 BACK 维持 stock SDL 行为（由 SDLSurface 吞掉，不送 native）。
+        if (keyCode == KeyEvent.KEYCODE_BACK
+                && (event.getSource() & InputDevice.SOURCE_MOUSE) == 0) {
+            if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                if (event.getRepeatCount() == 0) {
+                    if (DoubleBackExit.shouldExit(this)) {
+                        exitFromBack();
+                    } else if (mSDLThread != null) {
+                        onNativeKeyDown(keyCode);
+                    }
+                }
+                return true;
+            }
+            if (event.getAction() == KeyEvent.ACTION_UP) {
+                if (mSDLThread != null) onNativeKeyUp(keyCode);
+                return true;
+            }
             return true;
         }
         mDispatchingKeyEvent = true;
