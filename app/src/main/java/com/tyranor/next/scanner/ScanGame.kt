@@ -10,6 +10,7 @@ data class ScanGame(
     val engine: EngineType,
     val launchTarget: String,
     val coverUri: String? = null,
+    val coverSource: String? = null,
     val vndbId: String? = null,
     val metadataTitle: String? = null,
     /** 用户通过“启动文件”手动指定的启动入口文件名（相对游戏目录）；null 表示自动。 */
@@ -31,6 +32,7 @@ object ScanGameIntents {
     private const val EXTRA_ENGINE = "extra_engine"
     private const val EXTRA_LAUNCH_TARGET = "extra_launch_target"
     private const val EXTRA_COVER_URI = "extra_cover_uri"
+    private const val EXTRA_COVER_SOURCE = "extra_cover_source"
     private const val EXTRA_VNDB_ID = "extra_vndb_id"
     private const val EXTRA_METADATA_TITLE = "extra_metadata_title"
 
@@ -40,6 +42,7 @@ object ScanGameIntents {
         putExtra(EXTRA_ENGINE, game.engine.name)
         putExtra(EXTRA_LAUNCH_TARGET, game.launchTarget)
         game.coverUri?.let { putExtra(EXTRA_COVER_URI, it) }
+        game.coverSource?.let { putExtra(EXTRA_COVER_SOURCE, it) }
         game.vndbId?.let { putExtra(EXTRA_VNDB_ID, it) }
         game.metadataTitle?.let { putExtra(EXTRA_METADATA_TITLE, it) }
     }
@@ -56,6 +59,7 @@ object ScanGameIntents {
             engine = engine,
             launchTarget = intent.getStringExtra(EXTRA_LAUNCH_TARGET).orEmpty(),
             coverUri = intent.getStringExtra(EXTRA_COVER_URI),
+            coverSource = intent.getStringExtra(EXTRA_COVER_SOURCE),
             vndbId = intent.getStringExtra(EXTRA_VNDB_ID),
             metadataTitle = intent.getStringExtra(EXTRA_METADATA_TITLE),
         )

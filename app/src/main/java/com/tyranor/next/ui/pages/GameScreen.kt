@@ -40,13 +40,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.material3.RadioButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -70,22 +68,33 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import top.yukonga.miuix.kmp.basic.RadioButton
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 import com.tyranor.next.R
+import com.tyranor.next.scanner.CoverImageCache
+import com.tyranor.next.scanner.CoverScrapeTaskManager
+import com.tyranor.next.scanner.CoverSearchCandidate
+import com.tyranor.next.scanner.CoverSearchResult
+import com.tyranor.next.scanner.CoverScraperService
 import com.tyranor.next.scanner.EngineLauncher
 import com.tyranor.next.scanner.EngineScanner
 import com.tyranor.next.scanner.EngineType
 import com.tyranor.next.scanner.GameSaveManager
 import com.tyranor.next.scanner.ScanGame
-import com.tyranor.next.scanner.VndbCandidate
 import com.tyranor.next.scanner.VndbCoverService
+import com.tyranor.next.scanner.stableKey
 import com.tyranor.next.settings.AppSettingsStore
+import com.tyranor.next.settings.HikarinagiAuthStore
 import com.tyranor.next.settings.PerGameSettingsStore
+import com.tyranor.next.theme.MiuixSettingsTheme
 import com.tyranor.next.theme.NavWhite
+import com.tyranor.next.theme.PageGrey
+import com.tyranor.next.theme.TextColor
+import com.tyranor.next.ui.common.AppNavItem
 import com.tyranor.next.ui.common.AppSearchField
+import com.tyranor.next.ui.common.TopBarIcon
 import com.tyranor.next.ui.common.glassNavBottomInset
 import com.tyranor.next.ui.common.isWideScreen
-import com.tyranor.next.theme.PageGrey
-import com.tyranor.next.ui.common.TopBarIcon
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -103,6 +112,33 @@ fun GameScreen(modifier: Modifier = Modifier) {
     var patchLaunchTarget by remember { mutableStateOf<ScanGame?>(null) }
 
     val gridState = rememberLazyGridState()
+    val scrapeTaskState = CoverScrapeTaskManager.state.value
+
+    LaunchedEffect(scrapeTaskState.eventId) {
+        if (scrapeTaskState.eventId == 0L) return@LaunchedEffect
+        val result = scrapeTaskState.result
+        if (result != null) {
+            games = result.games
+            selectedGame = selectedGame?.let { selected ->
+                result.games.firstOrNull { it.uri == selected.uri }
+            }
+            android.widget.Toast.makeText(
+                context,
+                "批量刮削完成：更新 ${result.updatedCount}，跳过 ${result.skippedCount}，失败 ${result.failedCount}",
+                android.widget.Toast.LENGTH_SHORT,
+            ).show()
+        } else if (scrapeTaskState.error == null) {
+            val refreshed = EngineScanner.loadGames(context)
+            games = refreshed
+            selectedGame = selectedGame?.let { selected ->
+                refreshed.firstOrNull { it.uri == selected.uri }
+            }
+        }
+        scrapeTaskState.error?.let { message ->
+            android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_SHORT).show()
+        }
+        CoverScrapeTaskManager.clearFinished(scrapeTaskState.eventId)
+    }
 
     fun replaceGame(updated: ScanGame) {
         val nextGames = games.map { if (it.uri == updated.uri) updated else it }
@@ -126,43 +162,29 @@ fun GameScreen(modifier: Modifier = Modifier) {
     }
 
     fun syncMissingCovers() {
-        if (scanning) return
-        scope.launch {
-            scanning = true
-            val current = games
-            val updated = withContext(Dispatchers.IO) {
-                current.map { game ->
-                    val local = runCatching { EngineScanner.applyLocalCover(context, game) }.getOrDefault(game)
-                    val next = runCatching { VndbCoverService.fetchBestCover(context, local) }.getOrNull()
-                    if (next != null && next.coverUri != game.coverUri) {
-                        next
-                    } else if (local.coverUri != game.coverUri) {
-                        local
-                    } else {
-                        game
-                    }
-                }
-            }
-            games = updated
-            EngineScanner.saveGames(context, updated)
-            scanning = false
+        if (scanning || scrapeTaskState.running) return
+        if (!CoverScrapeTaskManager.start(context, games)) {
+            android.widget.Toast.makeText(context, "批量刮削正在进行", android.widget.Toast.LENGTH_SHORT).show()
         }
     }
 
     // 扫描游戏库：每次按扫描目录全量重建，删除/改名/移动后的旧缓存条目会被清理。
     fun scanLibrary() {
-        if (scanning) return
+        if (scanning || scrapeTaskState.running) return
         scope.launch {
             scanning = true
-            val roots = EngineScanner.loadRoots(context)
-            if (roots.isNotEmpty()) {
-                val updated = EngineScanner.rescanLibrary(context)
-                games = updated
-                selectedGame = selectedGame?.let { selected ->
-                    updated.firstOrNull { it.uri == selected.uri }
+            try {
+                val roots = EngineScanner.loadRoots(context)
+                if (roots.isNotEmpty()) {
+                    val updated = EngineScanner.rescanLibrary(context)
+                    games = updated
+                    selectedGame = selectedGame?.let { selected ->
+                        updated.firstOrNull { it.uri == selected.uri }
+                    }
                 }
+            } finally {
+                scanning = false
             }
-            scanning = false
         }
     }
 
@@ -184,7 +206,7 @@ fun GameScreen(modifier: Modifier = Modifier) {
     GameLibraryContent(
         modifier = modifier,
         games = games,
-        scanning = scanning,
+        scanning = scanning || scrapeTaskState.running,
         gridState = gridState,
         dirPickerLaunch = { dirPicker.launch(null) },
         syncMissingCovers = { syncMissingCovers() },
@@ -366,7 +388,7 @@ private fun GameLibraryContent(
                         showSearch = !showSearch
                         if (!showSearch) query = ""
                     }
-                    TopBarIcon(painterResource(R.drawable.ic_game_cover), "自动获取封面", MaterialTheme.colorScheme.primary) {
+                    TopBarIcon(painterResource(R.drawable.ic_game_cover), "批量刮削封面", MaterialTheme.colorScheme.primary) {
                         syncMissingCovers()
                     }
                     TopBarIcon(painterResource(R.drawable.ic_game_scan), "扫描游戏", MaterialTheme.colorScheme.primary) {
@@ -442,11 +464,20 @@ internal fun GameActionsSheet(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var launchError by remember { mutableStateOf<String?>(null) }
-    var showVndbSearch by remember { mutableStateOf(false) }
+    var showCoverSourcePicker by remember { mutableStateOf(false) }
+    var coverSearchSource by remember { mutableStateOf<String?>(null) }
+    var coverBinding by remember { mutableStateOf(false) }
+    var coverBindError by remember { mutableStateOf<String?>(null) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var showLaunchFilePicker by remember { mutableStateOf(false) }
     var showRenameDialog by remember { mutableStateOf(false) }
     var showPatchConfirm by remember { mutableStateOf(false) }
+
+    fun isBatchScrapingActive(): Boolean {
+        if (!CoverScrapeTaskManager.state.value.running) return false
+        android.widget.Toast.makeText(context, "批量刮削正在进行", android.widget.Toast.LENGTH_SHORT).show()
+        return true
+    }
 
     // 发起启动；Artemis 需要 PFS 基础补丁且策略为“启动时询问”时，先弹窗确认再带选择启动
     fun startLaunch(patchChoice: EngineLauncher.ArtemisPatchChoice? = null) {
@@ -459,6 +490,7 @@ internal fun GameActionsSheet(
     // 打开相册选择自定义封面
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
+        if (isBatchScrapingActive()) return@rememberLauncherForActivityResult
         scope.launch {
             launchError = "正在设置封面…"
             val updated = withContext(Dispatchers.IO) {
@@ -509,7 +541,7 @@ internal fun GameActionsSheet(
                     GameActionRow(
                         iconRes = R.drawable.ic_sheet_launch_file,
                         label = "启动文件",
-                        subtitle = game.launchFile ?: "自动",
+                        subtitle = game.launchFile ?: "自动 - 无法打开请手动选择游戏启动文件",
                     ) { showLaunchFilePicker = true }
                 }
             }
@@ -529,8 +561,16 @@ internal fun GameActionsSheet(
                     }
                 }
             }
-            item { GameActionRow(R.drawable.ic_sheet_search_cover, "搜索封面") { showVndbSearch = true } }
-            item { GameActionRow(R.drawable.ic_sheet_edit_cover, "修改封面") { imagePicker.launch("image/*") } }
+            item {
+                GameActionRow(R.drawable.ic_sheet_search_cover, "搜索封面") {
+                    if (!isBatchScrapingActive()) showCoverSourcePicker = true
+                }
+            }
+            item {
+                GameActionRow(R.drawable.ic_sheet_edit_cover, "修改封面") {
+                    if (!isBatchScrapingActive()) imagePicker.launch("image/*")
+                }
+            }
             item { GameActionRow(R.drawable.ic_sheet_rename, "名称修改") { showRenameDialog = true } }
             item {
                 GameActionRow(R.drawable.ic_sheet_saves, "存档管理") {
@@ -604,23 +644,42 @@ internal fun GameActionsSheet(
         )
     }
 
-    if (showVndbSearch) {
-        VndbSearchDialog(
+    if (showCoverSourcePicker) {
+        CoverSourcePickerDialog(
+            onDismiss = { showCoverSourcePicker = false },
+            onSelect = { source ->
+                if (!isBatchScrapingActive()) {
+                    showCoverSourcePicker = false
+                    coverBindError = null
+                    coverSearchSource = source
+                }
+            },
+        )
+    }
+
+    coverSearchSource?.let { source ->
+        CoverSearchDialog(
             game = game,
-            onDismiss = { showVndbSearch = false },
+            source = source,
+            binding = coverBinding,
+            bindError = coverBindError,
+            onDismiss = { coverSearchSource = null },
             onBind = { candidate ->
-                scope.launch {
-                    launchError = "正在绑定封面…"
-                    val updated = withContext(Dispatchers.IO) {
-                        runCatching { VndbCoverService.bindCandidate(context, game, candidate) }.getOrNull()
-                    }
-                    if (updated != null) {
-                        onGameUpdated(updated)
-                        launchError = null
-                        showVndbSearch = false
-                        onDismiss()
-                    } else {
-                        launchError = "封面下载失败"
+                if (!coverBinding && !isBatchScrapingActive()) {
+                    coverBinding = true
+                    coverBindError = null
+                    scope.launch {
+                        val updated = withContext(Dispatchers.IO) {
+                            runCatching { CoverScraperService.bindCoverCandidate(context, game, candidate) }.getOrNull()
+                        }
+                        coverBinding = false
+                        if (updated != null) {
+                            onGameUpdated(updated)
+                            coverSearchSource = null
+                            onDismiss()
+                        } else {
+                            coverBindError = "封面下载失败"
+                        }
                     }
                 }
             },
@@ -710,15 +769,57 @@ private fun RenameGameDialog(
 }
 
 @Composable
-private fun VndbSearchDialog(
-    game: ScanGame,
+private fun CoverSourcePickerDialog(
     onDismiss: () -> Unit,
-    onBind: (VndbCandidate) -> Unit,
+    onSelect: (String) -> Unit,
 ) {
-    var keyword by remember { mutableStateOf(game.title) }
+    val context = LocalContext.current
+    val authVersion = HikarinagiAuthStore.statusVersion.value
+    val sources = remember(AppSettingsStore.coverScraperSettingsVersion.value) {
+        AppSettingsStore.getCoverScraperSourceOrder(context)
+    }
+    val authStatus = remember(authVersion) { HikarinagiAuthStore.getStatus(context) }
+
+    AppAlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("选择封面来源", style = MaterialTheme.typography.titleMedium) },
+        text = {
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth().heightIn(max = 320.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                lazyItems(sources, key = { it }) { source ->
+                    val enabled = AppSettingsStore.isCoverScraperSourceEnabled(context, source)
+                    val needsHikarinagiLogin = source == AppSettingsStore.COVER_SOURCE_HIKARINAGI &&
+                        (!authStatus.authorized || authStatus.needsReauth)
+                    val selectable = enabled && !needsHikarinagiLogin
+                    AppNavItem(
+                        title = coverSourceTitle(source),
+                        summary = coverSourcePickerSummary(source, enabled, needsHikarinagiLogin),
+                        onClick = if (selectable) ({ onSelect(source) }) else null,
+                        leadingIcon = R.drawable.ic_cover_source,
+                    )
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+    )
+}
+
+@Composable
+private fun CoverSearchDialog(
+    game: ScanGame,
+    source: String,
+    binding: Boolean,
+    bindError: String?,
+    onDismiss: () -> Unit,
+    onBind: (CoverSearchCandidate) -> Unit,
+) {
+    val context = LocalContext.current
+    var keyword by remember(source, game.uri) { mutableStateOf(game.title) }
     var searching by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
-    var candidates by remember { mutableStateOf<List<VndbCandidate>>(emptyList()) }
+    var candidates by remember { mutableStateOf<List<CoverSearchCandidate>>(emptyList()) }
     val scope = rememberCoroutineScope()
 
     fun search() {
@@ -727,32 +828,53 @@ private fun VndbSearchDialog(
         scope.launch {
             searching = true
             error = null
-            val result = withContext(Dispatchers.IO) {
-                runCatching { VndbCoverService.searchCandidates(query, 8) }
+            candidates = emptyList()
+            try {
+                when (val result = withContext(Dispatchers.IO) {
+                    CoverScraperService.searchCoverCandidates(context, source, query, 8)
+                }) {
+                    is CoverSearchResult.Success -> {
+                        candidates = result.candidates.distinctBy { "${it.source}:${it.id}:${it.coverUrl}" }
+                        if (candidates.isEmpty()) error = "未找到匹配结果"
+                    }
+                    is CoverSearchResult.Failure -> {
+                        error = result.message
+                    }
+                }
+            } catch (e: Exception) {
+                error = e.message ?: "封面搜索失败"
+            } finally {
+                searching = false
             }
-            candidates = result.getOrDefault(emptyList())
-            result.exceptionOrNull()?.let { error = it.message ?: "VNDB 搜索失败" }
-            if (candidates.isEmpty() && error == null) error = "未找到匹配结果"
-            searching = false
         }
     }
 
     AppAlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("搜索 VNDB 封面", style = MaterialTheme.typography.titleMedium) },
+        title = { Text("搜索${coverSourceTitle(source)}封面", style = MaterialTheme.typography.titleMedium) },
         text = {
             Column {
                 AppSearchField(
                     query = keyword,
                     onQueryChange = { keyword = it },
                     onSearch = { search() },
+                    textStyle = MiuixTheme.textStyles.subtitle,
                 )
-                Button(
-                    onClick = { search() },
-                    enabled = !searching,
-                    modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
-                ) {
-                    Text(if (searching) "搜索中…" else "搜索", style = MaterialTheme.typography.bodyMedium)
+                if (binding) {
+                    Text(
+                        "正在绑定封面…",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                }
+                bindError?.let {
+                    Text(
+                        it,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
                 }
                 error?.let {
                     Text(
@@ -763,38 +885,145 @@ private fun VndbSearchDialog(
                     )
                 }
                 if (candidates.isNotEmpty()) {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxWidth().height(220.dp).padding(top = 8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(2),
+                        modifier = Modifier.fillMaxWidth().height(280.dp).padding(top = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
-                        lazyItems(candidates, key = { it.id }) { candidate ->
-                            Column(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(PageGrey)
-                                    .clickable { onBind(candidate) }
-                                    .padding(10.dp),
-                            ) {
-                                Text(candidate.title.ifBlank { candidate.originalTitle }, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                if (candidate.originalTitle.isNotBlank()) {
-                                    Text(candidate.originalTitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                }
-                                Text(
-                                    listOf(candidate.id, candidate.released, candidate.developer).filter { it.isNotBlank() }.joinToString(" · "),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
+                        gridItems(candidates, key = { "${it.source}:${it.id}:${it.coverUrl}" }) { candidate ->
+                            CoverCandidateCard(candidate = candidate, onClick = { if (!binding) onBind(candidate) })
                         }
                     }
                 }
             }
         },
+        dismissButton = {
+            TextButton(
+                onClick = { search() },
+                enabled = !searching && !binding,
+            ) {
+                Text(if (searching) "搜索中…" else "搜索")
+            }
+        },
         confirmButton = { TextButton(onClick = onDismiss) { Text("关闭") } },
     )
+}
+
+@Composable
+private fun CoverCandidateCard(
+    candidate: CoverSearchCandidate,
+    onClick: () -> Unit,
+) {
+    val previewState by rememberCandidateCoverPreview(candidate)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(NavWhite)
+            .clickable(onClick = onClick)
+            .padding(6.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(3f / 4f)
+                .clip(RoundedCornerShape(8.dp))
+                .background(PageGrey),
+            contentAlignment = Alignment.Center,
+        ) {
+            when (val state = previewState) {
+                CoverPreviewState.Failed -> Text(
+                    "无预览",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                CoverPreviewState.Loading -> CircularProgressIndicator(
+                    modifier = Modifier.size(22.dp),
+                    strokeWidth = 2.dp,
+                )
+                is CoverPreviewState.Ready -> Image(
+                    bitmap = state.bitmap,
+                    contentDescription = candidate.title,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+            CoverCandidateOverlay(candidate)
+        }
+        Text(
+            candidate.title.ifBlank { coverSourceTitle(candidate.source) },
+            style = MaterialTheme.typography.bodyMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(top = 6.dp),
+        )
+        Text(
+            candidate.detail.ifBlank { candidate.subtitle },
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun CoverCandidateOverlay(candidate: CoverSearchCandidate) {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(6.dp),
+        verticalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                coverSourceTitle(candidate.source),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary,
+                maxLines = 1,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(NavWhite.copy(alpha = 0.9f))
+                    .padding(horizontal = 6.dp, vertical = 2.dp),
+            )
+            candidate.score?.takeIf { it > 0 }?.let { score ->
+                Text(
+                    "票数 $score",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = NavWhite,
+                    maxLines = 1,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(TextColor.copy(alpha = 0.56f))
+                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                )
+            }
+        }
+        Text(
+            "使用",
+            style = MaterialTheme.typography.bodyMedium,
+            color = NavWhite,
+            maxLines = 1,
+            modifier = Modifier
+                .align(Alignment.End)
+                .clip(RoundedCornerShape(8.dp))
+                .background(TextColor.copy(alpha = 0.56f))
+                .padding(horizontal = 8.dp, vertical = 3.dp),
+        )
+    }
+}
+
+private fun coverSourcePickerSummary(source: String, enabled: Boolean, needsHikarinagiLogin: Boolean): String = when {
+    !enabled -> "已在封面刮削设置中关闭"
+    needsHikarinagiLogin -> "需要先在封面刮削设置中登录"
+    source == AppSettingsStore.COVER_SOURCE_HIKARINAGI -> "使用已授权账号搜索 Hikarinagi 封面"
+    source == AppSettingsStore.COVER_SOURCE_BANGUMI -> "搜索 Bangumi 条目封面"
+    source == AppSettingsStore.COVER_SOURCE_STEAM -> "搜索 Steam 商店竖版封面"
+    source == AppSettingsStore.COVER_SOURCE_VNDB -> "搜索 VNDB 封面"
+    else -> "搜索此来源"
 }
 
 /** KRKR 专属：选择游戏启动入口文件（目录内 xp3 / exe）。 */
@@ -833,30 +1062,33 @@ private fun LaunchFileDialog(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                else -> LazyColumn(
-                    modifier = Modifier.fillMaxWidth().height(260.dp),
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
-                ) {
-                    lazyItems(files) { name ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable { selected = name }
-                                .padding(horizontal = 8.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            RadioButton(
-                                selected = selected == name,
-                                onClick = { selected = name },
-                            )
-                            Text(
-                                name,
-                                style = MaterialTheme.typography.bodyMedium,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.padding(start = 10.dp),
-                            )
+                else -> MiuixSettingsTheme {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxWidth().height(260.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        lazyItems(files) { name ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(NavWhite)
+                                    .clickable { selected = name }
+                                    .padding(horizontal = 12.dp, vertical = 9.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    name,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                RadioButton(
+                                    selected = selected == name,
+                                    onClick = { selected = name },
+                                )
+                            }
                         }
                     }
                 }
@@ -1015,6 +1247,44 @@ internal fun rememberCoverBitmap(coverUri: String?): androidx.compose.runtime.St
             decodeCoverThumbnail(context, coverUri)?.also { CoverBitmapCache.put(coverUri, it) }?.asImageBitmap()
         }
     }
+}
+
+@Composable
+private fun rememberCandidateCoverPreview(candidate: CoverSearchCandidate): androidx.compose.runtime.State<CoverPreviewState> {
+    val context = LocalContext.current
+    val cacheKey = candidate.coverUrl
+    val cached = cacheKey.takeIf { it.isNotBlank() }?.let(CoverBitmapCache::get)
+    val initialState = cached?.asImageBitmap()?.let(CoverPreviewState::Ready)
+        ?: CoverPreviewState.Loading
+    return produceState<CoverPreviewState>(initialValue = initialState, cacheKey, candidate.source) {
+        if (cached != null) return@produceState
+        if (cacheKey.isBlank()) {
+            value = CoverPreviewState.Failed
+            return@produceState
+        }
+        value = withContext(Dispatchers.IO) {
+            val uri = CoverImageCache.download(
+                context = context,
+                imageUrl = cacheKey,
+                prefix = "preview_${stableKey("${candidate.source}:$cacheKey")}",
+                source = candidate.source,
+                persistent = false,
+            )
+            val bitmap = uri?.let { decodeCoverThumbnail(context, it) }
+            if (bitmap != null) {
+                CoverBitmapCache.put(cacheKey, bitmap)
+                CoverPreviewState.Ready(bitmap.asImageBitmap())
+            } else {
+                CoverPreviewState.Failed
+            }
+        }
+    }
+}
+
+private sealed interface CoverPreviewState {
+    data object Loading : CoverPreviewState
+    data object Failed : CoverPreviewState
+    data class Ready(val bitmap: ImageBitmap) : CoverPreviewState
 }
 
 /** 封面只按卡片实际需要的尺寸解码，避免切页时上传原始大图；已解码缩略图跨页面复用。 */
