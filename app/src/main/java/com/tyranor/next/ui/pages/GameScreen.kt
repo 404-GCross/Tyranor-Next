@@ -52,6 +52,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -95,18 +96,31 @@ import com.tyranor.next.ui.common.AppSearchField
 import com.tyranor.next.ui.common.TopBarIcon
 import com.tyranor.next.ui.common.glassNavBottomInset
 import com.tyranor.next.ui.common.isWideScreen
+import com.tyranor.next.ui.main.MainLibraryUiState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 
 @Composable
-fun GameScreen(modifier: Modifier = Modifier) {
+fun GameScreen(
+    modifier: Modifier = Modifier,
+    libraryState: MainLibraryUiState,
+    onGameUpdated: (ScanGame) -> Unit,
+    onGameDeleted: (ScanGame) -> Unit,
+    onQuickLaunchToggle: (ScanGame) -> Boolean,
+    onScanLibrary: () -> Unit,
+    onScrapeEventShown: (Long) -> Unit,
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var games by remember { mutableStateOf(EngineScanner.loadGames(context)) }
-    var scanning by remember { mutableStateOf(false) }
+    val games = libraryState.games
     var selectedGame by remember { mutableStateOf<ScanGame?>(null) }
     var launchError by remember { mutableStateOf<String?>(null) }
     var patchLaunchTarget by remember { mutableStateOf<ScanGame?>(null) }
@@ -114,55 +128,30 @@ fun GameScreen(modifier: Modifier = Modifier) {
     val gridState = rememberLazyGridState()
     val scrapeTaskState = CoverScrapeTaskManager.state.value
 
-    LaunchedEffect(scrapeTaskState.eventId) {
-        if (scrapeTaskState.eventId == 0L) return@LaunchedEffect
-        val result = scrapeTaskState.result
-        if (result != null) {
-            games = result.games
-            selectedGame = selectedGame?.let { selected ->
-                result.games.firstOrNull { it.uri == selected.uri }
-            }
-            android.widget.Toast.makeText(
-                context,
-                "批量刮削完成：更新 ${result.updatedCount}，跳过 ${result.skippedCount}，失败 ${result.failedCount}",
-                android.widget.Toast.LENGTH_SHORT,
-            ).show()
-        } else if (scrapeTaskState.error == null) {
-            val refreshed = EngineScanner.loadGames(context)
-            games = refreshed
-            selectedGame = selectedGame?.let { selected ->
-                refreshed.firstOrNull { it.uri == selected.uri }
-            }
+    LaunchedEffect(games) {
+        selectedGame = selectedGame?.let { selected ->
+            games.firstOrNull { it.uri == selected.uri }
         }
-        scrapeTaskState.error?.let { message ->
-            android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_SHORT).show()
-        }
-        CoverScrapeTaskManager.clearFinished(scrapeTaskState.eventId)
+    }
+
+    LaunchedEffect(libraryState.scrapeEventId, libraryState.scrapeMessage) {
+        val message = libraryState.scrapeMessage ?: return@LaunchedEffect
+        android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_SHORT).show()
+        onScrapeEventShown(libraryState.scrapeEventId)
     }
 
     fun replaceGame(updated: ScanGame) {
-        val nextGames = games.map { if (it.uri == updated.uri) updated else it }
-        games = nextGames
         selectedGame = selectedGame?.let { if (it.uri == updated.uri) updated else it }
-        EngineScanner.saveGames(context, nextGames)
+        onGameUpdated(updated)
     }
 
     fun deleteGame(target: ScanGame) {
-        val nextGames = games.filterNot { it.uri == target.uri }
-        games = nextGames
         selectedGame = null
-        EngineScanner.saveGames(context, nextGames)
-        // 最近记录/快捷启动同步持久化移除，避免切页取消 IO 清理协程后残留脏数据
-        EngineScanner.removeRecentGame(context, target.uri)
-        EngineScanner.removeQuickLaunch(context, target.uri)
-        // 仅清理应用内数据（每游戏设置、最近记录、封面缓存、应用内存档镜像）；不触碰游戏文件
-        scope.launch(Dispatchers.IO) {
-            cleanupDeletedGame(context, target)
-        }
+        onGameDeleted(target)
     }
 
     fun syncMissingCovers() {
-        if (scanning || scrapeTaskState.running) return
+        if (libraryState.scanning || scrapeTaskState.running) return
         if (!CoverScrapeTaskManager.start(context, games)) {
             android.widget.Toast.makeText(context, "批量刮削正在进行", android.widget.Toast.LENGTH_SHORT).show()
         }
@@ -170,22 +159,8 @@ fun GameScreen(modifier: Modifier = Modifier) {
 
     // 扫描游戏库：每次按扫描目录全量重建，删除/改名/移动后的旧缓存条目会被清理。
     fun scanLibrary() {
-        if (scanning || scrapeTaskState.running) return
-        scope.launch {
-            scanning = true
-            try {
-                val roots = EngineScanner.loadRoots(context)
-                if (roots.isNotEmpty()) {
-                    val updated = EngineScanner.rescanLibrary(context)
-                    games = updated
-                    selectedGame = selectedGame?.let { selected ->
-                        updated.firstOrNull { it.uri == selected.uri }
-                    }
-                }
-            } finally {
-                scanning = false
-            }
-        }
+        if (libraryState.scanning || scrapeTaskState.running) return
+        onScanLibrary()
     }
 
     val dirPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
@@ -206,7 +181,8 @@ fun GameScreen(modifier: Modifier = Modifier) {
     GameLibraryContent(
         modifier = modifier,
         games = games,
-        scanning = scanning || scrapeTaskState.running,
+        loaded = libraryState.loaded,
+        scanning = libraryState.scanning || scrapeTaskState.running,
         gridState = gridState,
         dirPickerLaunch = { dirPicker.launch(null) },
         syncMissingCovers = { syncMissingCovers() },
@@ -228,6 +204,8 @@ fun GameScreen(modifier: Modifier = Modifier) {
             onDismiss = { selectedGame = null },
             onGameUpdated = { replaceGame(it) },
             onDeleteGame = { deleteGame(game) },
+            quickLaunched = libraryState.quickLaunch.any { it.uri == game.uri },
+            onQuickLaunchToggle = { onQuickLaunchToggle(game) },
             onEngineSettings = {
                 startActivityWithPageTransition(context, PerGameSettingsActivity.createIntent(context, game))
                 selectedGame = null
@@ -352,6 +330,7 @@ internal fun startActivityWithPageTransition(context: android.content.Context, i
 private fun GameLibraryContent(
     modifier: Modifier,
     games: List<ScanGame>,
+    loaded: Boolean,
     scanning: Boolean,
     gridState: LazyGridState,
     dirPickerLaunch: () -> Unit,
@@ -360,8 +339,8 @@ private fun GameLibraryContent(
     onGameClick: (ScanGame) -> Unit,
     onGameLongClick: (ScanGame) -> Unit,
 ) {
-    var showSearch by remember { mutableStateOf(false) }
-    var query by remember { mutableStateOf("") }
+    var showSearch by rememberSaveable { mutableStateOf(false) }
+    var query by rememberSaveable { mutableStateOf("") }
     val gameSort = AppSettingsStore.gameSortState.value
     val sortedGames = remember(games, gameSort) { sortGames(games, gameSort) }
     val filteredGames = remember(sortedGames, query) {
@@ -409,7 +388,7 @@ private fun GameLibraryContent(
         // ===== 内容区 =====
         Box(Modifier.fillMaxSize()) {
             when {
-                scanning -> {
+                scanning || !loaded -> {
                     CircularProgressIndicator(Modifier.align(Alignment.Center))
                 }
                 games.isEmpty() -> {
@@ -460,6 +439,8 @@ internal fun GameActionsSheet(
     onGameUpdated: (ScanGame) -> Unit,
     onDeleteGame: () -> Unit,
     onEngineSettings: () -> Unit,
+    quickLaunched: Boolean,
+    onQuickLaunchToggle: () -> Boolean,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -546,15 +527,11 @@ internal fun GameActionsSheet(
                 }
             }
             item {
-                val quickLaunched = EngineScanner.isQuickLaunched(context, game.uri)
                 GameActionRow(
                     iconRes = R.drawable.ic_home,
                     label = if (quickLaunched) "移除快捷启动" else "添加快捷启动",
                 ) {
-                    if (quickLaunched) {
-                        EngineScanner.removeQuickLaunch(context, game.uri)
-                        onDismiss()
-                    } else if (EngineScanner.addQuickLaunch(context, game)) {
+                    if (onQuickLaunchToggle()) {
                         onDismiss()
                     } else {
                         android.widget.Toast.makeText(context, "首页快捷启动已满（最多 3 个）", android.widget.Toast.LENGTH_SHORT).show()
@@ -1167,7 +1144,11 @@ private fun GameGrid(
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        gridItems(games, key = { it.uri }) { game ->
+        gridItems(
+            items = games,
+            key = { it.uri },
+            contentType = { "game_card" },
+        ) { game ->
             GameCard(
                 game = game,
                 onClick = { onGameClick(game) },
@@ -1243,9 +1224,7 @@ internal fun rememberCoverBitmap(coverUri: String?): androidx.compose.runtime.St
     val cached = coverUri?.let(CoverBitmapCache::get)
     return produceState<ImageBitmap?>(initialValue = cached?.asImageBitmap(), coverUri) {
         if (cached != null || coverUri.isNullOrBlank()) return@produceState
-        value = withContext(Dispatchers.IO) {
-            decodeCoverThumbnail(context, coverUri)?.also { CoverBitmapCache.put(coverUri, it) }?.asImageBitmap()
-        }
+        value = CoverThumbnailLoader.load(context.applicationContext, coverUri)?.asImageBitmap()
     }
 }
 
@@ -1312,6 +1291,41 @@ private const val CoverDecodeMaxHeightPx = 683
 
 private object CoverBitmapCache : LruCache<String, Bitmap>(24 * 1024 * 1024) {
     override fun sizeOf(key: String, value: Bitmap): Int = value.allocationByteCount
+}
+
+/**
+ * 限制并发解码，避免游戏页首次组合时多个大图同时抢占 CPU/内存；相同 URI 共用一个任务。
+ * 第二批等待者在获得许可后会再次检查缓存，进一步避免排队期间的重复解码。
+ */
+private object CoverThumbnailLoader {
+    private val coordinator = BoundedKeyedLoader<String>(parallelism = 2)
+
+    suspend fun load(context: android.content.Context, uriText: String): Bitmap? = coordinator.load(
+        key = uriText,
+        cached = { CoverBitmapCache.get(uriText) },
+    ) {
+        withContext(Dispatchers.IO) {
+            decodeCoverThumbnail(context, uriText)?.also { CoverBitmapCache.put(uriText, it) }
+        }
+    }
+}
+
+/**
+ * 每个 key 串行、不同 key 最多 [parallelism] 路并发。调用者取消只释放自己的锁，后续等待者
+ * 会重新检查缓存并继续加载，不共享由首个 UI 协程拥有的 Deferred，因此不会被取消污染。
+ */
+internal class BoundedKeyedLoader<K : Any>(parallelism: Int) {
+    private val permits = Semaphore(parallelism)
+    private val keyLocks = ConcurrentHashMap<K, Mutex>()
+
+    suspend fun <V> load(key: K, cached: () -> V?, loader: suspend () -> V?): V? {
+        val keyLock = keyLocks.getOrPut(key) { Mutex() }
+        return keyLock.withLock {
+            cached() ?: permits.withPermit {
+                cached() ?: loader()
+            }
+        }
+    }
 }
 
 internal fun EngineType.coverColor(): Color = when (this) {
