@@ -40,7 +40,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
@@ -71,7 +70,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.tyranor.next.R
+import com.tyranor.next.scanner.CoverImageCache
+import com.tyranor.next.scanner.CoverScrapeTaskManager
 import com.tyranor.next.scanner.CoverSearchCandidate
+import com.tyranor.next.scanner.CoverSearchResult
 import com.tyranor.next.scanner.CoverScraperService
 import com.tyranor.next.scanner.EngineLauncher
 import com.tyranor.next.scanner.EngineScanner
@@ -79,6 +81,7 @@ import com.tyranor.next.scanner.EngineType
 import com.tyranor.next.scanner.GameSaveManager
 import com.tyranor.next.scanner.ScanGame
 import com.tyranor.next.scanner.VndbCoverService
+import com.tyranor.next.scanner.stableKey
 import com.tyranor.next.settings.AppSettingsStore
 import com.tyranor.next.settings.HikarinagiAuthStore
 import com.tyranor.next.settings.PerGameSettingsStore
@@ -92,10 +95,7 @@ import com.tyranor.next.ui.common.isWideScreen
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.ByteArrayOutputStream
 import java.io.File
-import java.net.HttpURLConnection
-import java.net.URL
 import java.util.Locale
 
 @Composable
@@ -109,6 +109,33 @@ fun GameScreen(modifier: Modifier = Modifier) {
     var patchLaunchTarget by remember { mutableStateOf<ScanGame?>(null) }
 
     val gridState = rememberLazyGridState()
+    val scrapeTaskState = CoverScrapeTaskManager.state.value
+
+    LaunchedEffect(scrapeTaskState.eventId) {
+        if (scrapeTaskState.eventId == 0L) return@LaunchedEffect
+        val result = scrapeTaskState.result
+        if (result != null) {
+            games = result.games
+            selectedGame = selectedGame?.let { selected ->
+                result.games.firstOrNull { it.uri == selected.uri }
+            }
+            android.widget.Toast.makeText(
+                context,
+                "批量刮削完成：更新 ${result.updatedCount}，跳过 ${result.skippedCount}，失败 ${result.failedCount}",
+                android.widget.Toast.LENGTH_SHORT,
+            ).show()
+        } else if (scrapeTaskState.error == null) {
+            val refreshed = EngineScanner.loadGames(context)
+            games = refreshed
+            selectedGame = selectedGame?.let { selected ->
+                refreshed.firstOrNull { it.uri == selected.uri }
+            }
+        }
+        scrapeTaskState.error?.let { message ->
+            android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_SHORT).show()
+        }
+        CoverScrapeTaskManager.clearFinished(scrapeTaskState.eventId)
+    }
 
     fun replaceGame(updated: ScanGame) {
         val nextGames = games.map { if (it.uri == updated.uri) updated else it }
@@ -132,38 +159,29 @@ fun GameScreen(modifier: Modifier = Modifier) {
     }
 
     fun syncMissingCovers() {
-        if (scanning) return
-        scope.launch {
-            scanning = true
-            val current = games
-            val result = withContext(Dispatchers.IO) {
-                CoverScraperService.scrapeLibraryCovers(context, current)
-            }
-            games = result.games
-            EngineScanner.saveGames(context, result.games)
-            scanning = false
-            android.widget.Toast.makeText(
-                context,
-                "批量刮削完成：更新 ${result.updatedCount}，跳过 ${result.skippedCount}，失败 ${result.failedCount}",
-                android.widget.Toast.LENGTH_SHORT,
-            ).show()
+        if (scanning || scrapeTaskState.running) return
+        if (!CoverScrapeTaskManager.start(context, games)) {
+            android.widget.Toast.makeText(context, "批量刮削正在进行", android.widget.Toast.LENGTH_SHORT).show()
         }
     }
 
     // 扫描游戏库：每次按扫描目录全量重建，删除/改名/移动后的旧缓存条目会被清理。
     fun scanLibrary() {
-        if (scanning) return
+        if (scanning || scrapeTaskState.running) return
         scope.launch {
             scanning = true
-            val roots = EngineScanner.loadRoots(context)
-            if (roots.isNotEmpty()) {
-                val updated = EngineScanner.rescanLibrary(context)
-                games = updated
-                selectedGame = selectedGame?.let { selected ->
-                    updated.firstOrNull { it.uri == selected.uri }
+            try {
+                val roots = EngineScanner.loadRoots(context)
+                if (roots.isNotEmpty()) {
+                    val updated = EngineScanner.rescanLibrary(context)
+                    games = updated
+                    selectedGame = selectedGame?.let { selected ->
+                        updated.firstOrNull { it.uri == selected.uri }
+                    }
                 }
+            } finally {
+                scanning = false
             }
-            scanning = false
         }
     }
 
@@ -185,7 +203,7 @@ fun GameScreen(modifier: Modifier = Modifier) {
     GameLibraryContent(
         modifier = modifier,
         games = games,
-        scanning = scanning,
+        scanning = scanning || scrapeTaskState.running,
         gridState = gridState,
         dirPickerLaunch = { dirPicker.launch(null) },
         syncMissingCovers = { syncMissingCovers() },
@@ -445,6 +463,8 @@ internal fun GameActionsSheet(
     var launchError by remember { mutableStateOf<String?>(null) }
     var showCoverSourcePicker by remember { mutableStateOf(false) }
     var coverSearchSource by remember { mutableStateOf<String?>(null) }
+    var coverBinding by remember { mutableStateOf(false) }
+    var coverBindError by remember { mutableStateOf<String?>(null) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var showLaunchFilePicker by remember { mutableStateOf(false) }
     var showRenameDialog by remember { mutableStateOf(false) }
@@ -611,6 +631,7 @@ internal fun GameActionsSheet(
             onDismiss = { showCoverSourcePicker = false },
             onSelect = { source ->
                 showCoverSourcePicker = false
+                coverBindError = null
                 coverSearchSource = source
             },
         )
@@ -620,20 +641,25 @@ internal fun GameActionsSheet(
         CoverSearchDialog(
             game = game,
             source = source,
+            binding = coverBinding,
+            bindError = coverBindError,
             onDismiss = { coverSearchSource = null },
             onBind = { candidate ->
-                scope.launch {
-                    launchError = "正在绑定封面…"
-                    val updated = withContext(Dispatchers.IO) {
-                        runCatching { CoverScraperService.bindCoverCandidate(context, game, candidate) }.getOrNull()
-                    }
-                    if (updated != null) {
-                        onGameUpdated(updated)
-                        launchError = null
-                        coverSearchSource = null
-                        onDismiss()
-                    } else {
-                        launchError = "封面下载失败"
+                if (!coverBinding) {
+                    coverBinding = true
+                    coverBindError = null
+                    scope.launch {
+                        val updated = withContext(Dispatchers.IO) {
+                            runCatching { CoverScraperService.bindCoverCandidate(context, game, candidate) }.getOrNull()
+                        }
+                        coverBinding = false
+                        if (updated != null) {
+                            onGameUpdated(updated)
+                            coverSearchSource = null
+                            onDismiss()
+                        } else {
+                            coverBindError = "封面下载失败"
+                        }
                     }
                 }
             },
@@ -793,6 +819,8 @@ private fun CoverSourcePickerDialog(
 private fun CoverSearchDialog(
     game: ScanGame,
     source: String,
+    binding: Boolean,
+    bindError: String?,
     onDismiss: () -> Unit,
     onBind: (CoverSearchCandidate) -> Unit,
 ) {
@@ -810,13 +838,23 @@ private fun CoverSearchDialog(
             searching = true
             error = null
             candidates = emptyList()
-            val result = withContext(Dispatchers.IO) {
-                runCatching { CoverScraperService.searchCoverCandidates(context, source, query, 8) }
+            try {
+                when (val result = withContext(Dispatchers.IO) {
+                    CoverScraperService.searchCoverCandidates(context, source, query, 8)
+                }) {
+                    is CoverSearchResult.Success -> {
+                        candidates = result.candidates.distinctBy { "${it.source}:${it.id}:${it.coverUrl}" }
+                        if (candidates.isEmpty()) error = "未找到匹配结果"
+                    }
+                    is CoverSearchResult.Failure -> {
+                        error = result.message
+                    }
+                }
+            } catch (e: Exception) {
+                error = e.message ?: "封面搜索失败"
+            } finally {
+                searching = false
             }
-            candidates = result.getOrDefault(emptyList())
-            result.exceptionOrNull()?.let { error = it.message ?: "封面搜索失败" }
-            if (candidates.isEmpty() && error == null) error = "未找到匹配结果"
-            searching = false
         }
     }
 
@@ -832,10 +870,26 @@ private fun CoverSearchDialog(
                 )
                 Button(
                     onClick = { search() },
-                    enabled = !searching,
+                    enabled = !searching && !binding,
                     modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
                 ) {
                     Text(if (searching) "搜索中…" else "搜索", style = MaterialTheme.typography.bodyMedium)
+                }
+                if (binding) {
+                    Text(
+                        "正在绑定封面…",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                }
+                bindError?.let {
+                    Text(
+                        it,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
                 }
                 error?.let {
                     Text(
@@ -853,7 +907,7 @@ private fun CoverSearchDialog(
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
                         gridItems(candidates, key = { "${it.source}:${it.id}:${it.coverUrl}" }) { candidate ->
-                            CoverCandidateCard(candidate = candidate, onClick = { onBind(candidate) })
+                            CoverCandidateCard(candidate = candidate, onClick = { if (!binding) onBind(candidate) })
                         }
                     }
                 }
@@ -942,8 +996,7 @@ private fun CoverCandidateOverlay(candidate: CoverSearchCandidate) {
                     .background(NavWhite.copy(alpha = 0.9f))
                     .padding(horizontal = 6.dp, vertical = 2.dp),
             )
-            val score = candidate.detail.substringAfterLast("票数 ", missingDelimiterValue = "")
-            if (score.isNotBlank() && score.all { it.isDigit() }) {
+            candidate.score?.takeIf { it > 0 }?.let { score ->
                 Text(
                     "票数 $score",
                     style = MaterialTheme.typography.bodyMedium,
@@ -968,14 +1021,6 @@ private fun CoverCandidateOverlay(candidate: CoverSearchCandidate) {
                 .padding(horizontal = 8.dp, vertical = 3.dp),
         )
     }
-}
-
-private fun coverSourceTitle(source: String): String = when (source) {
-    AppSettingsStore.COVER_SOURCE_HIKARINAGI -> "Hikarinagi"
-    AppSettingsStore.COVER_SOURCE_BANGUMI -> "Bangumi"
-    AppSettingsStore.COVER_SOURCE_STEAM -> "Steam"
-    AppSettingsStore.COVER_SOURCE_VNDB -> "VNDB"
-    else -> source
 }
 
 private fun coverSourcePickerSummary(source: String, enabled: Boolean, needsHikarinagiLogin: Boolean): String = when {
@@ -1210,6 +1255,7 @@ internal fun rememberCoverBitmap(coverUri: String?): androidx.compose.runtime.St
 
 @Composable
 private fun rememberCandidateCoverPreview(candidate: CoverSearchCandidate): androidx.compose.runtime.State<CoverPreviewState> {
+    val context = LocalContext.current
     val cacheKey = candidate.coverUrl
     val cached = cacheKey.takeIf { it.isNotBlank() }?.let(CoverBitmapCache::get)
     val initialState = cached?.asImageBitmap()?.let(CoverPreviewState::Ready)
@@ -1221,7 +1267,13 @@ private fun rememberCandidateCoverPreview(candidate: CoverSearchCandidate): andr
             return@produceState
         }
         value = withContext(Dispatchers.IO) {
-            val bitmap = decodeRemoteCoverThumbnail(cacheKey, candidate.source)
+            val uri = CoverImageCache.download(
+                context = context,
+                imageUrl = cacheKey,
+                prefix = "preview_${stableKey("${candidate.source}:$cacheKey")}",
+                source = candidate.source,
+            )
+            val bitmap = uri?.let { decodeCoverThumbnail(context, it) }
             if (bitmap != null) {
                 CoverBitmapCache.put(cacheKey, bitmap)
                 CoverPreviewState.Ready(bitmap.asImageBitmap())
@@ -1258,65 +1310,8 @@ private fun decodeCoverThumbnail(context: android.content.Context, uriText: Stri
     context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
 }.getOrNull()
 
-private fun decodeRemoteCoverThumbnail(urlText: String, source: String): Bitmap? = runCatching {
-    var conn: HttpURLConnection? = null
-    try {
-        conn = (URL(urlText).openConnection() as HttpURLConnection).apply {
-            connectTimeout = 15000
-            readTimeout = 20000
-            setRequestProperty("Accept", "image/webp,image/apng,image/*,*/*;q=0.8")
-            setRequestProperty("User-Agent", "Mozilla/5.0")
-            coverPreviewReferer(source)?.let { setRequestProperty("Referer", it) }
-            if (source == AppSettingsStore.COVER_SOURCE_VNDB) {
-                setRequestProperty("Cookie", "vndb_img=1; vndb_samesite=1")
-            }
-        }
-        if (conn.responseCode !in 200..299) return@runCatching null
-        if (conn.contentLengthLong > CoverPreviewMaxBytes) return@runCatching null
-        val bytes = ByteArrayOutputStream().use { output ->
-            conn.inputStream.use { input ->
-                val buffer = ByteArray(8192)
-                var total = 0L
-                while (true) {
-                    val read = input.read(buffer)
-                    if (read <= 0) break
-                    total += read
-                    if (total > CoverPreviewMaxBytes) return@runCatching null
-                    output.write(buffer, 0, read)
-                }
-            }
-            output.toByteArray()
-        }
-        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
-        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return@runCatching null
-
-        var sampleSize = 1
-        while (bounds.outWidth / (sampleSize * 2) >= CoverDecodeMaxWidthPx &&
-            bounds.outHeight / (sampleSize * 2) >= CoverDecodeMaxHeightPx
-        ) {
-            sampleSize *= 2
-        }
-        val options = BitmapFactory.Options().apply {
-            inSampleSize = sampleSize
-            inPreferredConfig = Bitmap.Config.ARGB_8888
-        }
-        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
-    } finally {
-        conn?.disconnect()
-    }
-}.getOrNull()
-
-private fun coverPreviewReferer(source: String): String? = when (source) {
-    AppSettingsStore.COVER_SOURCE_BANGUMI -> "https://bgm.tv/"
-    AppSettingsStore.COVER_SOURCE_STEAM -> "https://store.steampowered.com/"
-    AppSettingsStore.COVER_SOURCE_VNDB -> "https://vndb.org/"
-    else -> null
-}
-
 private const val CoverDecodeMaxWidthPx = 512
 private const val CoverDecodeMaxHeightPx = 683
-private const val CoverPreviewMaxBytes = 12L * 1024L * 1024L
 
 private object CoverBitmapCache : LruCache<String, Bitmap>(24 * 1024 * 1024) {
     override fun sizeOf(key: String, value: Bitmap): Int = value.allocationByteCount

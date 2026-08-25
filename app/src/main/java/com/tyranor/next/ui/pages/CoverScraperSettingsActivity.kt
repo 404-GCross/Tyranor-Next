@@ -32,10 +32,10 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,8 +45,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.tyranor.next.R
-import com.tyranor.next.scanner.CoverScraperService
-import com.tyranor.next.scanner.EngineScanner
+import com.tyranor.next.scanner.CoverScrapeTaskManager
 import com.tyranor.next.settings.AppSettingsStore
 import com.tyranor.next.settings.HikarinagiAuthService
 import com.tyranor.next.settings.HikarinagiAuthStore
@@ -56,9 +55,6 @@ import com.tyranor.next.theme.PageGrey
 import com.tyranor.next.theme.TextColor
 import com.tyranor.next.theme.TyranorNextTheme
 import com.tyranor.next.ui.common.WithoutPressIndication
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.basic.Card as MiuixCard
 import top.yukonga.miuix.kmp.basic.Scaffold as MiuixScaffold
 import top.yukonga.miuix.kmp.preference.SwitchPreference
@@ -104,28 +100,32 @@ class CoverScraperSettingsActivity : ComponentActivity() {
 internal fun CoverScraperSettingsScreen() {
     val ctx = LocalContext.current
     val activity = ctx as? ComponentActivity
-    val scope = rememberCoroutineScope()
     val authVersion = HikarinagiAuthStore.statusVersion.value
     val settingsVersion = AppSettingsStore.coverScraperSettingsVersion.value
+    val scrapeTaskState = CoverScrapeTaskManager.state.value
     var sources by remember(settingsVersion) { mutableStateOf(AppSettingsStore.getCoverScraperSourceOrder(ctx)) }
     var onlyMissing by remember(settingsVersion) { mutableStateOf(AppSettingsStore.isCoverScraperOnlyMissing(ctx)) }
-    var scraping by remember { mutableStateOf(false) }
+    val scraping = scrapeTaskState.running
     val authStatus = remember(authVersion) { HikarinagiAuthStore.getStatus(ctx) }
 
-    fun startBatchScrape() {
-        if (scraping) return
-        scope.launch {
-            scraping = true
-            val result = withContext(Dispatchers.IO) {
-                CoverScraperService.scrapeLibraryCovers(ctx, EngineScanner.loadGames(ctx))
-            }
-            EngineScanner.saveGames(ctx, result.games)
-            scraping = false
+    LaunchedEffect(scrapeTaskState.eventId) {
+        if (scrapeTaskState.eventId == 0L) return@LaunchedEffect
+        scrapeTaskState.result?.let { result ->
             Toast.makeText(
                 ctx,
                 "批量刮削完成：更新 ${result.updatedCount}，跳过 ${result.skippedCount}，失败 ${result.failedCount}",
                 Toast.LENGTH_SHORT,
             ).show()
+        }
+        scrapeTaskState.error?.let { message ->
+            Toast.makeText(ctx, message, Toast.LENGTH_SHORT).show()
+        }
+        CoverScrapeTaskManager.clearFinished(scrapeTaskState.eventId)
+    }
+
+    fun startBatchScrape() {
+        if (!CoverScrapeTaskManager.start(ctx)) {
+            Toast.makeText(ctx, "批量刮削正在进行", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -271,7 +271,7 @@ private fun CoverSourceRow(
             verticalArrangement = Arrangement.spacedBy(3.dp),
         ) {
             Text(
-                sourceTitle(source),
+                coverSourceTitle(source),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = TextColor,
@@ -324,14 +324,6 @@ private fun CoverScraperTopBar() {
             }
         }
     }
-}
-
-private fun sourceTitle(source: String): String = when (source) {
-    AppSettingsStore.COVER_SOURCE_HIKARINAGI -> "Hikarinagi"
-    AppSettingsStore.COVER_SOURCE_BANGUMI -> "Bangumi"
-    AppSettingsStore.COVER_SOURCE_STEAM -> "Steam"
-    AppSettingsStore.COVER_SOURCE_VNDB -> "VNDB"
-    else -> source
 }
 
 private fun sourceSummary(source: String, authStatus: com.tyranor.next.settings.HikarinagiAuthStatus): String = when (source) {

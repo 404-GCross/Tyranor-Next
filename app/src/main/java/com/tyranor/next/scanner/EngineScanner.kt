@@ -366,6 +366,7 @@ object EngineScanner {
                     engine = detected.engine,
                     launchTarget = detected.launchTarget,
                     coverUri = coverUri,
+                    coverSource = if (coverUri.isNullOrBlank()) null else AppSettingsStore.COVER_SOURCE_LOCAL,
                 )
             )
             return
@@ -413,6 +414,7 @@ object EngineScanner {
                     engine = detected.engine,
                     launchTarget = detected.launchTarget,
                     coverUri = coverUri,
+                    coverSource = if (coverUri.isNullOrBlank()) null else AppSettingsStore.COVER_SOURCE_LOCAL,
                 )
             )
             // 已识别为游戏，其子目录多为引擎内部资源，仅扫描直接文件层，不再深挖
@@ -431,7 +433,10 @@ object EngineScanner {
         if (!game.coverUri.isNullOrBlank()) return game
         val dir = DocumentFile.fromTreeUri(context.applicationContext, Uri.parse(game.uri)) ?: return game
         val coverUri = findLocalCoverUri(dir.listFiles())
-        return if (coverUri.isNullOrBlank()) game else game.copy(coverUri = coverUri, coverSource = "local")
+        return if (coverUri.isNullOrBlank()) game else game.copy(
+            coverUri = coverUri,
+            coverSource = AppSettingsStore.COVER_SOURCE_LOCAL,
+        )
     }
 
     private fun findLocalCoverUri(children: Array<DocumentFile>): String? {
@@ -455,13 +460,15 @@ object EngineScanner {
 
         val detected = detectEngine(dir)
         if (detected.engine != EngineType.UNKNOWN) {
+            val coverUri = findLocalCoverUri(children)
             out.add(
                 ScanGame(
                     title = dir.name.takeIf { it.isNotBlank() } ?: "未命名游戏",
                     uri = dir.absolutePath,
                     engine = detected.engine,
                     launchTarget = detected.launchTarget,
-                    coverUri = findLocalCoverUri(children),
+                    coverUri = coverUri,
+                    coverSource = if (coverUri.isNullOrBlank()) null else AppSettingsStore.COVER_SOURCE_LOCAL,
                 )
             )
             return
@@ -482,13 +489,15 @@ object EngineScanner {
 
         val detected = detectEngine(dir)
         if (detected.engine != EngineType.UNKNOWN) {
+            val coverUri = findLocalCoverUri(children)
             out.add(
                 ScanGame(
                     title = dir.name.takeIf { it.isNotBlank() } ?: "未命名游戏",
                     uri = dir.absolutePath,
                     engine = detected.engine,
                     launchTarget = detected.launchTarget,
-                    coverUri = findLocalCoverUri(children),
+                    coverUri = coverUri,
+                    coverSource = if (coverUri.isNullOrBlank()) null else AppSettingsStore.COVER_SOURCE_LOCAL,
                 )
             )
             return

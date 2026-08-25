@@ -25,6 +25,8 @@ object AppSettingsStore {
     const val COVER_SOURCE_BANGUMI = "bangumi"
     const val COVER_SOURCE_STEAM = "steam"
     const val COVER_SOURCE_VNDB = "vndb"
+    const val COVER_SOURCE_LOCAL = "local"
+    const val COVER_SOURCE_CUSTOM = "custom"
 
     val DEFAULT_COVER_SCRAPER_SOURCES = listOf(
         COVER_SOURCE_HIKARINAGI,

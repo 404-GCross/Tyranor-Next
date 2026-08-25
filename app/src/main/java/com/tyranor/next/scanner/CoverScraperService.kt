@@ -4,15 +4,14 @@ import android.content.Context
 import android.net.Uri
 import com.tyranor.next.settings.AppSettingsStore
 import com.tyranor.next.settings.HikarinagiAuthService
+import kotlinx.coroutines.ensureActive
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.File
-import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
-import java.security.MessageDigest
+import kotlin.coroutines.coroutineContext
 
 data class CoverScrapeResult(
     val games: List<ScanGame>,
@@ -27,11 +26,17 @@ data class CoverSearchCandidate(
     val title: String,
     val subtitle: String,
     val detail: String,
+    val score: Int? = null,
     val coverUrl: String,
 )
 
+sealed interface CoverSearchResult {
+    data class Success(val candidates: List<CoverSearchCandidate>) : CoverSearchResult
+    data class Failure(val message: String) : CoverSearchResult
+}
+
 object CoverScraperService {
-    fun scrapeLibraryCovers(context: Context, games: List<ScanGame>): CoverScrapeResult {
+    suspend fun scrapeLibraryCovers(context: Context, games: List<ScanGame>): CoverScrapeResult {
         val onlyMissing = AppSettingsStore.isCoverScraperOnlyMissing(context)
         val sources = AppSettingsStore.getCoverScraperSourceOrder(context)
             .filter { AppSettingsStore.isCoverScraperSourceEnabled(context, it) }
@@ -41,6 +46,7 @@ object CoverScraperService {
         var failedCount = 0
 
         val updatedGames = games.map { game ->
+            coroutineContext.ensureActive()
             val local = runCatching { EngineScanner.applyLocalCover(context, game) }.getOrDefault(game)
             if (onlyMissing && !local.coverUri.isNullOrBlank()) {
                 if (local.coverUri != game.coverUri) updatedCount++ else skippedCount++
@@ -49,6 +55,7 @@ object CoverScraperService {
 
             val searchBase = if (onlyMissing) local else local.copy(coverUri = null)
             val scraped = sources.firstNotNullOfOrNull { source ->
+                coroutineContext.ensureActive()
                 runCatching { scrapeWithSource(context, searchBase, source) }.getOrNull()
                     ?.asCoverOnlyUpdateFrom(local)
             }
@@ -74,31 +81,38 @@ object CoverScraperService {
         source: String,
         keyword: String,
         limit: Int = 8,
-    ): List<CoverSearchCandidate> {
+    ): CoverSearchResult {
         val query = keyword.trim()
-        if (query.isBlank()) return emptyList()
-        if (source !in AppSettingsStore.DEFAULT_COVER_SCRAPER_SOURCES) return emptyList()
-        if (!AppSettingsStore.isCoverScraperSourceEnabled(context, source)) return emptyList()
+        if (query.isBlank()) return CoverSearchResult.Success(emptyList())
+        if (source !in AppSettingsStore.DEFAULT_COVER_SCRAPER_SOURCES) {
+            return CoverSearchResult.Failure("封面来源无效")
+        }
+        if (!AppSettingsStore.isCoverScraperSourceEnabled(context, source)) {
+            return CoverSearchResult.Failure("此封面来源已在设置中关闭")
+        }
         return runCatching { searchWithSource(context, source, query, limit.coerceIn(1, 10)) }
-            .getOrDefault(emptyList())
+            .fold(
+                onSuccess = { CoverSearchResult.Success(it) },
+                onFailure = { CoverSearchResult.Failure(it.message ?: "封面搜索失败，请检查网络") },
+            )
     }
 
     fun bindCoverCandidate(context: Context, game: ScanGame, candidate: CoverSearchCandidate): ScanGame? {
         val prefix = "${candidate.source}_${stableKey(game.uri)}"
         val cover = if (candidate.source == AppSettingsStore.COVER_SOURCE_STEAM) {
             val appId = candidate.id.toIntOrNull()
-            CoverImageCache.download(context, candidate.coverUrl, prefix, referer = refererForSource(candidate.source))
+            CoverImageCache.download(context, candidate.coverUrl, prefix, source = candidate.source)
                 ?: appId?.let { SteamCoverSource.downloadSteamHeader(context, game, it) }
         } else {
             CoverImageCache.download(
                 context = context,
                 imageUrl = candidate.coverUrl,
                 prefix = prefix,
-                referer = refererForSource(candidate.source),
-                cookie = cookieForSource(candidate.source),
+                source = candidate.source,
             )
         }
         return cover?.let {
+            CoverImageCache.deleteCachedCover(context, game.coverUri, exceptUri = it)
             game.copy(
                 coverUri = it,
                 coverSource = candidate.source,
@@ -153,7 +167,12 @@ private object HikarinagiCoverSource {
             .maxByOrNull { it.score }
             ?: return null
 
-        val cover = CoverImageCache.download(context, candidate.coverUrl, "hikarinagi_${stableKey(game.uri)}")
+        val cover = CoverImageCache.download(
+            context,
+            candidate.coverUrl,
+            "hikarinagi_${stableKey(game.uri)}",
+            source = AppSettingsStore.COVER_SOURCE_HIKARINAGI,
+        )
             ?: return null
         return game.copy(
             coverUri = cover,
@@ -162,7 +181,8 @@ private object HikarinagiCoverSource {
     }
 
     fun searchCandidates(context: Context, keyword: String, limit: Int): List<CoverSearchCandidate> {
-        val token = HikarinagiAuthService.getValidAccessToken(context) ?: return emptyList()
+        val token = HikarinagiAuthService.getValidAccessToken(context)
+            ?: throw CoverSearchException("Hikarinagi 授权已失效，请重新登录")
         val query = cleanTitle(keyword)
         if (query.isBlank()) return emptyList()
         return searchRawCandidates(token, query, limit).map {
@@ -172,6 +192,7 @@ private object HikarinagiCoverSource {
                 title = it.title,
                 subtitle = "",
                 detail = detailText("Hikarinagi", it.id, "票数 ${it.score}"),
+                score = it.score,
                 coverUrl = it.coverUrl,
             )
         }
@@ -179,8 +200,9 @@ private object HikarinagiCoverSource {
 
     private fun searchRawCandidates(token: String, query: String, limit: Int): List<CoverCandidate> {
         val url = "$SEARCH_URL?q=${query.urlEncode()}&types=galgame&page=1&page_size=${limit.coerceIn(1, 10)}"
-        val json = httpJson(url, headers = mapOf("Authorization" to "Bearer $token")) ?: return emptyList()
-        if (!json.optBoolean("success", false)) return emptyList()
+        val json = httpJson(url, headers = mapOf("Authorization" to "Bearer $token"))
+            ?: throw CoverSearchException("Hikarinagi 搜索失败，请检查网络")
+        if (!json.optBoolean("success", false)) throw CoverSearchException("Hikarinagi 搜索失败，请稍后重试")
         val items = json.optJSONObject("data")?.optJSONArray("items") ?: return emptyList()
         return (0 until items.length()).asSequence()
             .mapNotNull { items.optJSONObject(it) }
@@ -215,7 +237,7 @@ private object BangumiCoverSource {
         val query = cleanTitle(game.title)
         if (query.isBlank()) return null
         val candidate = searchCandidates(query, 1).firstOrNull() ?: return null
-        val cover = CoverImageCache.download(context, candidate.coverUrl, "bangumi_${stableKey(game.uri)}", referer = "https://bgm.tv/")
+        val cover = CoverImageCache.download(context, candidate.coverUrl, "bangumi_${stableKey(game.uri)}", source = AppSettingsStore.COVER_SOURCE_BANGUMI)
             ?: return null
         return game.copy(
             coverUri = cover,
@@ -237,7 +259,8 @@ private object BangumiCoverSource {
             )
             .toString()
         val url = "$SEARCH_URL?limit=${limit.coerceIn(1, 10)}&offset=0"
-        val json = httpJson(url, method = "POST", body = body) ?: return emptyList()
+        val json = httpJson(url, method = "POST", body = body)
+            ?: throw CoverSearchException("Bangumi 搜索失败，请检查网络")
         val data = json.optJSONArray("data") ?: return emptyList()
         return (0 until data.length()).asSequence()
             .mapNotNull { data.optJSONObject(it) }
@@ -270,7 +293,7 @@ private object SteamCoverSource {
         if (query.isBlank()) return null
         for (candidate in searchCandidates(query, 3)) {
             val appId = candidate.id.toIntOrNull() ?: continue
-            val cover = CoverImageCache.download(context, candidate.coverUrl, "steam_${stableKey(game.uri)}", referer = "https://store.steampowered.com/")
+            val cover = CoverImageCache.download(context, candidate.coverUrl, "steam_${stableKey(game.uri)}", source = AppSettingsStore.COVER_SOURCE_STEAM)
                 ?: downloadSteamHeader(context, game, appId)
             if (cover != null) {
                 return game.copy(
@@ -285,7 +308,8 @@ private object SteamCoverSource {
     fun searchCandidates(keyword: String, limit: Int): List<CoverSearchCandidate> {
         val query = cleanTitle(keyword)
         if (query.isBlank()) return emptyList()
-        val search = httpJson("$SEARCH_URL?term=${query.urlEncode()}&l=schinese&cc=CN") ?: return emptyList()
+        val search = httpJson("$SEARCH_URL?term=${query.urlEncode()}&l=schinese&cc=CN")
+            ?: throw CoverSearchException("Steam 搜索失败，请检查网络")
         val items = search.optJSONArray("items") ?: return emptyList()
         return (0 until minOf(items.length(), limit.coerceIn(1, 10))).mapNotNull { index ->
             val item = items.optJSONObject(index) ?: return@mapNotNull null
@@ -309,7 +333,7 @@ private object SteamCoverSource {
             ?.optString("header_image", "")
             .orEmpty()
         if (header.isBlank()) return null
-        return CoverImageCache.download(context, header, "steam_${stableKey(game.uri)}", referer = "https://store.steampowered.com/")
+        return CoverImageCache.download(context, header, "steam_${stableKey(game.uri)}", source = AppSettingsStore.COVER_SOURCE_STEAM)
     }
 }
 
@@ -325,57 +349,6 @@ private fun ScanGame.asCoverOnlyUpdateFrom(base: ScanGame): ScanGame =
         coverUri = coverUri,
         coverSource = coverSource,
     )
-
-private object CoverImageCache {
-    private const val MAX_COVER_BYTES = 20L * 1024L * 1024L
-
-    fun download(
-        context: Context,
-        imageUrl: String,
-        prefix: String,
-        referer: String? = null,
-        cookie: String? = null,
-    ): String? {
-        if (imageUrl.isBlank()) return null
-        val dir = File(context.filesDir, "covers_remote")
-        if (!dir.exists() && !dir.mkdirs()) return null
-        val target = File(dir, "${prefix}_${stableKey(imageUrl)}.jpg")
-        if (target.isFile && target.length() > 0) return Uri.fromFile(target).toString()
-
-        var conn: HttpURLConnection? = null
-        return try {
-            conn = (URL(imageUrl).openConnection() as HttpURLConnection).apply {
-                connectTimeout = 15000
-                readTimeout = 20000
-                setRequestProperty("Accept", "image/avif,image/webp,image/apng,image/*,*/*;q=0.8")
-                setRequestProperty("User-Agent", "Mozilla/5.0")
-                referer?.let { setRequestProperty("Referer", it) }
-                cookie?.let { setRequestProperty("Cookie", it) }
-            }
-            if (conn.responseCode !in 200..299) return null
-            if (conn.contentLengthLong > MAX_COVER_BYTES) return null
-            var total = 0L
-            conn.inputStream.use { input ->
-                FileOutputStream(target).use { output ->
-                    val buffer = ByteArray(8192)
-                    while (true) {
-                        val read = input.read(buffer)
-                        if (read <= 0) break
-                        total += read
-                        if (total > MAX_COVER_BYTES) error("cover too large")
-                        output.write(buffer, 0, read)
-                    }
-                }
-            }
-            Uri.fromFile(target).toString()
-        } catch (_: Exception) {
-            target.delete()
-            null
-        } finally {
-            conn?.disconnect()
-        }
-    }
-}
 
 private fun httpJson(
     url: String,
@@ -408,44 +381,6 @@ private fun httpJson(
     } finally {
         conn?.disconnect()
     }
-}
-
-private fun cleanTitle(s: String): String {
-    val cleaned = s.replace("""\[[^\]]*\]|【[^】]*】""".toRegex(), " ")
-        .replace("[\\[\\]【】]".toRegex(), " ")
-        .replace("[（）()].*".toRegex(), " ")
-        .replace("(?i)complete|汉化|中文版|日文版|体验版|trial|patch".toRegex(), " ")
-        .replace('_', ' ')
-        .trim()
-    return cleaned.ifEmpty { s.trim() }
-}
-
-private fun stableKey(value: String): String {
-    val bytes = MessageDigest.getInstance("SHA-1").digest(value.toByteArray(StandardCharsets.UTF_8))
-    return bytes.take(8).joinToString("") { "%02x".format(it) }
-}
-
-private fun firstNonEmpty(a: String?, b: String?): String {
-    return when {
-        !a.isNullOrBlank() && a != "null" -> a
-        !b.isNullOrBlank() && b != "null" -> b
-        else -> ""
-    }
-}
-
-private fun detailText(vararg values: String?): String =
-    values.filter { !it.isNullOrBlank() && it != "null" }.joinToString(" · ")
-
-private fun refererForSource(source: String): String? = when (source) {
-    AppSettingsStore.COVER_SOURCE_BANGUMI -> "https://bgm.tv/"
-    AppSettingsStore.COVER_SOURCE_STEAM -> "https://store.steampowered.com/"
-    AppSettingsStore.COVER_SOURCE_VNDB -> "https://vndb.org/"
-    else -> null
-}
-
-private fun cookieForSource(source: String): String? = when (source) {
-    AppSettingsStore.COVER_SOURCE_VNDB -> "vndb_img=1; vndb_samesite=1"
-    else -> null
 }
 
 private fun String.urlEncode(): String =

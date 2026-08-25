@@ -2,6 +2,7 @@ package com.tyranor.next.settings
 
 import android.app.Activity
 import android.app.PendingIntent
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -32,9 +33,12 @@ object HikarinagiAuthService {
     private const val SCOPES = "openid catalog:read catalog:full offline_access"
     private const val REFRESH_SKEW_MS = 60_000L
 
+    private var authorizationService: AuthorizationService? = null
+
     fun startAuthorization(activity: Activity): String? {
         val clientId = clientId()
         if (clientId.isBlank()) return "Hikarinagi Client ID 未配置"
+        val appContext = activity.applicationContext
 
         val serviceConfig = AuthorizationServiceConfiguration(
             Uri.parse(AUTHORIZE_URL),
@@ -63,8 +67,18 @@ object HikarinagiAuthService {
             Intent(activity, HikarinagiOAuthCallbackActivity::class.java).putExtra(EXTRA_AUTH_CANCELED, true),
             flags,
         )
-        AuthorizationService(activity).performAuthorizationRequest(request, completeIntent, cancelIntent)
-        return null
+        val service = AuthorizationService(appContext)
+        replaceAuthorizationService(service)
+        return try {
+            service.performAuthorizationRequest(request, completeIntent, cancelIntent)
+            null
+        } catch (_: ActivityNotFoundException) {
+            replaceAuthorizationService(null)
+            "未找到可用于 Hikarinagi 登录的浏览器"
+        } catch (_: Exception) {
+            replaceAuthorizationService(null)
+            "Hikarinagi 登录启动失败"
+        }
     }
 
     fun handleAuthorizationResponse(
@@ -72,6 +86,8 @@ object HikarinagiAuthService {
         intent: Intent,
         onResult: (success: Boolean, message: String) -> Unit,
     ) {
+        replaceAuthorizationService(null)
+        val appContext = activity.applicationContext
         if (intent.getBooleanExtra(EXTRA_AUTH_CANCELED, false)) {
             onResult(false, "Hikarinagi 授权已取消")
             return
@@ -91,31 +107,36 @@ object HikarinagiAuthService {
             return
         }
 
-        val service = AuthorizationService(activity)
-        service.performTokenRequest(response.createTokenExchangeRequest()) { tokenResponse, tokenException ->
+        val service = AuthorizationService(appContext)
+        try {
+            service.performTokenRequest(response.createTokenExchangeRequest()) { tokenResponse, tokenException ->
+                service.dispose()
+                val token = tokenResponse
+                if (tokenException != null || token == null) {
+                    onResult(
+                        false,
+                        tokenException?.errorDescription ?: tokenException?.message ?: "Hikarinagi token 交换失败",
+                    )
+                    return@performTokenRequest
+                }
+                val nonceError = validateIdTokenNonce(token, response.request.nonce)
+                if (nonceError != null) {
+                    onResult(false, nonceError)
+                    return@performTokenRequest
+                }
+                val accessToken = token.accessToken.orEmpty()
+                val refreshToken = token.refreshToken.orEmpty()
+                if (accessToken.isBlank() || refreshToken.isBlank()) {
+                    onResult(false, "Hikarinagi token 响应缺少必要字段")
+                    return@performTokenRequest
+                }
+                val expiresAt = token.accessTokenExpirationTime ?: (System.currentTimeMillis() + 3_600_000L)
+                HikarinagiAuthStore.saveTokens(appContext, accessToken, refreshToken, expiresAt)
+                onResult(true, "Hikarinagi 授权成功")
+            }
+        } catch (_: Exception) {
             service.dispose()
-            val token = tokenResponse
-            if (tokenException != null || token == null) {
-                onResult(
-                    false,
-                    tokenException?.errorDescription ?: tokenException?.message ?: "Hikarinagi token 交换失败",
-                )
-                return@performTokenRequest
-            }
-            val nonceError = validateIdTokenNonce(token, response.request.nonce)
-            if (nonceError != null) {
-                onResult(false, nonceError)
-                return@performTokenRequest
-            }
-            val accessToken = token.accessToken.orEmpty()
-            val refreshToken = token.refreshToken.orEmpty()
-            if (accessToken.isBlank() || refreshToken.isBlank()) {
-                onResult(false, "Hikarinagi token 响应缺少必要字段")
-                return@performTokenRequest
-            }
-            val expiresAt = token.accessTokenExpirationTime ?: (System.currentTimeMillis() + 3_600_000L)
-            HikarinagiAuthStore.saveTokens(activity, accessToken, refreshToken, expiresAt)
-            onResult(true, "Hikarinagi 授权成功")
+            onResult(false, "Hikarinagi token 交换失败")
         }
     }
 
@@ -165,7 +186,9 @@ object HikarinagiAuthService {
 
             val json = JSONObject(body)
             val access = json.optString("access_token", "")
-            val nextRefresh = json.optString("refresh_token", refreshToken)
+            val nextRefresh = json.optString("refresh_token", "")
+                .takeIf { it.isNotBlank() }
+                ?: refreshToken
             if (access.isBlank()) return null
             val expiresIn = max(json.optLong("expires_in", 3600L), 1L)
             val expiresAt = System.currentTimeMillis() + expiresIn * 1000L
@@ -198,6 +221,12 @@ object HikarinagiAuthService {
     }
 
     private fun clientId(): String = BuildConfig.HIKARINAGI_CLIENT_ID.trim()
+
+    @Synchronized
+    private fun replaceAuthorizationService(service: AuthorizationService?) {
+        authorizationService?.dispose()
+        authorizationService = service
+    }
 
     private fun formBody(vararg values: Pair<String, String>): String =
         values.joinToString("&") { (key, value) ->
