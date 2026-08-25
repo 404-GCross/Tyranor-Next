@@ -160,7 +160,5 @@ dependencies {
   implementation(libs.miuix.preference)
   // 液态玻璃导航（圆角流体玻璃底部导航，参考 RinneMobile）
   implementation(libs.backdrop)
-  // 莫奈动态取色（Material You 种子色 → 动态 ColorScheme）
-  implementation(libs.materialkolor)
   implementation(project(":engine"))
 }

@@ -17,9 +17,6 @@ object AppSettingsStore {
     const val KEY_THEME_MODE = "theme_mode"
     const val KEY_TONE_SWITCH = "tone_switch"
     const val KEY_GAME_SORT = "game_sort"
-    const val KEY_MONET_SWITCH = "monet_switch"
-    const val KEY_MONET_SOURCE = "monet_source"
-    const val KEY_PALETTE_STYLE = "palette_style"
 
     /** 默认主题色：#307DEF，与 theme/Color.kt 的 Blue40 一致。 */
     const val DEFAULT_THEME_COLOR = "#307DEF"
@@ -32,23 +29,6 @@ object AppSettingsStore {
 
     /** 外观模式：跟随系统深/浅色。 */
     const val THEME_MODE_SYSTEM = "system"
-
-    /** 动态取色来源：跟随系统壁纸。 */
-    const val MONET_SOURCE_SYSTEM = "system"
-
-    /** 动态取色来源：游戏封面。 */
-    const val MONET_SOURCE_COVER = "cover"
-
-    /** 配色风格存储键值：与 theme/MonetColorScheme.kt 的 PaletteStyle 枚举名对应。 */
-    const val PALETTE_STYLE_TONAL_SPOT = "tonal_spot"
-    const val PALETTE_STYLE_NEUTRAL = "neutral"
-    const val PALETTE_STYLE_VIBRANT = "vibrant"
-    const val PALETTE_STYLE_EXPRESSIVE = "expressive"
-    const val PALETTE_STYLE_RAINBOW = "rainbow"
-    const val PALETTE_STYLE_FRUIT_SALAD = "fruit_salad"
-    const val PALETTE_STYLE_MONOCHROME = "monochrome"
-    const val PALETTE_STYLE_FIDELITY = "fidelity"
-    const val PALETTE_STYLE_CONTENT = "content"
 
     /** 文件夹扫描深度默认值（层级，1..5）。 */
     const val DEFAULT_SCAN_DEPTH = 3
@@ -146,33 +126,4 @@ object AppSettingsStore {
         THEME_MODE_SYSTEM -> isSystemDark(c)
         else -> false
     }
-
-    /** 莫奈动态取色开关（默认关闭，走手动轮盘色）。 */
-    fun isMonetEnabled(c: Context): Boolean =
-        prefs(c).getBoolean(KEY_MONET_SWITCH, false)
-
-    fun setMonetEnabled(c: Context, enabled: Boolean) =
-        prefs(c).edit().putBoolean(KEY_MONET_SWITCH, enabled).apply()
-
-    /** 动态取色来源：跟随系统壁纸 / 游戏封面。 */
-    fun getMonetSource(c: Context): String =
-        when (prefs(c).getString(KEY_MONET_SOURCE, MONET_SOURCE_SYSTEM)) {
-            MONET_SOURCE_COVER -> MONET_SOURCE_COVER
-            else -> MONET_SOURCE_SYSTEM
-        }
-
-    fun setMonetSource(c: Context, source: String) {
-        val normalized = when (source) {
-            MONET_SOURCE_COVER -> MONET_SOURCE_COVER
-            else -> MONET_SOURCE_SYSTEM
-        }
-        prefs(c).edit().putString(KEY_MONET_SOURCE, normalized).apply()
-    }
-
-    /** 配色风格存储值（默认 tonal_spot）。 */
-    fun getPaletteStyleValue(c: Context): String =
-        prefs(c).getString(KEY_PALETTE_STYLE, PALETTE_STYLE_TONAL_SPOT) ?: PALETTE_STYLE_TONAL_SPOT
-
-    fun setPaletteStyleValue(c: Context, value: String) =
-        prefs(c).edit().putString(KEY_PALETTE_STYLE, value).apply()
 }

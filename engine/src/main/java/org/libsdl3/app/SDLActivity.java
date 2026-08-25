@@ -234,8 +234,7 @@ public class SDLActivity extends AppCompatActivity implements View.OnSystemUiVis
     protected static boolean mActivityCreated = false;
     private static SDLFileDialogState mFileDialogState = null;
     protected static boolean mDispatchingKeyEvent = false;
-    /** 返回键透传模式下，退出分支吞掉的 ACTION_UP（防止引擎收到孤立抬键）。 */
-    private static boolean sBackKeyUpSuppressed;
+    private Object backInvokedCallback;
 
     public static SDLGenericMotionListener_API14 getMotionListener() {
         if (mMotionListener == null) {
@@ -410,6 +409,7 @@ public class SDLActivity extends AppCompatActivity implements View.OnSystemUiVis
 
         if (mBrokenLibraries) {
             mSingleton = this;
+            backInvokedCallback = DoubleBackExit.registerPredictiveBack(this, this::exitFromBack);
             AlertDialog.Builder dlgAlert  = new AlertDialog.Builder(this);
             dlgAlert.setMessage("An error occurred while trying to start the application. Please try again and/or reinstall."
                   + System.getProperty("line.separator")
@@ -456,6 +456,7 @@ public class SDLActivity extends AppCompatActivity implements View.OnSystemUiVis
 
         // So we can call stuff from static callbacks
         mSingleton = this;
+        backInvokedCallback = DoubleBackExit.registerPredictiveBack(this, this::exitFromBack);
         SDL.setContext(this);
 
         // 耳机/蓝牙热插拔：SDL 3.1.x 预览版不会自动把音频流迁移到新输出设备，
@@ -709,6 +710,7 @@ public class SDLActivity extends AppCompatActivity implements View.OnSystemUiVis
         // The recovery lambda captures this Activity; drop the static reference so it
         // doesn't leak past destruction (re-registered on next onCreate if needed).
         AudioRouteWatcher.clearRecoveryAction();
+        DoubleBackExit.unregisterPredictiveBack(this, backInvokedCallback);
         DoubleBackExit.clear(this);
 
         if (mHIDDeviceManager != null) {
@@ -840,8 +842,9 @@ public class SDLActivity extends AppCompatActivity implements View.OnSystemUiVis
             ) {
             return false;
         }
-        // 返回键不在 Activity 层拦截：放行到 SDLSurface → handleKeyEvent，
-        // 由它透传给 native 引擎并承担双击退出判定。
+        if (DoubleBackExit.dispatchBackKey(this, event, this::exitFromBack)) {
+            return true;
+        }
         mDispatchingKeyEvent = true;
         boolean result = super.dispatchKeyEvent(event);
         mDispatchingKeyEvent = false;
@@ -1548,24 +1551,6 @@ public class SDLActivity extends AppCompatActivity implements View.OnSystemUiVis
                         // handling KEYCODE_BACK by system will call onBackPressed()
                         return true;
                     }
-                }
-            }
-        }
-
-        // 返回键透传 + 双击退出：首次按下弹提示后照常送入 native 引擎；
-        // 窗口内第二次按下退出引擎且不送 native，并吞掉后续 ACTION_UP 防止孤立抬键。
-        if (keyCode == KeyEvent.KEYCODE_BACK && !nativeGetHintBoolean("SDL_ANDROID_TRAP_BACK_BUTTON", false)) {
-            SDLActivity activity = mSingleton;
-            if (activity != null) {
-                if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0
-                        && DoubleBackExit.shouldExit(activity)) {
-                    sBackKeyUpSuppressed = true;
-                    activity.exitFromBack();
-                    return true;
-                }
-                if (event.getAction() == KeyEvent.ACTION_UP && sBackKeyUpSuppressed) {
-                    sBackKeyUpSuppressed = false;
-                    return true;
                 }
             }
         }
