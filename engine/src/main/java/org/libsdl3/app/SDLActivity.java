@@ -841,6 +841,10 @@ public class SDLActivity extends AppCompatActivity implements View.OnSystemUiVis
         }
         // BACK 首按透传给 SDL native 事件循环（同原版），双击退出仅作兜底；
         // 鼠标来源的 BACK 维持 stock SDL 行为（由 SDLSurface 吞掉，不送 native）。
+        // 注意必须转译成 ESC：SDL3 把 AKEYCODE_BACK 映射为 SDL_SCANCODE_AC_BACK，
+        // 而 krkrsdl3 的 TVPConvertKeyCodeToVKCode 表中没有 AC_BACK，原样透传会被
+        // 引擎丢弃（KRKR_Trig_KeyDown 里 code==0 直接 return）；ESC 对应 VK_ESCAPE，
+        // 与 KR2 链上游 BACK→ESC 的语义一致。
         if (keyCode == KeyEvent.KEYCODE_BACK
                 && (event.getSource() & InputDevice.SOURCE_MOUSE) == 0) {
             Log.d("BackKeyTrace", "sdl BACK action=" + event.getAction() + " repeat=" + event.getRepeatCount()
@@ -851,8 +855,8 @@ public class SDLActivity extends AppCompatActivity implements View.OnSystemUiVis
                         Log.d("BackKeyTrace", "sdl -> double-back exit");
                         exitFromBack();
                     } else if (mSDLThread != null) {
-                        Log.d("BackKeyTrace", "sdl -> onNativeKeyDown");
-                        onNativeKeyDown(keyCode);
+                        Log.d("BackKeyTrace", "sdl -> onNativeKeyDown(as ESC)");
+                        onNativeKeyDown(KeyEvent.KEYCODE_ESCAPE);
                     } else {
                         Log.d("BackKeyTrace", "sdl -> skip forward (no sdl thread)");
                     }
@@ -861,8 +865,8 @@ public class SDLActivity extends AppCompatActivity implements View.OnSystemUiVis
             }
             if (event.getAction() == KeyEvent.ACTION_UP) {
                 if (mSDLThread != null) {
-                    Log.d("BackKeyTrace", "sdl -> onNativeKeyUp");
-                    onNativeKeyUp(keyCode);
+                    Log.d("BackKeyTrace", "sdl -> onNativeKeyUp(as ESC)");
+                    onNativeKeyUp(KeyEvent.KEYCODE_ESCAPE);
                 }
                 return true;
             }
