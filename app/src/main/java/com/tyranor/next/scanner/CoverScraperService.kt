@@ -191,7 +191,7 @@ private object HikarinagiCoverSource {
                 if (coverUrl.isBlank()) return@mapNotNull null
                 CoverCandidate(
                     id = item.optString("id", ""),
-                    title = firstNonEmpty(item.optString("subtitle", ""), item.optString("title", "")),
+                    title = firstNonEmpty(item.optString("title", ""), item.optString("subtitle", "")),
                     coverUrl = coverUrl,
                     score = cover.optInt("votes", 0),
                 )

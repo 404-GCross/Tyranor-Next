@@ -83,15 +83,19 @@ import com.tyranor.next.settings.AppSettingsStore
 import com.tyranor.next.settings.HikarinagiAuthStore
 import com.tyranor.next.settings.PerGameSettingsStore
 import com.tyranor.next.theme.NavWhite
+import com.tyranor.next.theme.PageGrey
+import com.tyranor.next.theme.TextColor
 import com.tyranor.next.ui.common.AppSearchField
+import com.tyranor.next.ui.common.TopBarIcon
 import com.tyranor.next.ui.common.glassNavBottomInset
 import com.tyranor.next.ui.common.isWideScreen
-import com.tyranor.next.theme.PageGrey
-import com.tyranor.next.ui.common.TopBarIcon
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.ByteArrayOutputStream
 import java.io.File
+import java.net.HttpURLConnection
+import java.net.URL
 import java.util.Locale
 
 @Composable
@@ -805,6 +809,7 @@ private fun CoverSearchDialog(
         scope.launch {
             searching = true
             error = null
+            candidates = emptyList()
             val result = withContext(Dispatchers.IO) {
                 runCatching { CoverScraperService.searchCoverCandidates(context, source, query, 8) }
             }
@@ -841,44 +846,14 @@ private fun CoverSearchDialog(
                     )
                 }
                 if (candidates.isNotEmpty()) {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxWidth().height(220.dp).padding(top = 8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(2),
+                        modifier = Modifier.fillMaxWidth().height(280.dp).padding(top = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
-                        lazyItems(candidates, key = { "${it.source}:${it.id}:${it.coverUrl}" }) { candidate ->
-                            Column(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(PageGrey)
-                                    .clickable { onBind(candidate) }
-                                    .padding(10.dp),
-                            ) {
-                                Text(
-                                    candidate.title.ifBlank { coverSourceTitle(candidate.source) },
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                                if (candidate.subtitle.isNotBlank() && candidate.subtitle != candidate.title) {
-                                    Text(
-                                        candidate.subtitle,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                }
-                                if (candidate.detail.isNotBlank()) {
-                                    Text(
-                                        candidate.detail,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                }
-                            }
+                        gridItems(candidates, key = { "${it.source}:${it.id}:${it.coverUrl}" }) { candidate ->
+                            CoverCandidateCard(candidate = candidate, onClick = { onBind(candidate) })
                         }
                     }
                 }
@@ -886,6 +861,113 @@ private fun CoverSearchDialog(
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text("关闭") } },
     )
+}
+
+@Composable
+private fun CoverCandidateCard(
+    candidate: CoverSearchCandidate,
+    onClick: () -> Unit,
+) {
+    val previewState by rememberCandidateCoverPreview(candidate)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(NavWhite)
+            .clickable(onClick = onClick)
+            .padding(6.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(3f / 4f)
+                .clip(RoundedCornerShape(8.dp))
+                .background(PageGrey),
+            contentAlignment = Alignment.Center,
+        ) {
+            when (val state = previewState) {
+                CoverPreviewState.Failed -> Text(
+                    "无预览",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                CoverPreviewState.Loading -> CircularProgressIndicator(
+                    modifier = Modifier.size(22.dp),
+                    strokeWidth = 2.dp,
+                )
+                is CoverPreviewState.Ready -> Image(
+                    bitmap = state.bitmap,
+                    contentDescription = candidate.title,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+            CoverCandidateOverlay(candidate)
+        }
+        Text(
+            candidate.title.ifBlank { coverSourceTitle(candidate.source) },
+            style = MaterialTheme.typography.bodyMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(top = 6.dp),
+        )
+        Text(
+            candidate.detail.ifBlank { candidate.subtitle },
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun CoverCandidateOverlay(candidate: CoverSearchCandidate) {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(6.dp),
+        verticalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                coverSourceTitle(candidate.source),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary,
+                maxLines = 1,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(NavWhite.copy(alpha = 0.9f))
+                    .padding(horizontal = 6.dp, vertical = 2.dp),
+            )
+            val score = candidate.detail.substringAfterLast("票数 ", missingDelimiterValue = "")
+            if (score.isNotBlank() && score.all { it.isDigit() }) {
+                Text(
+                    "票数 $score",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = NavWhite,
+                    maxLines = 1,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(TextColor.copy(alpha = 0.56f))
+                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                )
+            }
+        }
+        Text(
+            "使用",
+            style = MaterialTheme.typography.bodyMedium,
+            color = NavWhite,
+            maxLines = 1,
+            modifier = Modifier
+                .align(Alignment.End)
+                .clip(RoundedCornerShape(8.dp))
+                .background(TextColor.copy(alpha = 0.56f))
+                .padding(horizontal = 8.dp, vertical = 3.dp),
+        )
+    }
 }
 
 private fun coverSourceTitle(source: String): String = when (source) {
@@ -1126,6 +1208,36 @@ internal fun rememberCoverBitmap(coverUri: String?): androidx.compose.runtime.St
     }
 }
 
+@Composable
+private fun rememberCandidateCoverPreview(candidate: CoverSearchCandidate): androidx.compose.runtime.State<CoverPreviewState> {
+    val cacheKey = candidate.coverUrl
+    val cached = cacheKey.takeIf { it.isNotBlank() }?.let(CoverBitmapCache::get)
+    val initialState = cached?.asImageBitmap()?.let(CoverPreviewState::Ready)
+        ?: CoverPreviewState.Loading
+    return produceState<CoverPreviewState>(initialValue = initialState, cacheKey, candidate.source) {
+        if (cached != null) return@produceState
+        if (cacheKey.isBlank()) {
+            value = CoverPreviewState.Failed
+            return@produceState
+        }
+        value = withContext(Dispatchers.IO) {
+            val bitmap = decodeRemoteCoverThumbnail(cacheKey, candidate.source)
+            if (bitmap != null) {
+                CoverBitmapCache.put(cacheKey, bitmap)
+                CoverPreviewState.Ready(bitmap.asImageBitmap())
+            } else {
+                CoverPreviewState.Failed
+            }
+        }
+    }
+}
+
+private sealed interface CoverPreviewState {
+    data object Loading : CoverPreviewState
+    data object Failed : CoverPreviewState
+    data class Ready(val bitmap: ImageBitmap) : CoverPreviewState
+}
+
 /** 封面只按卡片实际需要的尺寸解码，避免切页时上传原始大图；已解码缩略图跨页面复用。 */
 private fun decodeCoverThumbnail(context: android.content.Context, uriText: String): Bitmap? = runCatching {
     val uri = android.net.Uri.parse(uriText)
@@ -1146,8 +1258,65 @@ private fun decodeCoverThumbnail(context: android.content.Context, uriText: Stri
     context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
 }.getOrNull()
 
+private fun decodeRemoteCoverThumbnail(urlText: String, source: String): Bitmap? = runCatching {
+    var conn: HttpURLConnection? = null
+    try {
+        conn = (URL(urlText).openConnection() as HttpURLConnection).apply {
+            connectTimeout = 15000
+            readTimeout = 20000
+            setRequestProperty("Accept", "image/webp,image/apng,image/*,*/*;q=0.8")
+            setRequestProperty("User-Agent", "Mozilla/5.0")
+            coverPreviewReferer(source)?.let { setRequestProperty("Referer", it) }
+            if (source == AppSettingsStore.COVER_SOURCE_VNDB) {
+                setRequestProperty("Cookie", "vndb_img=1; vndb_samesite=1")
+            }
+        }
+        if (conn.responseCode !in 200..299) return@runCatching null
+        if (conn.contentLengthLong > CoverPreviewMaxBytes) return@runCatching null
+        val bytes = ByteArrayOutputStream().use { output ->
+            conn.inputStream.use { input ->
+                val buffer = ByteArray(8192)
+                var total = 0L
+                while (true) {
+                    val read = input.read(buffer)
+                    if (read <= 0) break
+                    total += read
+                    if (total > CoverPreviewMaxBytes) return@runCatching null
+                    output.write(buffer, 0, read)
+                }
+            }
+            output.toByteArray()
+        }
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return@runCatching null
+
+        var sampleSize = 1
+        while (bounds.outWidth / (sampleSize * 2) >= CoverDecodeMaxWidthPx &&
+            bounds.outHeight / (sampleSize * 2) >= CoverDecodeMaxHeightPx
+        ) {
+            sampleSize *= 2
+        }
+        val options = BitmapFactory.Options().apply {
+            inSampleSize = sampleSize
+            inPreferredConfig = Bitmap.Config.ARGB_8888
+        }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
+    } finally {
+        conn?.disconnect()
+    }
+}.getOrNull()
+
+private fun coverPreviewReferer(source: String): String? = when (source) {
+    AppSettingsStore.COVER_SOURCE_BANGUMI -> "https://bgm.tv/"
+    AppSettingsStore.COVER_SOURCE_STEAM -> "https://store.steampowered.com/"
+    AppSettingsStore.COVER_SOURCE_VNDB -> "https://vndb.org/"
+    else -> null
+}
+
 private const val CoverDecodeMaxWidthPx = 512
 private const val CoverDecodeMaxHeightPx = 683
+private const val CoverPreviewMaxBytes = 12L * 1024L * 1024L
 
 private object CoverBitmapCache : LruCache<String, Bitmap>(24 * 1024 * 1024) {
     override fun sizeOf(key: String, value: Bitmap): Int = value.allocationByteCount
