@@ -751,7 +751,7 @@ private fun RenameGameDialog(
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit,
 ) {
-    var title by remember(game.uri, game.title) { mutableStateOf(game.title) }
+    var title by rememberSaveable(game.uri, game.title) { mutableStateOf(game.title) }
     val normalizedTitle = title.trim()
     val canConfirm = normalizedTitle.isNotEmpty() && normalizedTitle != game.title
 
