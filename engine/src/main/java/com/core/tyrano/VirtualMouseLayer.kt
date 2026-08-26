@@ -149,7 +149,8 @@ class VirtualMouseLayer(
         if (w <= 0 || h <= 0) return
         if (hx < 0f) {
             hx = prefs.getFloat(KEY_HANDLE_X, 0.055f) * w
-            hy = prefs.getFloat(KEY_HANDLE_Y, 0.34f) * h
+            // 默认 0.48：避开触屏手柄左上开关区（~0-36%）与左下摇杆区（~60%+）
+            hy = prefs.getFloat(KEY_HANDLE_Y, 0.48f) * h
         }
         hx = hx.coerceIn(handleR, w - handleR)
         hy = hy.coerceIn(handleR, h - handleR)

@@ -189,6 +189,22 @@
     launcher.addEventListener("click", function (event) { event.preventDefault(); event.stopPropagation(); toggle(); });
     ["touchstart","touchend","pointerdown","pointerup"].forEach(function (name) { launcher.addEventListener(name, function (event) { event.stopPropagation(); }); });
     document.body.appendChild(launcher);
+    positionLauncher();
+    // 触屏手柄（__touch_pad.js）重排后避让其动作键列；无手柄时回退 CSS 默认位
+    window.addEventListener("tyranorpadlayout", positionLauncher);
+    window.addEventListener("resize", positionLauncher);
+  }
+  function positionLauncher() {
+    if (!launcher) return;
+    var pad = window.__touchPadMetrics;
+    var w = launcher.offsetWidth || 46;
+    if (pad && pad.actionLeft > 0 && window.innerWidth > pad.actionLeft) {
+      launcher.style.right = "auto";
+      launcher.style.left = Math.max(8, Math.round(pad.actionLeft - w - 12)) + "px";
+    } else {
+      launcher.style.left = "";
+      launcher.style.right = "";
+    }
   }
   window.TyranorModUI = { open: open, close: close, toggle: toggle, isOpen: isOpen };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", installLauncher); else installLauncher();

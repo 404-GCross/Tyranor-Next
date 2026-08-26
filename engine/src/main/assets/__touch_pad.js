@@ -1,15 +1,20 @@
 /* 触屏手柄（issue #30/#35）：MV/MZ 共用。
  * 由 TyranoActivity 拼接进引擎 hook 注入；按键通过合成 keydown/keyup
- * （keyCode）派发，MV 与 MZ 的 Input 均读 keyCode，事件模型一致。 */
-// RPG Touch Pad
+ * （keyCode）派发，MV 与 MZ 的 Input 均读 keyCode，事件模型一致。
+ *
+ * 布局说明：所有尺寸/位置由 layout() 统一计算，锚定游戏画布
+ * （Graphics._canvas 的 getBoundingClientRect）而非整个视口，
+ * 避免旋转后手柄铺满 letterbox 黑边；监听 resize/orientationchange
+ * 重排。布局完成后发布 window.__touchPadMetrics 并派发
+ * tyranorpadlayout 事件，供修改器悬浮球避让动作键列。 */
 window.addEventListener('load', () => {
-  const padSize = window.innerHeight * 0.4
-  const joyStickSR = padSize * 0.5
-  const joyStickR = joyStickSR * 0.4
+  let padSize = 0
+  let joyStickSR = 0
+  let joyStickR = 0
+  let joyStickCX = 0
+  let joyStickCY = 0
   const allMargin = 10
   const lrMargin = 50
-  const joyStickCX = joyStickSR + allMargin + lrMargin
-  const joyStickCY = window.innerHeight - joyStickSR - allMargin
   let isKeysShown = true
   let useJoyStick = true
   let useDir8 = false
@@ -246,24 +251,6 @@ window.addEventListener('load', () => {
     textAlign: 'center',
     boxShadow: '0 0 10px 0 rgba(255,255,255,0.5)'
   }
-  const actionStyle = {
-    ...btnStyle,
-    width: `${padSize * 0.5}px`,
-    height: `${padSize * 0.125}px`,
-    lineHeight: `${padSize * 0.125}px`,
-    borderRadius: '50em'
-  }
-  const udlrStyle = {
-    ...btnStyle,
-    width: '33%',
-    height: '33%'
-  }
-  const qwzxStyle = {
-    ...btnStyle,
-    width: '40%',
-    height: '40%',
-    borderRadius: '50em'
-  }
   const textStyle = {
     ...commonStyle,
     color: 'rgba(255,255,255,0.3)',
@@ -271,73 +258,130 @@ window.addEventListener('load', () => {
     left: '50%',
     top: '50%'
   }
-  Object.assign(keySwitchElement.style, {
-    ...btnStyle,
-    width: `${padSize * 0.3}px`,
-    height: `${padSize * 0.3}px`,
-    lineHeight: `${padSize * 0.3}px`,
-    borderRadius: '50em',
-    left: `${allMargin}px`,
-    top: `${allMargin}px`
-  })
-  Object.assign(joyStickSwitchElement.style, {
-    ...btnStyle,
-    width: `${padSize * 0.3}px`,
-    height: `${padSize * 0.3}px`,
-    lineHeight: `${padSize * 0.3}px`,
-    borderRadius: '50em',
-    left: `${allMargin}px`,
-    top: `${padSize * 0.3 + 5 + allMargin}px`
-  })
-  Object.assign(dir8SwitchElement.style, {
-    ...btnStyle,
-    width: `${padSize * 0.3}px`,
-    height: `${padSize * 0.3}px`,
-    lineHeight: `${padSize * 0.3}px`,
-    borderRadius: '50em',
-    left: `${allMargin}px`,
-    top: `${padSize * 0.6 + 10 + allMargin}px`
-  })
-  Object.assign(joyStickStage.style, {
-    ...commonStyle,
-    boxShadow: '0 0 10px 0 rgba(255,255,255,0.5)',
-    width: `${padSize}px`,
-    height: `${padSize}px`,
-    transform: 'translate(0%,-100%)',
-    borderRadius: '50em',
-    left: `${allMargin + lrMargin}px`,
-    top: `calc(100% - ${allMargin}px)`,
-    display: useJoyStick ? 'block' : 'none'
-  })
-  Object.assign(joyStick.style, {
-    ...btnStyle,
-    marginLeft: `${joyStickSR - joyStickR}px`,
-    marginTop: `${joyStickSR - joyStickR}px`,
-    width: `${2 * joyStickR}px`,
-    height: `${2 * joyStickR}px`,
-    borderRadius: '50em'
-  })
-  Object.assign(udlrElement.style, {
-    ...commonStyle,
-    boxShadow: '0 0 10px 0 rgba(255,255,255,0.5)',
-    borderRadius: '50em',
-    width: `${padSize}px`,
-    height: `${padSize}px`,
-    transform: 'translate(0%,-100%)',
-    left: `${allMargin + lrMargin}px`,
-    top: `calc(100% - ${allMargin}px)`,
-    display: useJoyStick ? 'none' : 'block'
-  })
-  Object.assign(qwzxElement.style, {
-    ...commonStyle,
-    width: `${padSize}px`,
-    height: `${padSize}px`,
-    transform: 'translate(-100%,-100%)',
-    borderRadius: '50em',
-    boxShadow: '0 0 10px 0 rgba(255,255,255,0.5)',
-    left: `calc(100% - ${allMargin + lrMargin}px)`,
-    top: `calc(100% - ${allMargin}px)`
-  })
+  const switchSize = () => `${padSize * 0.3}px`
+  const actionBtnH = () => padSize * 0.125
+
+  /* 游戏画布实际显示区域；拿不到时退回整个视口 */
+  function gameRect() {
+    try {
+      const c = window.Graphics && Graphics._canvas
+      if (c && c.getBoundingClientRect) {
+        const r = c.getBoundingClientRect()
+        if (r.width > 50 && r.height > 50) return r
+      }
+    } catch (e) { /* 引擎未就绪时用视口 */ }
+    return { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight }
+  }
+
+  let actionEls = []
+  function layout() {
+    const r = gameRect()
+    padSize = Math.min(r.height * 0.4, r.width * 0.25)
+    joyStickSR = padSize * 0.5
+    joyStickR = joyStickSR * 0.4
+    joyStickCX = r.left + joyStickSR + allMargin + lrMargin
+    joyStickCY = r.top + r.height - joyStickSR - allMargin
+    const switchTop = (i) => `${r.top + allMargin + i * (padSize * 0.3 + 5)}px`
+    Object.assign(keySwitchElement.style, {
+      ...btnStyle,
+      width: switchSize(),
+      height: switchSize(),
+      lineHeight: switchSize(),
+      borderRadius: '50em',
+      left: `${r.left + allMargin}px`,
+      top: switchTop(0),
+      display: 'block'
+    })
+    Object.assign(joyStickSwitchElement.style, {
+      ...btnStyle,
+      width: switchSize(),
+      height: switchSize(),
+      lineHeight: switchSize(),
+      borderRadius: '50em',
+      left: `${r.left + allMargin}px`,
+      top: switchTop(1),
+      display: isKeysShown ? 'block' : 'none'
+    })
+    Object.assign(dir8SwitchElement.style, {
+      ...btnStyle,
+      width: switchSize(),
+      height: switchSize(),
+      lineHeight: switchSize(),
+      borderRadius: '50em',
+      left: `${r.left + allMargin}px`,
+      top: switchTop(2),
+      display: isKeysShown ? 'block' : 'none'
+    })
+    Object.assign(joyStickStage.style, {
+      ...commonStyle,
+      boxShadow: '0 0 10px 0 rgba(255,255,255,0.5)',
+      width: `${padSize}px`,
+      height: `${padSize}px`,
+      transform: 'translate(0%,-100%)',
+      borderRadius: '50em',
+      left: `${r.left + allMargin + lrMargin}px`,
+      top: `${joyStickCY + joyStickSR}px`,
+      display: useJoyStick && isKeysShown ? 'block' : 'none'
+    })
+    Object.assign(joyStick.style, {
+      ...btnStyle,
+      marginLeft: `${joyStickSR - joyStickR}px`,
+      marginTop: `${joyStickSR - joyStickR}px`,
+      width: `${2 * joyStickR}px`,
+      height: `${2 * joyStickR}px`,
+      borderRadius: '50em'
+    })
+    Object.assign(udlrElement.style, {
+      ...commonStyle,
+      boxShadow: '0 0 10px 0 rgba(255,255,255,0.5)',
+      borderRadius: '50em',
+      width: `${padSize}px`,
+      height: `${padSize}px`,
+      transform: 'translate(0%,-100%)',
+      left: `${r.left + allMargin + lrMargin}px`,
+      top: `${joyStickCY + joyStickSR}px`,
+      display: !useJoyStick && isKeysShown ? 'block' : 'none'
+    })
+    Object.assign(qwzxElement.style, {
+      ...commonStyle,
+      width: `${padSize}px`,
+      height: `${padSize}px`,
+      transform: 'translate(-100%,-100%)',
+      borderRadius: '50em',
+      boxShadow: '0 0 10px 0 rgba(255,255,255,0.5)',
+      left: `${r.left + r.width - allMargin}px`,
+      top: `${r.top + r.height - allMargin}px`,
+      display: isKeysShown ? 'block' : 'none'
+    })
+    const btnW = padSize * 0.5
+    const pitch = actionBtnH() + 5
+    actionEls.forEach((el, i) => {
+      Object.assign(el.style, {
+        ...btnStyle,
+        width: `${btnW}px`,
+        height: `${actionBtnH()}px`,
+        lineHeight: `${actionBtnH()}px`,
+        borderRadius: '50em',
+        right: 'auto',
+        left: `${r.left + r.width - allMargin - btnW}px`,
+        top: `${r.top + allMargin + i * pitch}px`,
+        display: isKeysShown ? 'block' : 'none'
+      })
+    })
+    // 发布动作键列区域，供修改器悬浮球避让（见 __rpgmaker_mod_ui.js）
+    window.__touchPadMetrics = {
+      actionLeft: r.left + r.width - allMargin - btnW,
+      actionTop: r.top + allMargin,
+      actionBottom: r.top + allMargin + actionEls.length * pitch - 5
+    }
+    window.dispatchEvent(new Event('tyranorpadlayout'))
+    // 引擎画布晚于 load 出现时，等它就绪后重排一次
+    if (!(window.Graphics && Graphics._canvas) && !layout._retry) {
+      layout._retry = true
+      setTimeout(() => { layout._retry = false; layout() }, 1200)
+    }
+  }
+
   const setKeyDownColor = (e) => {
     e.style.background = 'rgba(255,150,200,0.6)'
   }
@@ -442,24 +486,12 @@ window.addEventListener('load', () => {
     evt.preventDefault()
     setKeyUpColor(keySwitchElement)
     if (isKeysShown) {
-      if (useJoyStick) joyStickStage.style.display = 'none'
-      else udlrElement.style.display = 'none'
-      qwzxElement.style.display = 'none'
-      for (let i = 1; i < actionsElement.children.length; i++) {
-        actionsElement.children.item(i).style.display = 'none'
-      }
-      keySwitchElement.innerText = 'Show'
       isKeysShown = false
     } else {
-      if (useJoyStick) joyStickStage.style.display = 'block'
-      else udlrElement.style.display = 'block'
-      qwzxElement.style.display = 'block'
-      for (let i = 1; i < actionsElement.children.length; i++) {
-        actionsElement.children.item(i).style.display = 'block'
-      }
-      keySwitchElement.innerText = 'Hide'
       isKeysShown = true
     }
+    keySwitchElement.innerText = isKeysShown ? 'Hide' : 'Show'
+    layout()
   })
   joyStickSwitchElement.addEventListener('touchstart', (evt) => {
     evt.stopPropagation()
@@ -472,16 +504,13 @@ window.addEventListener('load', () => {
     evt.preventDefault()
     setKeyUpColor(joyStickSwitchElement)
     if (useJoyStick) {
-      udlrElement.style.display = 'block'
-      joyStickStage.style.display = 'none'
-      joyStickSwitchElement.innerText = 'Stick'
       useJoyStick = false
+      joyStickSwitchElement.innerText = 'Stick'
     } else {
-      udlrElement.style.display = 'none'
-      joyStickStage.style.display = 'block'
-      joyStickSwitchElement.innerText = 'Button'
       useJoyStick = true
+      joyStickSwitchElement.innerText = 'Button'
     }
+    layout()
   })
   dir8SwitchElement.addEventListener('touchstart', (evt) => {
     evt.stopPropagation()
@@ -494,17 +523,14 @@ window.addEventListener('load', () => {
     evt.preventDefault()
     setKeyUpColor(dir8SwitchElement)
     if (useDir8) {
-      for (let i = 4; i < udlrElement.children.length; i++) {
-        udlrElement.children.item(i).style.display = 'none'
-      }
       dir8SwitchElement.innerText = '8 Dir'
       useDir8 = false
     } else {
-      for (let i = 4; i < udlrElement.children.length; i++) {
-        udlrElement.children.item(i).style.display = 'block'
-      }
       dir8SwitchElement.innerText = '4 Dir'
       useDir8 = true
+    }
+    for (let i = 4; i < udlrElement.children.length; i++) {
+      udlrElement.children.item(i).style.display = useDir8 ? 'block' : 'none'
     }
   })
   joyStickStage.addEventListener('touchstart', (evt) => {
@@ -540,11 +566,7 @@ window.addEventListener('load', () => {
     const childElement = document.createElement('div')
     actionsElement.appendChild(childElement)
     childElement.innerText = it.text
-    Object.assign(childElement.style, {
-      ...actionStyle,
-      right: `${allMargin}px`,
-      top: `${actionsBtns.indexOf(it) * (padSize * 0.125 + 5) + allMargin}px`
-    })
+    actionEls.push(childElement)
     setEventStart(childElement, [it.keyCode])
     setEventMove(childElement)
     setEventEnd(childElement, [it.keyCode])
@@ -553,7 +575,9 @@ window.addEventListener('load', () => {
     const childElement = document.createElement('div')
     udlrElement.appendChild(childElement)
     Object.assign(childElement.style, {
-      ...udlrStyle,
+      ...btnStyle,
+      width: '33%',
+      height: '33%',
       ...it.style
     })
     setEventStart(childElement, it.keyCodes)
@@ -564,7 +588,10 @@ window.addEventListener('load', () => {
     const childElement = document.createElement('div')
     qwzxElement.appendChild(childElement)
     Object.assign(childElement.style, {
-      ...qwzxStyle,
+      ...btnStyle,
+      width: '40%',
+      height: '40%',
+      borderRadius: '50em',
       ...it.style
     })
     setEventStart(childElement, [it.keyCode])
@@ -575,4 +602,8 @@ window.addEventListener('load', () => {
     Object.assign(tElement.style, textStyle)
     tElement.innerText = it.text
   })
+  layout()
+  window.addEventListener('resize', layout)
+  // 旋转后画布矩形可能滞后于视口变化，延迟一帧再排
+  window.addEventListener('orientationchange', () => setTimeout(layout, 150))
 })
