@@ -43,6 +43,9 @@
             android:name=".ui.pages.EngineSettingsActivity"
             android:exported="false" />
         <activity
+            android:name=".ui.pages.EngineSettingsMenuActivity"
+            android:exported="false" />
+        <activity
             android:name=".ui.pages.PerGameSettingsActivity"
             android:exported="false" />
         <activity
