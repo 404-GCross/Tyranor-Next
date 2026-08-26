@@ -126,19 +126,22 @@ class VirtualMouseLayer(
         flushNow()
     }
 
-    /** 页面重载 / 退后台时复位手势，但保留光标开关与位置。 */
-    fun reset() {
+    /** 清除手势状态、取消延迟任务、释放 JS 按压；reset / onSizeChanged 共用。 */
+    private fun cancelGesture() {
         removeCallbacks(longPressRunnable)
         removeCallbacks(flushRunnable)
         flushPosted = false
         state = STATE_IDLE
         pid1 = -1
         pid2 = -1
-        // 取消 JS 侧未完成的 click timer + 释放按压状态；跳过 flushNow
-        // 避免退后台后旧 move/wheel 事件在恢复时才派发。
-        js("cancel")
         pendingCssX = Float.NaN
         pendingWheelDelta = 0f
+    }
+
+    /** 页面重载 / 退后台时复位手势，但保留光标开关与位置。 */
+    fun reset() {
+        cancelGesture()
+        js("cancel")
         invalidate()
     }
 
@@ -149,10 +152,26 @@ class VirtualMouseLayer(
         if (w <= 0 || h <= 0) return
         if (hx < 0f) {
             hx = prefs.getFloat(KEY_HANDLE_X, 0.055f) * w
-            hy = prefs.getFloat(KEY_HANDLE_Y, 0.34f) * h
+            // 默认 0.48：避开触屏手柄左上开关区（~0-36%）与左下摇杆区（~60%+）
+            hy = prefs.getFloat(KEY_HANDLE_Y, 0.48f) * h
         }
         hx = hx.coerceIn(handleR, w - handleR)
         hy = hy.coerceIn(handleR, h - handleR)
+        // 屏幕旋转后尺寸变化：将 handle 坐标归一化再按新尺寸计算，
+        // 保持手柄在屏幕上的相对位置；然后清除残留手势、重置光标到中心。
+        if (ow > 0 && oh > 0 && (w != ow || h != oh)) {
+            hx = (hx / ow * w).coerceIn(handleR, w - handleR)
+            hy = (hy / oh * h).coerceIn(handleR, h - handleR)
+            cancelGesture()
+            cnx = 0.5f
+            cny = 0.5f
+            if (active) {
+                pendingCssX = cnx * w / density
+                pendingCssY = cny * h / density
+                flushNow()
+            }
+            invalidate()
+        }
     }
 
     override fun onDraw(canvas: Canvas) {

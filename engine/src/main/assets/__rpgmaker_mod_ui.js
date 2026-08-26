@@ -4,6 +4,10 @@
   var mod = window.TyranorMod;
   var root = null;
   var launcher = null;
+  var dragState = null; // { startX, startY, startLeft, startTop, moved }
+  var justDragged = false; // pointerup 设 true，click 消费后复位
+  var userDragged = false; // 用户手动拖拽过，positionLauncher 不再覆盖
+  var LAUNCHER_POS_KEY = "tyranor_mod_fab_pos";
   var activeTab = "quick";
   var context = { actorId: 0, itemKind: "item", systemKind: "switch" };
   var tabs = [
@@ -186,9 +190,75 @@
   function installLauncher() {
     if (launcher || !document.body) return;
     launcher = document.createElement("button"); launcher.id = "tyranor-mod-launcher"; launcher.innerHTML = '<span class="tm-launcher-icon" aria-hidden="true"></span>'; launcher.setAttribute("aria-label", "打开 RPG Maker 修改器");
-    launcher.addEventListener("click", function (event) { event.preventDefault(); event.stopPropagation(); toggle(); });
+    // 点击：拖拽后不触发（pointerup → click 时序问题）
+    launcher.addEventListener("click", function (event) {
+      event.preventDefault(); event.stopPropagation();
+      if (justDragged) { justDragged = false; return; }
+      toggle();
+    });
+    // 阻止 touch/pointer 冒泡到 WebView
     ["touchstart","touchend","pointerdown","pointerup"].forEach(function (name) { launcher.addEventListener(name, function (event) { event.stopPropagation(); }); });
+    // 拖拽支持：pointerdown 开始追踪，移动超过 8px 视为拖拽
+    launcher.addEventListener("pointerdown", function (event) {
+      event.preventDefault();
+      var rect = launcher.getBoundingClientRect();
+      dragState = { startX: event.clientX, startY: event.clientY, startLeft: rect.left, startTop: rect.top, moved: false };
+      launcher.setPointerCapture(event.pointerId);
+    });
+    launcher.addEventListener("pointermove", function (event) {
+      if (!dragState) return;
+      var dx = event.clientX - dragState.startX;
+      var dy = event.clientY - dragState.startY;
+      if (!dragState.moved && Math.abs(dx) + Math.abs(dy) < 8) return;
+      dragState.moved = true;
+      launcher.style.left = Math.max(0, Math.min(window.innerWidth - launcher.offsetWidth, dragState.startLeft + dx)) + "px";
+      launcher.style.top = Math.max(0, Math.min(window.innerHeight - launcher.offsetHeight, dragState.startTop + dy)) + "px";
+      launcher.style.right = "auto";
+    });
+    var endDrag = function (event) {
+      if (dragState && dragState.moved) {
+        justDragged = true;
+        userDragged = true;
+        setTimeout(function () { justDragged = false; }, 100);
+        launcher.style.left = launcher.offsetLeft + "px";
+        launcher.style.top = launcher.offsetTop + "px";
+        try { localStorage.setItem(LAUNCHER_POS_KEY, launcher.offsetLeft + "," + launcher.offsetTop); } catch (e) {}
+      }
+      dragState = null;
+    };
+    launcher.addEventListener("pointerup", endDrag);
+    launcher.addEventListener("pointercancel", function () { dragState = null; });
     document.body.appendChild(launcher);
+    // 恢复上次拖拽位置
+    try {
+      var saved = localStorage.getItem(LAUNCHER_POS_KEY);
+      if (saved) {
+        var parts = saved.split(",");
+        var sx = parseInt(parts[0], 10), sy = parseInt(parts[1], 10);
+        if (sx >= 0 && sy >= 0 && sx < window.innerWidth && sy < window.innerHeight) {
+          launcher.style.left = sx + "px";
+          launcher.style.top = sy + "px";
+          launcher.style.right = "auto";
+          userDragged = true;
+        }
+      }
+    } catch (e) {}
+    positionLauncher();
+    // 触屏手柄（__touch_pad.js）重排后避让其动作键列；无手柄时回退右侧
+    window.addEventListener("tyranorpadlayout", positionLauncher);
+    window.addEventListener("resize", positionLauncher);
+  }
+  function positionLauncher() {
+    if (!launcher || userDragged) return;
+    var pad = window.__touchPadMetrics;
+    var w = launcher.offsetWidth || 46;
+    if (pad && pad.actionLeft > 0 && window.innerWidth > pad.actionLeft + w + 20) {
+      launcher.style.right = "auto";
+      launcher.style.left = Math.max(8, Math.round(pad.actionLeft - w - 12)) + "px";
+    } else {
+      launcher.style.left = "";
+      launcher.style.right = "10px";
+    }
   }
   window.TyranorModUI = { open: open, close: close, toggle: toggle, isOpen: isOpen };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", installLauncher); else installLauncher();
