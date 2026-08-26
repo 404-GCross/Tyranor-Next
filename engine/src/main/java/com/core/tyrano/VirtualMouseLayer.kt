@@ -154,6 +154,26 @@ class VirtualMouseLayer(
         }
         hx = hx.coerceIn(handleR, w - handleR)
         hy = hy.coerceIn(handleR, h - handleR)
+        // 屏幕旋转后尺寸变化：清除残留手势状态，重置光标到屏幕中心，
+        // 否则 pid1/pid2 指向已不存在的 pointer，后续触摸事件无法正确派发。
+        if (ow > 0 && oh > 0 && (w != ow || h != oh)) {
+            removeCallbacks(longPressRunnable)
+            removeCallbacks(flushRunnable)
+            flushPosted = false
+            state = STATE_IDLE
+            pid1 = -1
+            pid2 = -1
+            pendingCssX = Float.NaN
+            pendingWheelDelta = 0f
+            cnx = 0.5f
+            cny = 0.5f
+            if (active) {
+                pendingCssX = cnx * w / density
+                pendingCssY = cny * h / density
+                flushNow()
+            }
+            invalidate()
+        }
     }
 
     override fun onDraw(canvas: Canvas) {

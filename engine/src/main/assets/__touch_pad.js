@@ -2,10 +2,10 @@
  * 由 TyranoActivity 拼接进引擎 hook 注入；按键通过合成 keydown/keyup
  * （keyCode）派发，MV 与 MZ 的 Input 均读 keyCode，事件模型一致。
  *
- * 布局说明：所有尺寸/位置由 layout() 统一计算，锚定游戏画布
- * （Graphics._canvas 的 getBoundingClientRect）而非整个视口，
- * 避免旋转后手柄铺满 letterbox 黑边；监听 resize/orientationchange
- * 重排。布局完成后发布 window.__touchPadMetrics 并派发
+ * 布局说明：所有尺寸/位置由 layout() 统一计算，锚定全视口
+ * （window.innerWidth/innerHeight），portrait 模式下自然利用
+ * letterbox 黑边空间；监听 resize/orientationchange 重排。
+ * 布局完成后发布 window.__touchPadMetrics 并派发
  * tyranorpadlayout 事件，供修改器悬浮球避让动作键列。 */
 window.addEventListener('load', () => {
   let padSize = 0
@@ -261,20 +261,9 @@ window.addEventListener('load', () => {
   const switchSize = () => `${padSize * 0.3}px`
   const actionBtnH = () => padSize * 0.125
 
-  /* 游戏画布实际显示区域；拿不到时退回整个视口。
-   * 返回 { rect, fromCanvas }，fromCanvas=false 时 layout 会安排重试。 */
+  /* 全视口布局：始终使用整个屏幕，portrait 下按钮自然落入 letterbox 黑边。 */
   function gameRect() {
-    try {
-      const c = window.Graphics && Graphics._canvas
-      if (c && c.getBoundingClientRect) {
-        const r = c.getBoundingClientRect()
-        if (r.width > 50 && r.height > 50) return { rect: r, fromCanvas: true }
-      }
-    } catch (e) { /* 引擎未就绪时用视口 */ }
-    return {
-      rect: { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight },
-      fromCanvas: false,
-    }
+    return { rect: { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight } }
   }
 
   let actionEls = []
@@ -380,14 +369,6 @@ window.addEventListener('load', () => {
       actionBottom: r.top + allMargin + actionEls.length * pitch - 5
     }
     window.dispatchEvent(new Event('tyranorpadlayout'))
-    // 引擎画布晚于 load 就绪（不存在或尺寸无效）时链式重试，
-    // 上限 10 次 × 800ms，命中真实画布后停止
-    if (!g.fromCanvas) {
-      layout._retryCount = (layout._retryCount || 0) + 1
-      if (layout._retryCount <= 10) setTimeout(layout, 800)
-    } else {
-      layout._retryCount = 0
-    }
   }
 
   const setKeyDownColor = (e) => {
