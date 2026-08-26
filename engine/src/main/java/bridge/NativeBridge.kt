@@ -97,6 +97,15 @@ object NativeBridge {
 
     @JvmStatic
     fun redirect(path: String?): String? {
+        val raw = KrPathUtils.normalizeFilePath(path)
+        val normalized = KrPathUtils.canonicalizeKrStoragePath(raw)
+        KrPathUtils.redirectScopedSavePath(normalized)?.let { return it }
+        if (normalized != null && normalized != path) return normalized
+        return null
+    }
+
+    @JvmStatic
+    fun redirectScopedSave(path: String?): String? {
         val normalized = KrPathUtils.canonicalizeKrStoragePath(KrPathUtils.normalizeFilePath(path))
         return KrPathUtils.redirectScopedSavePath(normalized)
     }
