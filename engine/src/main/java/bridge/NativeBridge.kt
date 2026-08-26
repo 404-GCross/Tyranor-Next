@@ -100,7 +100,16 @@ object NativeBridge {
         val raw = KrPathUtils.normalizeFilePath(path)
         val normalized = KrPathUtils.canonicalizeKrStoragePath(raw)
         KrPathUtils.redirectScopedSavePath(normalized)?.let { return it }
-        if (raw != null && normalized != null && raw != normalized) return normalized
+
+        // 纯路径规范化必须返回：file://、相对路径、缺少开头 "/" 等。
+        // 否则 C++ 会把未规范化的原始路径直接交给 libc，file:// 等路径无法打开。
+        if (path != null && raw != null && raw != path) {
+            return normalized ?: raw
+        }
+
+        // 大小写修正不在这里返回，避免跳过 NativeBridge.open() 的 Java/SAF fallback。
+        // open() 内部会先按 canonicalize 后的正确大小写路径直接打开，
+        // 失败后再走 SAF mirror / SAF fallback。
         return null
     }
 
