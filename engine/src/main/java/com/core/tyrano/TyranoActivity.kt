@@ -134,7 +134,16 @@ class TyranoActivity : Activity() {
                 WebGameType.RPG_MZ -> RPG_MZ_HOOK_ASSET
                 WebGameType.VN, WebGameType.WEB_OTHER -> null
             }
-            val hook = hookAsset?.let { assets.open(it).buffered().use { input -> input.readBytes() } } ?: ByteArray(0)
+            // 触屏手柄（issue #35）：MV/MZ 共用 __touch_pad.js，拼接进 hook 注入，
+            // 独立于修改器开关。手柄代码零引擎依赖，MV/MZ 的 Input 均读 keyCode。
+            val touchPad =
+                if (webGameType == WebGameType.RPG_MV || webGameType == WebGameType.RPG_MZ) {
+                    loadAsset(TOUCH_PAD_ASSET)
+                } else {
+                    ByteArray(0)
+                }
+            val hook = (hookAsset?.let { assets.open(it).buffered().use { input -> input.readBytes() } } ?: ByteArray(0)) +
+                touchPad
             val scriptAppends = if (webGameType == WebGameType.RPG_MZ) {
                 mapOf(
                     "js/rmmz_core.js" to loadAsset(RPG_MZ_CORE_HOOK_ASSET),
@@ -846,6 +855,7 @@ class TyranoActivity : Activity() {
         private const val TYRANO_HOOK_ASSET = "__tyrano__.js"
         private const val RPG_MV_HOOK_ASSET = "__rpg__.js"
         private const val RPG_MZ_HOOK_ASSET = "__rmmz__.js"
+        private const val TOUCH_PAD_ASSET = "__touch_pad.js"
         private const val RPG_MZ_CORE_HOOK_ASSET = "__hook_rmmz_core.js"
         private const val RPG_MZ_MANAGERS_HOOK_ASSET = "__hook_rmmz_managers.js"
         private const val JS_BRIDGE_NAME = "appJsInterface"
