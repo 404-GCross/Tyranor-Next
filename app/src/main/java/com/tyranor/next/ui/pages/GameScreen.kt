@@ -134,17 +134,19 @@ fun GameScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val games = libraryState.games
-    var selectedGame by remember { mutableStateOf<ScanGame?>(null) }
+    var selectedGameUri by rememberSaveable { mutableStateOf<String?>(null) }
+    val selectedGame = remember(games, selectedGameUri) {
+        selectedGameUri?.let { uri -> games.firstOrNull { it.uri == uri } }
+    }
     var launchError by remember { mutableStateOf<String?>(null) }
     var patchLaunchTarget by remember { mutableStateOf<ScanGame?>(null) }
 
     val gridState = rememberLazyGridState()
     val scrapeTaskState = CoverScrapeTaskManager.state.value
 
-    LaunchedEffect(games) {
-        selectedGame = selectedGame?.let { selected ->
-            games.firstOrNull { it.uri == selected.uri }
-        }
+    LaunchedEffect(libraryState.loaded, games, selectedGameUri) {
+        val uri = selectedGameUri ?: return@LaunchedEffect
+        if (libraryState.loaded && games.none { it.uri == uri }) selectedGameUri = null
     }
 
     LaunchedEffect(libraryState.scrapeEventId, libraryState.scrapeMessage) {
@@ -154,12 +156,11 @@ fun GameScreen(
     }
 
     fun replaceGame(updated: ScanGame) {
-        selectedGame = selectedGame?.let { if (it.uri == updated.uri) updated else it }
         onGameUpdated(updated)
     }
 
     fun deleteGame(target: ScanGame) {
-        selectedGame = null
+        if (selectedGameUri == target.uri) selectedGameUri = null
         onGameDeleted(target)
     }
 
@@ -201,7 +202,7 @@ fun GameScreen(
         dirPickerLaunch = { dirPicker.launch(null) },
         syncMissingCovers = { syncMissingCovers() },
         refreshGames = { scanLibrary() },
-        onGameClick = { selectedGame = it },
+        onGameClick = { selectedGameUri = it.uri },
         onGameLongClick = { game ->
             if (EngineLauncher.needsArtemisPatchConfirm(context, game)) {
                 patchLaunchTarget = game
@@ -216,14 +217,14 @@ fun GameScreen(
         key(game.uri) {
             GameActionsSheet(
                 game = game,
-                onDismiss = { selectedGame = null },
+                onDismiss = { selectedGameUri = null },
                 onGameUpdated = { replaceGame(it) },
                 onDeleteGame = { deleteGame(game) },
                 quickLaunched = libraryState.quickLaunch.any { it.uri == game.uri },
                 onQuickLaunchToggle = { onQuickLaunchToggle(game) },
                 onEngineSettings = {
                     startActivityWithPageTransition(context, PerGameSettingsActivity.createIntent(context, game))
-                    selectedGame = null
+                    selectedGameUri = null
                 },
             )
         }
@@ -476,15 +477,15 @@ internal fun GameActionsSheet(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var launchError by remember { mutableStateOf<String?>(null) }
-    var showCoverSourcePicker by remember { mutableStateOf(false) }
-    var coverSearchSource by remember { mutableStateOf<String?>(null) }
+    var launchError by rememberSaveable(game.uri) { mutableStateOf<String?>(null) }
+    var showCoverSourcePicker by rememberSaveable(game.uri) { mutableStateOf(false) }
+    var coverSearchSource by rememberSaveable(game.uri) { mutableStateOf<String?>(null) }
     var coverBinding by remember { mutableStateOf(false) }
-    var coverBindError by remember { mutableStateOf<String?>(null) }
-    var showDeleteConfirm by remember { mutableStateOf(false) }
-    var showLaunchFilePicker by remember { mutableStateOf(false) }
-    var showRenameDialog by remember { mutableStateOf(false) }
-    var showPatchConfirm by remember { mutableStateOf(false) }
+    var coverBindError by rememberSaveable(game.uri) { mutableStateOf<String?>(null) }
+    var showDeleteConfirm by rememberSaveable(game.uri) { mutableStateOf(false) }
+    var showLaunchFilePicker by rememberSaveable(game.uri) { mutableStateOf(false) }
+    var showRenameDialog by rememberSaveable(game.uri) { mutableStateOf(false) }
+    var showPatchConfirm by rememberSaveable(game.uri) { mutableStateOf(false) }
 
     fun isBatchScrapingActive(): Boolean {
         if (!CoverScrapeTaskManager.state.value.running) return false
@@ -825,7 +826,7 @@ private fun CoverSearchDialog(
     onBind: (CoverSearchCandidate) -> Unit,
 ) {
     val context = LocalContext.current
-    var keyword by remember(source, game.uri) { mutableStateOf(game.title) }
+    var keyword by rememberSaveable(source, game.uri) { mutableStateOf(game.title) }
     var searching by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var candidates by remember { mutableStateOf<List<CoverSearchCandidate>>(emptyList()) }
@@ -877,7 +878,7 @@ private fun CoverSearchDialog(
                     .padding(horizontal = 12.dp, vertical = 12.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                val gridColumns = if (maxWidth >= 620.dp) 3 else 2
+                val gridColumns = if (isWideScreen()) 4 else 3
                 val dialogHeightModifier = if (imeVisible || maxHeight < CoverSearchDialogMaxHeight) {
                     Modifier.fillMaxHeight()
                 } else {
@@ -954,7 +955,7 @@ private fun CoverSearchDialog(
                                 LazyVerticalGrid(
                                     columns = GridCells.Fixed(gridColumns),
                                     modifier = Modifier.fillMaxSize(),
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
                                     verticalArrangement = Arrangement.spacedBy(12.dp),
                                 ) {
                                     gridItems(candidates, key = { "${it.source}:${it.id}:${it.coverUrl}" }) { candidate ->
@@ -997,18 +998,11 @@ private fun CoverCandidateCard(
     onClick: () -> Unit,
 ) {
     val previewState by rememberCandidateCoverPreview(candidate)
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .background(NavWhite)
-            .clickable(onClick = onClick)
-            .padding(6.dp),
-    ) {
+    Column(Modifier.fillMaxWidth().clickable(onClick = onClick)) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(2f / 3f)
+                .aspectRatio(3f / 4f)
                 .clip(RoundedCornerShape(8.dp))
                 .background(PageGrey),
             contentAlignment = Alignment.Center,
@@ -1037,14 +1031,8 @@ private fun CoverCandidateCard(
             style = MaterialTheme.typography.bodyMedium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(top = 6.dp),
-        )
-        Text(
-            candidate.detail.ifBlank { candidate.subtitle },
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
         )
     }
 }
