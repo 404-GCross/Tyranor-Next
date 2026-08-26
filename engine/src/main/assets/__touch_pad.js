@@ -405,30 +405,37 @@ window.addEventListener('load', () => {
     e.dispatchEvent(evtObj)
   }
   const setEventStart = (e, keyCodes) => {
-    e.addEventListener('touchstart', (evt) => {
+    const press = (evt) => {
       evt.stopPropagation()
       evt.preventDefault()
       setKeyDownColor(e)
       keyCodes.forEach(keyCode => {
         startKeyEvent(e, keyCode, 'keydown')
       })
-    })
+    }
+    // 触摸路径 preventDefault 会阻止浏览器合成鼠标事件，不会双触发；
+    // 虚拟鼠标（__tyranor_mouse）只派发 MouseEvent，靠这里的 mousedown 命中
+    e.addEventListener('touchstart', press)
+    e.addEventListener('mousedown', press)
   }
   const setEventMove = (e) => {
     e.addEventListener('touchmove', (evt) => {
       evt.stopPropagation()
       evt.preventDefault()
     })
+    e.addEventListener('mousemove', (evt) => { evt.stopPropagation() })
   }
   const setEventEnd = (e, keyCodes) => {
-    e.addEventListener('touchend', (evt) => {
+    const release = (evt) => {
       evt.stopPropagation()
       evt.preventDefault()
       setKeyUpColor(e)
       keyCodes.forEach(keyCode => {
         startKeyEvent(e, keyCode, 'keyup')
       })
-    })
+    }
+    e.addEventListener('touchend', release)
+    e.addEventListener('mouseup', release)
   }
   const getDistance = (x1, y1, x2, y2) => {
     return Math.sqrt((x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2))
@@ -533,34 +540,62 @@ window.addEventListener('load', () => {
       udlrElement.children.item(i).style.display = useDir8 ? 'block' : 'none'
     }
   })
+  const joyStart = (x, y) => {
+    joyStick.style.left = `${x - joyStickCX}px`
+    joyStick.style.top = `${y - joyStickCY}px`
+    startMoveEvent({ clientX: x, clientY: y })
+  }
+  const joyMove = (x, y) => {
+    const subLen = getDistance(x, y, joyStickCX, joyStickCY)
+    if (subLen > joyStickSR) {
+      joyStick.style.left = `${(x - joyStickCX) * joyStickSR / subLen}px`
+      joyStick.style.top = `${(y - joyStickCY) * joyStickSR / subLen}px`
+    } else {
+      joyStick.style.left = `${x - joyStickCX}px`
+      joyStick.style.top = `${y - joyStickCY}px`
+    }
+    startMoveEvent({ clientX: x, clientY: y })
+  }
+  const joyEnd = () => {
+    joyStick.style.left = '0px'
+    joyStick.style.top = '0px'
+    endMoveEvent()
+  }
   joyStickStage.addEventListener('touchstart', (evt) => {
     evt.stopPropagation()
     evt.preventDefault()
     const touch = evt.targetTouches[0]
-    joyStick.style.left = `${touch.clientX - joyStickCX}px`
-    joyStick.style.top = `${touch.clientY - joyStickCY}px`
-    startMoveEvent(touch)
+    joyStart(touch.clientX, touch.clientY)
   })
   joyStickStage.addEventListener('touchmove', (evt) => {
     evt.stopPropagation()
     evt.preventDefault()
     const touch = evt.targetTouches[0]
-    const subLen = getDistance(touch.clientX, touch.clientY, joyStickCX, joyStickCY)
-    if (subLen > joyStickSR) {
-      joyStick.style.left = `${(touch.clientX - joyStickCX) * joyStickSR / subLen}px`
-      joyStick.style.top = `${(touch.clientY - joyStickCY) * joyStickSR / subLen}px`
-    } else {
-      joyStick.style.left = `${touch.clientX - joyStickCX}px`
-      joyStick.style.top = `${touch.clientY - joyStickCY}px`
-    }
-    startMoveEvent(touch)
+    joyMove(touch.clientX, touch.clientY)
   })
   joyStickStage.addEventListener('touchend', (evt) => {
     evt.stopPropagation()
     evt.preventDefault()
-    joyStick.style.left = '0px'
-    joyStick.style.top = '0px'
-    endMoveEvent()
+    joyEnd()
+  })
+  // 虚拟鼠标拖拽摇杆：光标按下后跟随 mousemove
+  let joyMouseDown = false
+  joyStickStage.addEventListener('mousedown', (evt) => {
+    evt.stopPropagation()
+    evt.preventDefault()
+    joyMouseDown = true
+    joyStart(evt.clientX, evt.clientY)
+  })
+  window.addEventListener('mousemove', (evt) => {
+    if (!joyMouseDown) return
+    evt.stopPropagation()
+    joyMove(evt.clientX, evt.clientY)
+  })
+  window.addEventListener('mouseup', (evt) => {
+    if (!joyMouseDown) return
+    evt.stopPropagation()
+    joyMouseDown = false
+    joyEnd()
   })
   actionsBtns.forEach(it => {
     const childElement = document.createElement('div')
