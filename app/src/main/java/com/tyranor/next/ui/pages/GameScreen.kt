@@ -12,6 +12,8 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,14 +23,18 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items as lazyItems
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -53,6 +59,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -62,8 +69,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -72,8 +81,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import top.yukonga.miuix.kmp.basic.RadioButton
-import top.yukonga.miuix.kmp.theme.MiuixTheme
 import com.tyranor.next.R
 import com.tyranor.next.scanner.CoverImageCache
 import com.tyranor.next.scanner.CoverScrapeTaskManager
@@ -100,6 +110,7 @@ import com.tyranor.next.ui.common.TopBarIcon
 import com.tyranor.next.ui.common.glassNavBottomInset
 import com.tyranor.next.ui.common.isWideScreen
 import com.tyranor.next.ui.main.MainLibraryUiState
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -107,6 +118,7 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 import java.io.File
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
@@ -124,17 +136,19 @@ fun GameScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val games = libraryState.games
-    var selectedGame by remember { mutableStateOf<ScanGame?>(null) }
+    var selectedGameUri by rememberSaveable { mutableStateOf<String?>(null) }
+    val selectedGame = remember(games, selectedGameUri) {
+        selectedGameUri?.let { uri -> games.firstOrNull { it.uri == uri } }
+    }
     var launchError by remember { mutableStateOf<String?>(null) }
     var patchLaunchTarget by remember { mutableStateOf<ScanGame?>(null) }
 
     val gridState = rememberLazyGridState()
     val scrapeTaskState = CoverScrapeTaskManager.state.value
 
-    LaunchedEffect(games) {
-        selectedGame = selectedGame?.let { selected ->
-            games.firstOrNull { it.uri == selected.uri }
-        }
+    LaunchedEffect(libraryState.loaded, games, selectedGameUri) {
+        val uri = selectedGameUri ?: return@LaunchedEffect
+        if (libraryState.loaded && games.none { it.uri == uri }) selectedGameUri = null
     }
 
     LaunchedEffect(libraryState.scrapeEventId, libraryState.scrapeMessage) {
@@ -144,12 +158,11 @@ fun GameScreen(
     }
 
     fun replaceGame(updated: ScanGame) {
-        selectedGame = selectedGame?.let { if (it.uri == updated.uri) updated else it }
         onGameUpdated(updated)
     }
 
     fun deleteGame(target: ScanGame) {
-        selectedGame = null
+        if (selectedGameUri == target.uri) selectedGameUri = null
         onGameDeleted(target)
     }
 
@@ -191,7 +204,7 @@ fun GameScreen(
         dirPickerLaunch = { dirPicker.launch(null) },
         syncMissingCovers = { syncMissingCovers() },
         refreshGames = { scanLibrary() },
-        onGameClick = { selectedGame = it },
+        onGameClick = { selectedGameUri = it.uri },
         onGameLongClick = { game ->
             if (EngineLauncher.needsArtemisPatchConfirm(context, game)) {
                 patchLaunchTarget = game
@@ -206,14 +219,14 @@ fun GameScreen(
         key(game.uri) {
             GameActionsSheet(
                 game = game,
-                onDismiss = { selectedGame = null },
+                onDismiss = { selectedGameUri = null },
                 onGameUpdated = { replaceGame(it) },
                 onDeleteGame = { deleteGame(game) },
                 quickLaunched = libraryState.quickLaunch.any { it.uri == game.uri },
                 onQuickLaunchToggle = { onQuickLaunchToggle(game) },
                 onEngineSettings = {
                     startActivityWithPageTransition(context, PerGameSettingsActivity.createIntent(context, game))
-                    selectedGame = null
+                    selectedGameUri = null
                 },
             )
         }
@@ -466,15 +479,15 @@ internal fun GameActionsSheet(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var launchError by remember { mutableStateOf<String?>(null) }
-    var showCoverSourcePicker by remember { mutableStateOf(false) }
-    var coverSearchSource by remember { mutableStateOf<String?>(null) }
+    var launchError by remember(game.uri) { mutableStateOf<String?>(null) }
+    var showCoverSourcePicker by rememberSaveable(game.uri) { mutableStateOf(false) }
+    var coverSearchSource by rememberSaveable(game.uri) { mutableStateOf<String?>(null) }
     var coverBinding by remember { mutableStateOf(false) }
-    var coverBindError by remember { mutableStateOf<String?>(null) }
-    var showDeleteConfirm by remember { mutableStateOf(false) }
-    var showLaunchFilePicker by remember { mutableStateOf(false) }
-    var showRenameDialog by remember { mutableStateOf(false) }
-    var showPatchConfirm by remember { mutableStateOf(false) }
+    var coverBindError by rememberSaveable(game.uri) { mutableStateOf<String?>(null) }
+    var showDeleteConfirm by rememberSaveable(game.uri) { mutableStateOf(false) }
+    var showLaunchFilePicker by rememberSaveable(game.uri) { mutableStateOf(false) }
+    var showRenameDialog by rememberSaveable(game.uri) { mutableStateOf(false) }
+    var showPatchConfirm by rememberSaveable(game.uri) { mutableStateOf(false) }
 
     fun isBatchScrapingActive(): Boolean {
         if (!CoverScrapeTaskManager.state.value.running) return false
@@ -738,7 +751,7 @@ private fun RenameGameDialog(
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit,
 ) {
-    var title by remember(game.uri, game.title) { mutableStateOf(game.title) }
+    var title by rememberSaveable(game.uri, game.title) { mutableStateOf(game.title) }
     val normalizedTitle = title.trim()
     val canConfirm = normalizedTitle.isNotEmpty() && normalizedTitle != game.title
 
@@ -815,15 +828,19 @@ private fun CoverSearchDialog(
     onBind: (CoverSearchCandidate) -> Unit,
 ) {
     val context = LocalContext.current
-    var keyword by remember(source, game.uri) { mutableStateOf(game.title) }
+    var keyword by rememberSaveable(source, game.uri) { mutableStateOf(game.title) }
     var searching by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
-    var candidates by remember { mutableStateOf<List<CoverSearchCandidate>>(emptyList()) }
+    var error by rememberSaveable(source, game.uri) { mutableStateOf<String?>(null) }
+    var candidates by rememberSaveable(source, game.uri, stateSaver = CoverSearchCandidatesSaver) {
+        mutableStateOf(emptyList<CoverSearchCandidate>())
+    }
     val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
+    val imeVisible = WindowInsets.ime.getBottom(density) > 0
 
     fun search() {
         val query = keyword.trim()
-        if (query.isEmpty() || searching) return
+        if (query.isEmpty() || searching || binding) return
         scope.launch {
             searching = true
             error = null
@@ -840,6 +857,8 @@ private fun CoverSearchDialog(
                         error = result.message
                     }
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 error = e.message ?: "封面搜索失败"
             } finally {
@@ -848,66 +867,170 @@ private fun CoverSearchDialog(
         }
     }
 
-    AppAlertDialog(
+    Dialog(
         onDismissRequest = onDismiss,
-        title = { Text("搜索${coverSourceTitle(source)}封面", style = MaterialTheme.typography.titleMedium) },
-        text = {
-            Column {
-                AppSearchField(
-                    query = keyword,
-                    onQueryChange = { keyword = it },
-                    onSearch = { search() },
-                    textStyle = MiuixTheme.textStyles.subtitle,
-                )
-                if (binding) {
-                    Text(
-                        "正在绑定封面…",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 8.dp),
-                    )
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.5f)),
+        ) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .pointerInput(Unit) { detectTapGestures { onDismiss() } },
+            )
+            BoxWithConstraints(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .statusBarsPadding()
+                    .then(if (imeVisible) Modifier.imePadding() else Modifier.navigationBarsPadding())
+                    .padding(horizontal = 12.dp, vertical = 12.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                val dialogHeightModifier = if (imeVisible || maxHeight < CoverSearchDialogMaxHeight) {
+                    Modifier.fillMaxHeight()
+                } else {
+                    Modifier.height(CoverSearchDialogMaxHeight)
                 }
-                bindError?.let {
-                    Text(
-                        it,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(top = 8.dp),
-                    )
-                }
-                error?.let {
-                    Text(
-                        it,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(top = 8.dp),
-                    )
-                }
-                if (candidates.isNotEmpty()) {
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(2),
-                        modifier = Modifier.fillMaxWidth().height(280.dp).padding(top = 8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        gridItems(candidates, key = { "${it.source}:${it.id}:${it.coverUrl}" }) { candidate ->
-                            CoverCandidateCard(candidate = candidate, onClick = { if (!binding) onBind(candidate) })
+                val canSearch = keyword.trim().isNotEmpty() && !searching && !binding
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .widthIn(max = CoverSearchDialogMaxWidth)
+                        .then(dialogHeightModifier)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(NavWhite)
+                        .pointerInput(Unit) { detectTapGestures { } },
+                ) {
+                    Column(Modifier.fillMaxSize()) {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 16.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                "搜索 ${coverSourceTitle(source)} 封面",
+                                style = MaterialTheme.typography.titleMedium,
+                            )
+                        }
+                        Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
+                            AppSearchField(
+                                query = keyword,
+                                onQueryChange = { keyword = it },
+                                onSearch = { search() },
+                                textStyle = MaterialTheme.typography.bodyMedium,
+                            )
+                            if (searching) {
+                                Text(
+                                    "正在搜索封面…",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(top = 8.dp),
+                                )
+                            }
+                            if (binding) {
+                                Text(
+                                    "正在绑定封面…",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(top = 8.dp),
+                                )
+                            }
+                            bindError?.let {
+                                Text(
+                                    it,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.padding(top = 8.dp),
+                                )
+                            }
+                            error?.let {
+                                Text(
+                                    it,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.padding(top = 8.dp),
+                                )
+                            }
+                        }
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f)
+                                .padding(horizontal = 18.dp, vertical = 12.dp),
+                        ) {
+                            if (candidates.isNotEmpty()) {
+                                LazyVerticalGrid(
+                                    columns = GridCells.Adaptive(CoverSearchCandidateMinWidth),
+                                    modifier = Modifier.fillMaxSize(),
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                                ) {
+                                    gridItems(candidates, key = { "${it.source}:${it.id}:${it.coverUrl}" }) { candidate ->
+                                        CoverCandidateCard(
+                                            candidate = candidate,
+                                            onClick = { if (!binding) onBind(candidate) },
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            TextButton(onClick = onDismiss) {
+                                Text("关闭", style = MaterialTheme.typography.bodyMedium)
+                            }
+                            TextButton(
+                                onClick = { search() },
+                                enabled = canSearch,
+                            ) {
+                                Text(if (searching) "搜索中…" else "搜索", style = MaterialTheme.typography.bodyMedium)
+                            }
                         }
                     }
                 }
             }
-        },
-        dismissButton = {
-            TextButton(
-                onClick = { search() },
-                enabled = !searching && !binding,
-            ) {
-                Text(if (searching) "搜索中…" else "搜索")
-            }
-        },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("关闭") } },
-    )
+        }
+    }
 }
+
+private val CoverSearchDialogMaxWidth: Dp = 720.dp
+private val CoverSearchDialogMaxHeight: Dp = 620.dp
+private val CoverSearchCandidateMinWidth: Dp = 150.dp
+
+private val CoverSearchCandidatesSaver = listSaver<List<CoverSearchCandidate>, String>(
+    save = { candidates -> candidates.map { encodeCoverSearchCandidate(it) } },
+    restore = { savedCandidates -> savedCandidates.mapNotNull { decodeCoverSearchCandidate(it) } },
+)
+
+private fun encodeCoverSearchCandidate(candidate: CoverSearchCandidate): String =
+    JSONObject()
+        .put("source", candidate.source)
+        .put("id", candidate.id)
+        .put("title", candidate.title)
+        .put("subtitle", candidate.subtitle)
+        .put("detail", candidate.detail)
+        .put("score", candidate.score)
+        .put("coverUrl", candidate.coverUrl)
+        .toString()
+
+private fun decodeCoverSearchCandidate(encoded: String): CoverSearchCandidate? = runCatching {
+    val json = JSONObject(encoded)
+    CoverSearchCandidate(
+        source = json.optString("source"),
+        id = json.optString("id"),
+        title = json.optString("title"),
+        subtitle = json.optString("subtitle"),
+        detail = json.optString("detail"),
+        score = if (json.has("score") && !json.isNull("score")) json.optInt("score") else null,
+        coverUrl = json.optString("coverUrl"),
+    )
+}.getOrNull()
 
 @Composable
 private fun CoverCandidateCard(
@@ -915,14 +1038,7 @@ private fun CoverCandidateCard(
     onClick: () -> Unit,
 ) {
     val previewState by rememberCandidateCoverPreview(candidate)
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .background(NavWhite)
-            .clickable(onClick = onClick)
-            .padding(6.dp),
-    ) {
+    Column(Modifier.fillMaxWidth().clickable(onClick = onClick)) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -955,14 +1071,8 @@ private fun CoverCandidateCard(
             style = MaterialTheme.typography.bodyMedium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(top = 6.dp),
-        )
-        Text(
-            candidate.detail.ifBlank { candidate.subtitle },
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
         )
     }
 }

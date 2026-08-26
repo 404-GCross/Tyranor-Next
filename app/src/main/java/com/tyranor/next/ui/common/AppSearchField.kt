@@ -32,7 +32,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
  * @param onSearch 键盘 IME 动作回调；即时过滤场景可不传（默认空实现）
  * @param leadingIcon 前导图标 drawable；null 用默认搜索图标，非搜索语义必须传对应图标
  * @param iconContentDescription 无障碍描述，跟随图标语义
- * @param textStyle 输入文字样式；null 用 miuix 默认 `main`（17sp），需要其他字号可传（如弹窗场景传 `subtitle`）
+ * @param textStyle 输入文字样式；null 用 miuix 默认 `main`（17sp），需要其他字号可传（如弹窗场景传 `bodyMedium`）
  */
 @Composable
 fun AppSearchField(
