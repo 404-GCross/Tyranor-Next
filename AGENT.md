@@ -152,6 +152,32 @@ Column(fillMaxSize)                                // 页面根
 
 ---
 
+## 开关按钮统一规范
+
+所有需要**布尔二态开关**（开/关）的场景，必须统一使用 **Miuix 风格** 的开关组件，禁止混用 Material3 的 `Switch` 或其他库的开关，避免深浅色 / 主题色 / 触感样式不一致。
+
+### 1. 组件选型（按场景二选一）
+
+- **设置条目式开关**（标题行 + 右侧开关，如设置清单中的配置项）：统一使用
+  `top.yukonga.miuix.kmp.preference.SwitchPreference`（title / checked / onCheckedChange）。
+- **行内独立开关**（列表项右端内嵌、无标题行的纯开关）：统一使用
+  `top.yukonga.miuix.kmp.basic.Switch`（checked / onCheckedChange）。
+
+### 2. 现有调用点（新增场景照此对齐）
+
+| 场景 | 位置 | 组件 |
+|---|---|---|
+| 设置清单开关（KRKR/ONS/Artemis/RPG Maker 等） | `SettingsScreen.kt` | `SwitchPreference` |
+| 应用设置开关（色调切换 / 圆角导航等） | `AppSettingsActivity.kt` | `SwitchPreference` |
+| 封面来源启用开关（行内） | `CoverScraperSettingsActivity.kt`（CoverSourceRow） | `Switch` |
+
+### 3. 例外
+
+- 三态「跟随全局 / 开 / 关」等**非布尔**选择（如 `PerGameSettingsScreen.kt` 的 `OverrideSwitch`）不属于开关按钮范畴，用 Miuix `OverlayDropdownPreference` 实现，不受本节约束。
+- 引擎原生代码（engine 模块）内的开关不属于 Compose 层，不适用本节。
+
+---
+
 ## 主题色调统一使用规范
 
 应用主题色（primary）由用户通过 **应用设置 → 色调轮盘** 修改，必须全局统一生效。规范如下：
