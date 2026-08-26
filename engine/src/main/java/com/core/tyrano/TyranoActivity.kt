@@ -138,7 +138,7 @@ class TyranoActivity : Activity() {
             // 独立于修改器开关。手柄代码零引擎依赖，MV/MZ 的 Input 均读 keyCode。
             val touchPad =
                 if (webGameType == WebGameType.RPG_MV || webGameType == WebGameType.RPG_MZ) {
-                    loadAsset(TOUCH_PAD_ASSET)
+                    try { loadAsset(TOUCH_PAD_ASSET) } catch (_: Exception) { ByteArray(0) }
                 } else {
                     ByteArray(0)
                 }

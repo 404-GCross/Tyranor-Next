@@ -6,6 +6,7 @@
   var launcher = null;
   var dragState = null; // { startX, startY, startLeft, startTop, moved }
   var justDragged = false; // pointerup 设 true，click 消费后复位
+  var userDragged = false; // 用户手动拖拽过，positionLauncher 不再覆盖
   var LAUNCHER_POS_KEY = "tyranor_mod_fab_pos";
   var activeTab = "quick";
   var context = { actorId: 0, itemKind: "item", systemKind: "switch" };
@@ -214,16 +215,19 @@
       launcher.style.top = Math.max(0, Math.min(window.innerHeight - launcher.offsetHeight, dragState.startTop + dy)) + "px";
       launcher.style.right = "auto";
     });
-    launcher.addEventListener("pointerup", function (event) {
+    var endDrag = function (event) {
       if (dragState && dragState.moved) {
         justDragged = true;
+        userDragged = true;
         setTimeout(function () { justDragged = false; }, 100);
         launcher.style.left = launcher.offsetLeft + "px";
         launcher.style.top = launcher.offsetTop + "px";
         try { localStorage.setItem(LAUNCHER_POS_KEY, launcher.offsetLeft + "," + launcher.offsetTop); } catch (e) {}
       }
       dragState = null;
-    });
+    };
+    launcher.addEventListener("pointerup", endDrag);
+    launcher.addEventListener("pointercancel", function () { dragState = null; });
     document.body.appendChild(launcher);
     // 恢复上次拖拽位置
     try {
@@ -235,7 +239,7 @@
           launcher.style.left = sx + "px";
           launcher.style.top = sy + "px";
           launcher.style.right = "auto";
-          return; // 已定位，跳过 positionLauncher
+          userDragged = true;
         }
       }
     } catch (e) {}
@@ -245,15 +249,13 @@
     window.addEventListener("resize", positionLauncher);
   }
   function positionLauncher() {
-    if (!launcher) return;
+    if (!launcher || userDragged) return;
     var pad = window.__touchPadMetrics;
     var w = launcher.offsetWidth || 46;
     if (pad && pad.actionLeft > 0 && window.innerWidth > pad.actionLeft + w + 20) {
-      // 动作键列在屏幕内：FAB 放在其左侧
       launcher.style.right = "auto";
       launcher.style.left = Math.max(8, Math.round(pad.actionLeft - w - 12)) + "px";
     } else {
-      // 动作键列超出屏幕或无手柄：FAB 回到右侧
       launcher.style.left = "";
       launcher.style.right = "10px";
     }
