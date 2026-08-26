@@ -12,6 +12,8 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,14 +23,18 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items as lazyItems
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -62,8 +68,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -72,6 +80,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import top.yukonga.miuix.kmp.basic.RadioButton
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import com.tyranor.next.R
@@ -820,10 +830,12 @@ private fun CoverSearchDialog(
     var error by remember { mutableStateOf<String?>(null) }
     var candidates by remember { mutableStateOf<List<CoverSearchCandidate>>(emptyList()) }
     val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
+    val imeVisible = WindowInsets.ime.getBottom(density) > 0
 
     fun search() {
         val query = keyword.trim()
-        if (query.isEmpty() || searching) return
+        if (query.isEmpty() || searching || binding) return
         scope.launch {
             searching = true
             error = null
@@ -848,66 +860,136 @@ private fun CoverSearchDialog(
         }
     }
 
-    AppAlertDialog(
+    Dialog(
         onDismissRequest = onDismiss,
-        title = { Text("搜索${coverSourceTitle(source)}封面", style = MaterialTheme.typography.titleMedium) },
-        text = {
-            Column {
-                AppSearchField(
-                    query = keyword,
-                    onQueryChange = { keyword = it },
-                    onSearch = { search() },
-                    textStyle = MiuixTheme.textStyles.subtitle,
-                )
-                if (binding) {
-                    Text(
-                        "正在绑定封面…",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 8.dp),
-                    )
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.5f)),
+        ) {
+            Box(Modifier.fillMaxSize().clickable(onClick = onDismiss))
+            BoxWithConstraints(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(if (imeVisible) Modifier.imePadding() else Modifier.navigationBarsPadding())
+                    .padding(horizontal = 12.dp, vertical = 12.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                val gridColumns = if (maxWidth >= 620.dp) 3 else 2
+                val dialogHeightModifier = if (imeVisible || maxHeight < CoverSearchDialogMaxHeight) {
+                    Modifier.fillMaxHeight()
+                } else {
+                    Modifier.height(CoverSearchDialogMaxHeight)
                 }
-                bindError?.let {
-                    Text(
-                        it,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(top = 8.dp),
-                    )
-                }
-                error?.let {
-                    Text(
-                        it,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(top = 8.dp),
-                    )
-                }
-                if (candidates.isNotEmpty()) {
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(2),
-                        modifier = Modifier.fillMaxWidth().height(280.dp).padding(top = 8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        gridItems(candidates, key = { "${it.source}:${it.id}:${it.coverUrl}" }) { candidate ->
-                            CoverCandidateCard(candidate = candidate, onClick = { if (!binding) onBind(candidate) })
+                val canSearch = keyword.trim().isNotEmpty() && !searching && !binding
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .widthIn(max = CoverSearchDialogMaxWidth)
+                        .then(dialogHeightModifier)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color.White)
+                        .pointerInput(Unit) { detectTapGestures { } },
+                ) {
+                    Column(Modifier.fillMaxSize()) {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 16.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                "搜索 ${coverSourceTitle(source)} 封面",
+                                style = MaterialTheme.typography.titleMedium,
+                            )
+                        }
+                        Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
+                            AppSearchField(
+                                query = keyword,
+                                onQueryChange = { keyword = it },
+                                onSearch = { search() },
+                                textStyle = MiuixTheme.textStyles.subtitle,
+                            )
+                            if (searching) {
+                                Text(
+                                    "正在搜索封面…",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(top = 8.dp),
+                                )
+                            }
+                            if (binding) {
+                                Text(
+                                    "正在绑定封面…",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(top = 8.dp),
+                                )
+                            }
+                            bindError?.let {
+                                Text(
+                                    it,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.padding(top = 8.dp),
+                                )
+                            }
+                            error?.let {
+                                Text(
+                                    it,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.padding(top = 8.dp),
+                                )
+                            }
+                        }
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f)
+                                .padding(horizontal = 18.dp, vertical = 12.dp),
+                        ) {
+                            if (candidates.isNotEmpty()) {
+                                LazyVerticalGrid(
+                                    columns = GridCells.Fixed(gridColumns),
+                                    modifier = Modifier.fillMaxSize(),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                                ) {
+                                    gridItems(candidates, key = { "${it.source}:${it.id}:${it.coverUrl}" }) { candidate ->
+                                        CoverCandidateCard(
+                                            candidate = candidate,
+                                            onClick = { if (!binding) onBind(candidate) },
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            TextButton(onClick = onDismiss) {
+                                Text("关闭", style = MaterialTheme.typography.bodyMedium)
+                            }
+                            TextButton(
+                                onClick = { search() },
+                                enabled = canSearch,
+                            ) {
+                                Text(if (searching) "搜索中…" else "搜索", style = MaterialTheme.typography.bodyMedium)
+                            }
                         }
                     }
                 }
             }
-        },
-        dismissButton = {
-            TextButton(
-                onClick = { search() },
-                enabled = !searching && !binding,
-            ) {
-                Text(if (searching) "搜索中…" else "搜索")
-            }
-        },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("关闭") } },
-    )
+        }
+    }
 }
+
+private val CoverSearchDialogMaxWidth: Dp = 720.dp
+private val CoverSearchDialogMaxHeight: Dp = 620.dp
 
 @Composable
 private fun CoverCandidateCard(
@@ -926,7 +1008,7 @@ private fun CoverCandidateCard(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(3f / 4f)
+                .aspectRatio(2f / 3f)
                 .clip(RoundedCornerShape(8.dp))
                 .background(PageGrey),
             contentAlignment = Alignment.Center,
