@@ -882,7 +882,6 @@ private fun CoverSearchDialog(
                     .padding(horizontal = 12.dp, vertical = 12.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                val gridColumns = if (isWideScreen()) 4 else 3
                 val dialogHeightModifier = if (imeVisible || maxHeight < CoverSearchDialogMaxHeight) {
                     Modifier.fillMaxHeight()
                 } else {
@@ -957,7 +956,7 @@ private fun CoverSearchDialog(
                         ) {
                             if (candidates.isNotEmpty()) {
                                 LazyVerticalGrid(
-                                    columns = GridCells.Fixed(gridColumns),
+                                    columns = GridCells.Adaptive(CoverSearchCandidateMinWidth),
                                     modifier = Modifier.fillMaxSize(),
                                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                                     verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -995,6 +994,7 @@ private fun CoverSearchDialog(
 
 private val CoverSearchDialogMaxWidth: Dp = 720.dp
 private val CoverSearchDialogMaxHeight: Dp = 620.dp
+private val CoverSearchCandidateMinWidth: Dp = 150.dp
 
 private val CoverSearchCandidatesSaver = listSaver<List<CoverSearchCandidate>, String>(
     save = { candidates -> candidates.map { encodeCoverSearchCandidate(it) } },
