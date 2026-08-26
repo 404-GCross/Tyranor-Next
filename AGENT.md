@@ -140,6 +140,8 @@ Column(fillMaxSize)                                // 页面根
 - `leadingIcon`：左侧图标 drawable；未提供时组件自动使用**默认占位图标** `DEFAULT_LEADING_ICON`，不允许调用方在不该出现空图标时留白。
 - `onClick`：点击回调；传 `null` 表示不可用（整条变灰且不可点击）。
 - 进入跳转的 icon 统一用 `KeyboardArrowRight`，组件内置，调用方不传。
+- **深色模式适配**：左侧图标（PNG drawable）与右侧箭头在深色模式下自动染色为 `Color.White`，浅色模式保持原色不变；不可点击状态（`onClick = null`）保留 `contentAlpha` 衰减。这一适配由组件内部完成，调用方无需处理。
+- 颜色判断依赖全局 `AppThemeColors.isDark` 快照，切换外观模式自动重组刷新，与整体主题保持同步。
 
 ### 2. 现有调用点（新增场景照此对齐）
 
