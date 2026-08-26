@@ -50,6 +50,9 @@ object AppSettingsStore {
     /** 文件夹扫描深度默认值（层级，1..5）。 */
     const val DEFAULT_SCAN_DEPTH = 3
 
+    /** 色调切换默认关闭：中性灰页面背景 + 白色组件。 */
+    const val DEFAULT_TONE_SWITCH_ENABLED = false
+
     /** 游戏排序：按标题字母/字符顺序。 */
     const val GAME_SORT_ALPHA = "alpha"
 
@@ -176,7 +179,7 @@ object AppSettingsStore {
 
     /** 色调切换：开启时使用白色页面背景 + 中性灰组件；关闭时使用中性灰页面背景 + 白色组件。 */
     fun isToneSwitchEnabled(c: Context): Boolean =
-        prefs(c).getBoolean(KEY_TONE_SWITCH, true)
+        prefs(c).getBoolean(KEY_TONE_SWITCH, DEFAULT_TONE_SWITCH_ENABLED)
 
     fun setToneSwitchEnabled(c: Context, enabled: Boolean) =
         prefs(c).edit().putBoolean(KEY_TONE_SWITCH, enabled).apply()
