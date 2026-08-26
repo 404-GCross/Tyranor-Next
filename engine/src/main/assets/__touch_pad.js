@@ -261,21 +261,26 @@ window.addEventListener('load', () => {
   const switchSize = () => `${padSize * 0.3}px`
   const actionBtnH = () => padSize * 0.125
 
-  /* 游戏画布实际显示区域；拿不到时退回整个视口 */
+  /* 游戏画布实际显示区域；拿不到时退回整个视口。
+   * 返回 { rect, fromCanvas }，fromCanvas=false 时 layout 会安排重试。 */
   function gameRect() {
     try {
       const c = window.Graphics && Graphics._canvas
       if (c && c.getBoundingClientRect) {
         const r = c.getBoundingClientRect()
-        if (r.width > 50 && r.height > 50) return r
+        if (r.width > 50 && r.height > 50) return { rect: r, fromCanvas: true }
       }
     } catch (e) { /* 引擎未就绪时用视口 */ }
-    return { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight }
+    return {
+      rect: { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight },
+      fromCanvas: false,
+    }
   }
 
   let actionEls = []
   function layout() {
-    const r = gameRect()
+    const g = gameRect()
+    const r = g.rect
     padSize = Math.min(r.height * 0.4, r.width * 0.25)
     joyStickSR = padSize * 0.5
     joyStickR = joyStickSR * 0.4
@@ -375,10 +380,13 @@ window.addEventListener('load', () => {
       actionBottom: r.top + allMargin + actionEls.length * pitch - 5
     }
     window.dispatchEvent(new Event('tyranorpadlayout'))
-    // 引擎画布晚于 load 出现时，等它就绪后重排一次
-    if (!(window.Graphics && Graphics._canvas) && !layout._retry) {
-      layout._retry = true
-      setTimeout(() => { layout._retry = false; layout() }, 1200)
+    // 引擎画布晚于 load 就绪（不存在或尺寸无效）时链式重试，
+    // 上限 10 次 × 800ms，命中真实画布后停止
+    if (!g.fromCanvas) {
+      layout._retryCount = (layout._retryCount || 0) + 1
+      if (layout._retryCount <= 10) setTimeout(layout, 800)
+    } else {
+      layout._retryCount = 0
     }
   }
 
@@ -482,60 +490,42 @@ window.addEventListener('load', () => {
       endMoveEvent()
     }
   }
-  keySwitchElement.addEventListener('touchstart', (evt) => {
-    evt.stopPropagation()
-    evt.preventDefault()
-    setKeyDownColor(keySwitchElement)
-  })
-  setEventMove(keySwitchElement)
-  keySwitchElement.addEventListener('touchend', (evt) => {
-    evt.stopPropagation()
-    evt.preventDefault()
-    setKeyUpColor(keySwitchElement)
-    if (isKeysShown) {
-      isKeysShown = false
-    } else {
-      isKeysShown = true
+  // 开关通用绑定：press/release 与按钮一致走 touchstart/touchend +
+  // mousedown/mouseup 双路径（虚拟鼠标靠后者命中）
+  const bindSwitch = (el, onRelease) => {
+    el.addEventListener('touchstart', (evt) => {
+      evt.stopPropagation()
+      evt.preventDefault()
+      setKeyDownColor(el)
+    })
+    el.addEventListener('mousedown', (evt) => {
+      evt.stopPropagation()
+      evt.preventDefault()
+      setKeyDownColor(el)
+    })
+    setEventMove(el)
+    const release = (evt) => {
+      evt.stopPropagation()
+      evt.preventDefault()
+      setKeyUpColor(el)
+      onRelease()
     }
+    el.addEventListener('touchend', release)
+    el.addEventListener('mouseup', release)
+  }
+  bindSwitch(keySwitchElement, null, () => {
+    isKeysShown = !isKeysShown
     keySwitchElement.innerText = isKeysShown ? 'Hide' : 'Show'
     layout()
   })
-  joyStickSwitchElement.addEventListener('touchstart', (evt) => {
-    evt.stopPropagation()
-    evt.preventDefault()
-    setKeyDownColor(joyStickSwitchElement)
-  })
-  setEventMove(joyStickSwitchElement)
-  joyStickSwitchElement.addEventListener('touchend', (evt) => {
-    evt.stopPropagation()
-    evt.preventDefault()
-    setKeyUpColor(joyStickSwitchElement)
-    if (useJoyStick) {
-      useJoyStick = false
-      joyStickSwitchElement.innerText = 'Stick'
-    } else {
-      useJoyStick = true
-      joyStickSwitchElement.innerText = 'Button'
-    }
+  bindSwitch(joyStickSwitchElement, null, () => {
+    useJoyStick = !useJoyStick
+    joyStickSwitchElement.innerText = useJoyStick ? 'Button' : 'Stick'
     layout()
   })
-  dir8SwitchElement.addEventListener('touchstart', (evt) => {
-    evt.stopPropagation()
-    evt.preventDefault()
-    setKeyDownColor(dir8SwitchElement)
-  })
-  setEventMove(dir8SwitchElement)
-  dir8SwitchElement.addEventListener('touchend', (evt) => {
-    evt.stopPropagation()
-    evt.preventDefault()
-    setKeyUpColor(dir8SwitchElement)
-    if (useDir8) {
-      dir8SwitchElement.innerText = '8 Dir'
-      useDir8 = false
-    } else {
-      dir8SwitchElement.innerText = '4 Dir'
-      useDir8 = true
-    }
+  bindSwitch(dir8SwitchElement, null, () => {
+    useDir8 = !useDir8
+    dir8SwitchElement.innerText = useDir8 ? '4 Dir' : '8 Dir'
     for (let i = 4; i < udlrElement.children.length; i++) {
       udlrElement.children.item(i).style.display = useDir8 ? 'block' : 'none'
     }
