@@ -98,7 +98,7 @@ fun PerGameSettingsScreen(game: ScanGame) {
     val globalKrScoped = EngineSettingsStore.isKrScopedSaveDir(ctx)
     val globalKrFont = EngineSettingsStore.getKrDefaultFont(ctx)
     val globalForce = EngineSettingsStore.isKrForceDefaultFont(ctx)
-    val globalRenderer = EngineSettingsStore.getKrRenderer(ctx)
+    val configuredGlobalRenderer = EngineSettingsStore.getKrRenderer(ctx)
     val globalOns = remember { EngineSettingsStore.loadOns(ctx) }
     val globalArtVersion = EngineSettingsStore.getArtEngineVersion(ctx)
     val globalArtRotate = EngineSettingsStore.isArtRotateScreen(ctx)
@@ -108,6 +108,9 @@ fun PerGameSettingsScreen(game: ScanGame) {
     val globalRpgMakerMod = EngineSettingsStore.isRpgMakerModEnabled(ctx)
 
     val isSdl3 = (krKernel ?: globalKrKernel) == EngineSettingsStore.KERNEL_KRKRSDL3
+    val globalRenderer = configuredGlobalRenderer.ifEmpty {
+        if (isSdl3) EngineSettingsStore.RENDERER_OPENGL else ""
+    }
     val effVersion = krVersion ?: globalKrVersion
     val krIs134126 = effVersion == EngineSettingsStore.KR_134 || effVersion == EngineSettingsStore.KR_126
 

@@ -566,8 +566,14 @@ private fun LazyListPlaceholder(
                     SwitchPreference(title = "OpenGL 精确渲染", checked = krAccurate == "1", onCheckedChange = { b -> onKrAccurate(if (b) "1" else "0") })
                     EnumSliderRow("内存用量", KR_MEM_MAP, krMem, onKrMem)
                 }
-                DropdownRow("渲染器", KR_RENDERER_MAP, krRenderer.ifEmpty { "default" }) {
-                    onKrRenderer(if (it == "default") "" else it)
+                val rendererOptions = if (isSdl3) KR_SDL3_RENDERER_MAP else KR_RENDERER_MAP
+                val selectedRenderer = if (isSdl3) {
+                    krRenderer.ifEmpty { EngineSettingsStore.RENDERER_OPENGL }
+                } else {
+                    krRenderer.ifEmpty { "default" }
+                }
+                DropdownRow("渲染器", rendererOptions, selectedRenderer) {
+                    onKrRenderer(if (!isSdl3 && it == "default") "" else it)
                 }
                 if (!isSdl3 && (krRenderer == "" || krRenderer == EngineSettingsStore.RENDERER_SOFTWARE)) {
                     EnumSliderRow("软件渲染线程数", KR_THREAD_MAP, krDrawThread, onKrDrawThread)
@@ -781,6 +787,10 @@ private val KR_RENDERER_MAP = listOf(
     "default" to "引擎默认",
     EngineSettingsStore.RENDERER_SOFTWARE to "软件渲染",
     EngineSettingsStore.RENDERER_OPENGL to "OpenGL",
+)
+private val KR_SDL3_RENDERER_MAP = listOf(
+    EngineSettingsStore.RENDERER_OPENGL to "OpenGL（默认）",
+    EngineSettingsStore.RENDERER_SOFTWARE to "软件渲染",
 )
 private val KR_THREAD_MAP = listOf("0" to "自动") + (1..8).map { it.toString() to "$it 线程" }
 private val KR_SW_COMPRESS_MAP = listOf(

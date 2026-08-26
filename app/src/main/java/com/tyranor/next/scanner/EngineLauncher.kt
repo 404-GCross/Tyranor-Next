@@ -468,7 +468,7 @@ object EngineLauncher {
         when (value.trim().lowercase()) {
             EngineSettingsStore.RENDERER_OPENGL, "gl", "gpu" -> EngineSettingsStore.RENDERER_OPENGL
             EngineSettingsStore.RENDERER_SOFTWARE, "sw" -> EngineSettingsStore.RENDERER_SOFTWARE
-            else -> EngineSettingsStore.RENDERER_SOFTWARE
+            else -> EngineSettingsStore.RENDERER_OPENGL
         }
 
     /**
