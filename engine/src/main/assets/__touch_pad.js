@@ -513,17 +513,17 @@ window.addEventListener('load', () => {
     el.addEventListener('touchend', release)
     el.addEventListener('mouseup', release)
   }
-  bindSwitch(keySwitchElement, null, () => {
+  bindSwitch(keySwitchElement, () => {
     isKeysShown = !isKeysShown
     keySwitchElement.innerText = isKeysShown ? 'Hide' : 'Show'
     layout()
   })
-  bindSwitch(joyStickSwitchElement, null, () => {
+  bindSwitch(joyStickSwitchElement, () => {
     useJoyStick = !useJoyStick
     joyStickSwitchElement.innerText = useJoyStick ? 'Button' : 'Stick'
     layout()
   })
-  bindSwitch(dir8SwitchElement, null, () => {
+  bindSwitch(dir8SwitchElement, () => {
     useDir8 = !useDir8
     dir8SwitchElement.innerText = useDir8 ? '4 Dir' : '8 Dir'
     for (let i = 4; i < udlrElement.children.length; i++) {
