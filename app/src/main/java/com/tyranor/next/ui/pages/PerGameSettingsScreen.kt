@@ -186,18 +186,20 @@ fun PerGameSettingsScreen(game: ScanGame) {
                                 OverrideChoice("引擎内核", KR_KERNEL_MAP2, globalKrKernel, krKernel) { krKernel = it }
                             }
                         }
-                        if (!isSdl3) {
-                            item {
-                                SectionCard("渲染") {
+                        item {
+                            SectionCard("渲染") {
+                                if (!isSdl3) {
                                     OverrideSwitch("OpenGL 精确渲染", globalAccurate, krRender[PerGameSettingsStore.F_OGL_ACCURATE_RENDER]!!.value == "1") { b ->
                                         krRender[PerGameSettingsStore.F_OGL_ACCURATE_RENDER]!!.value = when (b) { null -> ""; true -> "1"; false -> "0" }
                                     }
                                     OverrideChoice("内存用量", KR_MEM_MAP2, globalMem, krRender[PerGameSettingsStore.F_MEM_USAGE]!!.value, emptyLabel = "引擎默认") {
                                         krRender[PerGameSettingsStore.F_MEM_USAGE]!!.value = it
                                     }
-                                    OverrideChoice("渲染器", KR_RENDERER_MAP2, globalRenderer, krRender[PerGameSettingsStore.F_RENDERER]!!.value, emptyLabel = "引擎默认") {
-                                        krRender[PerGameSettingsStore.F_RENDERER]!!.value = it
-                                    }
+                                }
+                                OverrideChoice("渲染器", KR_RENDERER_MAP2, globalRenderer, krRender[PerGameSettingsStore.F_RENDERER]!!.value, emptyLabel = "引擎默认") {
+                                    krRender[PerGameSettingsStore.F_RENDERER]!!.value = it
+                                }
+                                if (!isSdl3) {
                                     if (effRenderer == "" || effRenderer == EngineSettingsStore.RENDERER_SOFTWARE) {
                                         OverrideChoice("软件渲染线程数", KR_THREAD_MAP2, globalDrawThread, krRender[PerGameSettingsStore.F_SOFTWARE_DRAW_THREAD]!!.value, emptyLabel = "自动") {
                                             krRender[PerGameSettingsStore.F_SOFTWARE_DRAW_THREAD]!!.value = it
@@ -221,6 +223,8 @@ fun PerGameSettingsScreen(game: ScanGame) {
                                     }
                                 }
                             }
+                        }
+                        if (!isSdl3) {
                             item {
                                 SectionCard("字体") {
                                     OverrideFont("默认字体", globalKrFont, krFont, onReset = { krFont = "" }, onPick = { fontLauncher.launch("*/*") })

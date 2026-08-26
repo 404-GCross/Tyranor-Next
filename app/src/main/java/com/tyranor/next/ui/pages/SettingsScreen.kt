@@ -560,21 +560,23 @@ private fun LazyListPlaceholder(
             }
         }
 
-        if (kind == EngineSettingsKind.KRKR && !isSdl3) item {
+        if (kind == EngineSettingsKind.KRKR) item {
             EngineCard("渲染") {
-                SwitchPreference(title = "OpenGL 精确渲染", checked = krAccurate == "1", onCheckedChange = { b -> onKrAccurate(if (b) "1" else "0") })
-                EnumSliderRow("内存用量", KR_MEM_MAP, krMem, onKrMem)
+                if (!isSdl3) {
+                    SwitchPreference(title = "OpenGL 精确渲染", checked = krAccurate == "1", onCheckedChange = { b -> onKrAccurate(if (b) "1" else "0") })
+                    EnumSliderRow("内存用量", KR_MEM_MAP, krMem, onKrMem)
+                }
                 DropdownRow("渲染器", KR_RENDERER_MAP, krRenderer.ifEmpty { "default" }) {
                     onKrRenderer(if (it == "default") "" else it)
                 }
-                if (krRenderer == "" || krRenderer == EngineSettingsStore.RENDERER_SOFTWARE) {
+                if (!isSdl3 && (krRenderer == "" || krRenderer == EngineSettingsStore.RENDERER_SOFTWARE)) {
                     EnumSliderRow("软件渲染线程数", KR_THREAD_MAP, krDrawThread, onKrDrawThread)
                     DropdownRow("软件纹理压缩", KR_SW_COMPRESS_MAP, krSwCompress, onKrSwCompress)
                 }
-                if (!krIs134126) {
+                if (!isSdl3 && !krIs134126) {
                     EnumSliderRow("FPS 限制", KR_FPS_MAP, krFps, onKrFps)
                 }
-                if (krRenderer == "" || krRenderer == EngineSettingsStore.RENDERER_OPENGL) {
+                if (!isSdl3 && (krRenderer == "" || krRenderer == EngineSettingsStore.RENDERER_OPENGL)) {
                     DropdownRow("OpenGL 纹理压缩", KR_OGL_COMPRESS_MAP, krOglCompress, onKrOglCompress)
                     EnumSliderRow("最大纹理尺寸", KR_TEXSIZE_MAP, krTexsize, onKrTexsize)
                 }
