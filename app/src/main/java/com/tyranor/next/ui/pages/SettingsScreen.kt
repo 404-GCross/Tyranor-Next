@@ -46,6 +46,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -57,6 +59,7 @@ import com.tyranor.next.R
 import com.tyranor.next.settings.AppSettingsStore
 import com.tyranor.next.settings.EngineSettingsStore
 import com.tyranor.next.scanner.EngineScanner
+import com.tyranor.next.theme.AppThemeColors
 import com.tyranor.next.theme.MiuixSettingsTheme
 import com.tyranor.next.theme.NavWhite
 import com.tyranor.next.ui.common.AppNavItem
@@ -498,6 +501,8 @@ private fun SettingsItemIcon(@DrawableRes iconRes: Int) {
     Image(
         painter = painterResource(iconRes),
         contentDescription = null,
+        // 深色模式下整体染白，保证低亮度背景上的可读性
+        colorFilter = if (AppThemeColors.isDark) ColorFilter.tint(Color.White) else null,
         modifier = Modifier.padding(end = 6.dp).size(24.dp),
     )
 }

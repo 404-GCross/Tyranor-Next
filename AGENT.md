@@ -140,6 +140,8 @@ Column(fillMaxSize)                                // 页面根
 - `leadingIcon`：左侧图标 drawable；未提供时组件自动使用**默认占位图标** `DEFAULT_LEADING_ICON`，不允许调用方在不该出现空图标时留白。
 - `onClick`：点击回调；传 `null` 表示不可用（整条变灰且不可点击）。
 - 进入跳转的 icon 统一用 `KeyboardArrowRight`，组件内置，调用方不传。
+- **深色模式适配**：左侧图标（PNG drawable）与右侧箭头在深色模式下自动染色为 `Color.White`，浅色模式保持原色不变；不可点击状态（`onClick = null`）保留 `contentAlpha` 衰减。这一适配由组件内部完成，调用方无需处理。
+- 颜色判断依赖全局 `AppThemeColors.isDark` 快照，切换外观模式自动重组刷新，与整体主题保持同步。
 
 ### 2. 现有调用点（新增场景照此对齐）
 
@@ -147,6 +149,32 @@ Column(fillMaxSize)                                // 页面根
 |---|---|---|
 | 选择封面来源（四源统一） | `GameScreen.kt`（CoverSourcePickerDialog） | `ic_cover_source`（云端） |
 | 加入群聊（企鹅群聊/飞机频道） | `SettingsScreen.kt`（加入群聊弹窗） | `ic_group_qq` / `ic_group_telegram` |
+
+---
+
+## 开关按钮统一规范
+
+所有需要**布尔二态开关**（开/关）的场景，必须统一使用 **Miuix 风格** 的开关组件，禁止混用 Material3 的 `Switch` 或其他库的开关，避免深浅色 / 主题色 / 触感样式不一致。
+
+### 1. 组件选型（按场景二选一）
+
+- **设置条目式开关**（标题行 + 右侧开关，如设置清单中的配置项）：统一使用
+  `top.yukonga.miuix.kmp.preference.SwitchPreference`（title / checked / onCheckedChange）。
+- **行内独立开关**（列表项右端内嵌、无标题行的纯开关）：统一使用
+  `top.yukonga.miuix.kmp.basic.Switch`（checked / onCheckedChange）。
+
+### 2. 现有调用点（新增场景照此对齐）
+
+| 场景 | 位置 | 组件 |
+|---|---|---|
+| 设置清单开关（KRKR/ONS/Artemis/RPG Maker 等） | `SettingsScreen.kt` | `SwitchPreference` |
+| 应用设置开关（色调切换 / 圆角导航等） | `AppSettingsActivity.kt` | `SwitchPreference` |
+| 封面来源启用开关（行内） | `CoverScraperSettingsActivity.kt`（CoverSourceRow） | `Switch` |
+
+### 3. 例外
+
+- 三态「跟随全局 / 开 / 关」等**非布尔**选择（如 `PerGameSettingsScreen.kt` 的 `OverrideSwitch`）不属于开关按钮范畴，用 Miuix `OverlayDropdownPreference` 实现，不受本节约束。
+- 引擎原生代码（engine 模块）内的开关不属于 Compose 层，不适用本节。
 
 ---
 

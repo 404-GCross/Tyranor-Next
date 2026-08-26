@@ -20,10 +20,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.tyranor.next.R
+import com.tyranor.next.theme.AppThemeColors
 import com.tyranor.next.theme.NavWhite
 import com.tyranor.next.theme.TextColor
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -68,6 +71,8 @@ fun AppNavItem(
             painter = painterResource(leadingIcon ?: DEFAULT_LEADING_ICON),
             contentDescription = null,
             modifier = Modifier.size(24.dp),
+            // 深色模式下左侧图标染白，保持低亮度背景上的可读性
+            colorFilter = if (AppThemeColors.isDark) ColorFilter.tint(Color.White) else null,
         )
         Column(
             modifier = Modifier.weight(1f).padding(start = 12.dp),
@@ -94,7 +99,12 @@ fun AppNavItem(
             imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
             contentDescription = null,
             modifier = Modifier.padding(start = 12.dp),
-            tint = MiuixTheme.colorScheme.onBackground.copy(alpha = contentAlpha),
+            // 深色模式下右侧箭头染白，与左侧图标保持一致
+            tint = if (AppThemeColors.isDark) {
+                Color.White.copy(alpha = contentAlpha)
+            } else {
+                MiuixTheme.colorScheme.onBackground.copy(alpha = contentAlpha)
+            },
         )
     }
 }
