@@ -97,8 +97,11 @@ object NativeBridge {
 
     @JvmStatic
     fun redirect(path: String?): String? {
-        val normalized = KrPathUtils.canonicalizeKrStoragePath(KrPathUtils.normalizeFilePath(path))
-        return KrPathUtils.redirectScopedSavePath(normalized)
+        val raw = KrPathUtils.normalizeFilePath(path)
+        val normalized = KrPathUtils.canonicalizeKrStoragePath(raw)
+        KrPathUtils.redirectScopedSavePath(normalized)?.let { return it }
+        if (raw != null && normalized != null && raw != normalized) return normalized
+        return null
     }
 
     private fun recordOpenDiagnostic(value: String) {
