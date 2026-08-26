@@ -59,6 +59,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -117,6 +118,7 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 import java.io.File
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
@@ -828,8 +830,10 @@ private fun CoverSearchDialog(
     val context = LocalContext.current
     var keyword by rememberSaveable(source, game.uri) { mutableStateOf(game.title) }
     var searching by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
-    var candidates by remember { mutableStateOf<List<CoverSearchCandidate>>(emptyList()) }
+    var error by rememberSaveable(source, game.uri) { mutableStateOf<String?>(null) }
+    var candidates by rememberSaveable(source, game.uri, stateSaver = CoverSearchCandidatesSaver) {
+        mutableStateOf(emptyList<CoverSearchCandidate>())
+    }
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
     val imeVisible = WindowInsets.ime.getBottom(density) > 0
@@ -991,6 +995,35 @@ private fun CoverSearchDialog(
 
 private val CoverSearchDialogMaxWidth: Dp = 720.dp
 private val CoverSearchDialogMaxHeight: Dp = 620.dp
+
+private val CoverSearchCandidatesSaver = listSaver<List<CoverSearchCandidate>, String>(
+    save = { candidates -> candidates.map { encodeCoverSearchCandidate(it) } },
+    restore = { savedCandidates -> savedCandidates.mapNotNull { decodeCoverSearchCandidate(it) } },
+)
+
+private fun encodeCoverSearchCandidate(candidate: CoverSearchCandidate): String =
+    JSONObject()
+        .put("source", candidate.source)
+        .put("id", candidate.id)
+        .put("title", candidate.title)
+        .put("subtitle", candidate.subtitle)
+        .put("detail", candidate.detail)
+        .put("score", candidate.score)
+        .put("coverUrl", candidate.coverUrl)
+        .toString()
+
+private fun decodeCoverSearchCandidate(encoded: String): CoverSearchCandidate? = runCatching {
+    val json = JSONObject(encoded)
+    CoverSearchCandidate(
+        source = json.optString("source"),
+        id = json.optString("id"),
+        title = json.optString("title"),
+        subtitle = json.optString("subtitle"),
+        detail = json.optString("detail"),
+        score = if (json.has("score") && !json.isNull("score")) json.optInt("score") else null,
+        coverUrl = json.optString("coverUrl"),
+    )
+}.getOrNull()
 
 @Composable
 private fun CoverCandidateCard(
