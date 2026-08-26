@@ -66,7 +66,7 @@ android {
         minSdk = 26
         targetSdk = 36
         versionCode = 1
-        versionName = "1.19"
+        versionName = "1.20"
         buildConfigField("String", "HIKARINAGI_CLIENT_ID", hikarinagiClientId.asBuildConfigString())
     }
 
