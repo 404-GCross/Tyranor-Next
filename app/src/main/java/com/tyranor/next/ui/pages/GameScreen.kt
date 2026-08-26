@@ -479,7 +479,7 @@ internal fun GameActionsSheet(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var launchError by rememberSaveable(game.uri) { mutableStateOf<String?>(null) }
+    var launchError by remember(game.uri) { mutableStateOf<String?>(null) }
     var showCoverSourcePicker by rememberSaveable(game.uri) { mutableStateOf(false) }
     var coverSearchSource by rememberSaveable(game.uri) { mutableStateOf<String?>(null) }
     var coverBinding by remember { mutableStateOf(false) }
@@ -867,17 +867,22 @@ private fun CoverSearchDialog(
 
     Dialog(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black.copy(alpha = 0.5f)),
         ) {
-            Box(Modifier.fillMaxSize().clickable(onClick = onDismiss))
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .pointerInput(Unit) { detectTapGestures { onDismiss() } },
+            )
             BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxSize()
+                    .statusBarsPadding()
                     .then(if (imeVisible) Modifier.imePadding() else Modifier.navigationBarsPadding())
                     .padding(horizontal = 12.dp, vertical = 12.dp),
                 contentAlignment = Alignment.Center,
@@ -895,7 +900,7 @@ private fun CoverSearchDialog(
                         .widthIn(max = CoverSearchDialogMaxWidth)
                         .then(dialogHeightModifier)
                         .clip(RoundedCornerShape(8.dp))
-                        .background(Color.White)
+                        .background(NavWhite)
                         .pointerInput(Unit) { detectTapGestures { } },
                 ) {
                     Column(Modifier.fillMaxSize()) {
