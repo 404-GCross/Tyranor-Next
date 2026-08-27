@@ -25,6 +25,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -45,15 +47,18 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -65,7 +70,8 @@ import com.tyranor.next.ui.common.AppAlertDialog
 import com.tyranor.next.ui.common.TimeFormats
 import com.tyranor.next.ui.common.glassNavBottomInset
 import com.tyranor.next.ui.game.GameActionsSheet
-import com.tyranor.next.ui.game.GameCard
+import com.tyranor.next.ui.game.coverColor
+import com.tyranor.next.ui.game.rememberCoverBitmap
 import com.tyranor.next.ui.game.startActivityWithPageTransition
 import com.tyranor.next.ui.main.MainLibraryUiState
 import com.tyranor.next.ui.settings.PerGameSettingsActivity
@@ -131,52 +137,57 @@ fun HomeScreen(
             }
         }
 
-        // ===== 顶部栏底下固定三个快捷启动游戏（一行三个） =====
-        // 平板上整行三列会把每张卡撑得过大：限制快捷启动区最大宽度并水平居中，
-        // 手机宽度不变，平板仅占居中一段（约 3 列 × 166dp）
-        Box(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
-            contentAlignment = Alignment.Center,
+        // ===== 快捷启动卡与最近打开列表合并为同一个滚动列表 =====
+        // 水平内边距统一由 contentPadding 提供（覆盖快捷启动区与列表行）
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(
+                start = 12.dp,
+                end = 12.dp,
+                top = 4.dp,
+                bottom = 16.dp + glassNavBottomInset(),
+            ),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Row(
-                modifier = Modifier.widthIn(max = 520.dp).fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                repeat(3) { i ->
-                    val game = quickLaunch.getOrNull(i)
-                    // 按游戏 uri 做 key：删除卡片后槽位状态跟随游戏移动而不是按位置复用，
-                    // 避免被顶上来那张卡复用被删卡的封面 MutableState（上一个封面串到另一张卡）。
-                    key(game?.uri ?: "quick_launch_empty_$i") {
-                        QuickLaunchSlot(
-                            game = game,
-                            onClick = { if (game != null) selectedGame = game },
-                            onLongClick = { if (game != null) launchGame(game) },
-                            modifier = Modifier.weight(1f),
+            if (!libraryState.loaded) {
+                // 加载中：快捷启动区（空态）在顶部，指示器占满剩余空间居中
+                item(key = "loading", contentType = "loading") {
+                    Column(Modifier.fillParentMaxSize()) {
+                        QuickLaunchSection(
+                            quickLaunch = quickLaunch,
+                            onGameClick = { selectedGame = it },
+                            onGameLongClick = { launchGame(it) },
                         )
+                        Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator()
+                        }
                     }
                 }
-            }
-        }
-
-        // ===== 快捷启动下方：最近打开列表（最多 10 条，圆角长矩形） =====
-        if (!libraryState.loaded) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-            }
-        } else if (recentGames.isEmpty()) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(
-                    "暂无最近打开的游戏",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
-                contentPadding = PaddingValues(top = 8.dp, bottom = 16.dp + glassNavBottomInset()),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
+            } else if (recentGames.isEmpty()) {
+                item(key = "recent_empty", contentType = "recent_empty") {
+                    Column(Modifier.fillParentMaxSize()) {
+                        QuickLaunchSection(
+                            quickLaunch = quickLaunch,
+                            onGameClick = { selectedGame = it },
+                            onGameLongClick = { launchGame(it) },
+                        )
+                        Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                            Text(
+                                "暂无最近打开的游戏",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+            } else {
+                item(key = "quick_launch", contentType = "quick_launch") {
+                    QuickLaunchSection(
+                        quickLaunch = quickLaunch,
+                        onGameClick = { selectedGame = it },
+                        onGameLongClick = { launchGame(it) },
+                    )
+                }
                 items(
                     items = recentGames,
                     key = { it.uri },
@@ -273,42 +284,213 @@ fun HomeScreen(
     }
 }
 
-/** 首页快捷启动槽位：已设置复用游戏页卡片样式（封面跟随游戏页），交互与游戏页统一——点按开菜单、长按直启；空槽显示白色封面 + 加号。 */
+/**
+ * 快捷启动区（最多 3 个）：小屏（可用宽度 < 600dp，竖屏手机）单张大卡左右滑动切换；
+ * 大屏（横屏/平板）直接一行三个卡位，空槽显示占位。两种形态都限制最大宽度并水平居中。
+ */
 @Composable
-private fun QuickLaunchSlot(
-    game: ScanGame?,
+private fun QuickLaunchSection(
+    quickLaunch: List<ScanGame>,
+    onGameClick: (ScanGame) -> Unit,
+    onGameLongClick: (ScanGame) -> Unit,
+) {
+    BoxWithConstraints(
+        modifier = Modifier.fillMaxWidth(),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (maxWidth >= 600.dp) {
+            // 三张横幅卡并排需要比单卡形态更宽的行：上限放宽到 900dp，
+            // 每张卡约 293dp，保证左侧文字列在封面之外仍有可用宽度
+            Row(
+                modifier = Modifier.widthIn(max = 900.dp).fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                repeat(3) { i ->
+                    val game = quickLaunch.getOrNull(i)
+                    // 按游戏 uri 做 key：删除卡片后槽位状态跟随游戏而不是按位置复用，
+                    // 避免复用被删卡的封面 MutableState（上一个封面串到另一张卡）。
+                    key(game?.uri ?: "quick_launch_empty_$i") {
+                        if (game != null) {
+                            QuickLaunchCard(
+                                game = game,
+                                onClick = { onGameClick(game) },
+                                onLongClick = { onGameLongClick(game) },
+                                modifier = Modifier.weight(1f),
+                            )
+                        } else {
+                            QuickLaunchEmptyCard(modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
+        } else if (quickLaunch.isEmpty()) {
+            QuickLaunchEmptyCard(modifier = Modifier.widthIn(max = 520.dp).fillMaxWidth())
+        } else {
+            val pagerState = rememberPagerState { quickLaunch.size }
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.widthIn(max = 520.dp).fillMaxWidth(),
+                pageSpacing = 10.dp,
+                verticalAlignment = Alignment.Top,
+            ) { page ->
+                val game = quickLaunch.getOrNull(page) ?: return@HorizontalPager
+                // 按游戏 uri 做 key：删除卡片后页面状态跟随游戏而不是按位置复用，
+                // 避免复用被删卡的封面 MutableState（上一个封面串到另一张卡）。
+                key(game.uri) {
+                    QuickLaunchCard(
+                        game = game,
+                        onClick = { onGameClick(game) },
+                        onLongClick = { onGameLongClick(game) },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 首页快捷启动大卡：封面高斯模糊铺满整卡作背景（无封面/加载中退回中性深灰底），
+ * 左上角引擎类型（下方游戏名）、右侧游戏封面。交互与游戏页统一——点按开操作抽屉、长按直接启动。
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun QuickLaunchCard(
+    game: ScanGame,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     onLongClick: (() -> Unit)? = null,
 ) {
-    if (game != null) {
-        GameCard(game = game, onClick = onClick, modifier = modifier, onLongClick = onLongClick)
+    val pressModifier = if (onLongClick != null) {
+        Modifier.combinedClickable(onClick = onClick, onLongClick = onLongClick)
     } else {
-        Column(modifier) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(3f / 4f)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(NavWhite),
-                contentAlignment = Alignment.Center,
+        Modifier.clickable(onClick = onClick)
+    }
+    BoxWithConstraints(
+        modifier = modifier
+            .height(172.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(QuickLaunchFallbackBackground),
+    ) {
+        val cardMaxWidth = maxWidth
+        val coverBitmap by rememberCoverBitmap(game.coverUri)
+        coverBitmap?.let { bmp ->
+            // 封面先缩到 40px 再拉伸铺满，全版本都有柔化效果；API 31+ 叠加真高斯模糊
+            val blurred = remember(bmp) {
+                val src = bmp.asAndroidBitmap()
+                val width = 40
+                val height = (src.height * width / src.width).coerceAtLeast(1)
+                android.graphics.Bitmap.createScaledBitmap(src, width, height, true).asImageBitmap()
+            }
+            Image(
+                bitmap = blurred,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.matchParentSize().blur(24.dp),
+            )
+            // 黑色压暗遮罩：保证白色文字可读
+            Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.25f)))
+        }
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .then(pressModifier)
+                .padding(20.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().weight(1f),
             ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        game.engine.displayName,
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        game.title,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 6.dp),
+                    )
+                }
+                // 封面按卡宽取比例宽度（大屏三卡并排时自动缩小，给文字留空间），上限 99dp，
+                // 垂直居中于文字行高度内；左侧与文字列保持 12dp 间距
+                Box(
+                    modifier = Modifier.fillMaxHeight().padding(start = 12.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    val coverWidth = (cardMaxWidth * 0.32f).coerceAtMost(99.dp)
+                    Box(
+                        modifier = Modifier
+                            .width(coverWidth)
+                            .height(coverWidth * 4f / 3f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color.White.copy(alpha = 0.18f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        val bmp = coverBitmap
+                        if (bmp != null) {
+                            Image(
+                                bitmap = bmp,
+                                contentDescription = game.title,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        } else {
+                            Text(
+                                "Tyranor",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color.White.copy(alpha = 0.7f),
+                            )
+                        }
+                    }
+                }
+                // 封面右侧的指向箭头，仅作视觉引导，不单独响应点击；左侧与封面间距 9dp
                 Icon(
-                    Icons.Filled.Add,
-                    contentDescription = "空槽位",
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(28.dp),
+                    painter = painterResource(R.drawable.ic_quick_launch_arrow),
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier
+                        .align(Alignment.CenterVertically)
+                        .padding(start = 9.dp)
+                        .size(24.dp),
                 )
             }
-            Text(
-                "快捷启动",
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-            )
         }
+    }
+}
+
+/** 快捷启动卡无封面/封面加载中时的中性兜底底色。 */
+private val QuickLaunchFallbackBackground = Color(0xFF303338)
+
+/** 快捷启动空状态：尚未设置任何快捷启动时显示整张白色卡片 + 加号。 */
+@Composable
+private fun QuickLaunchEmptyCard(modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .height(172.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(NavWhite),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Icon(
+            Icons.Filled.Add,
+            contentDescription = "空槽位",
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(28.dp),
+        )
+        Text(
+            "快捷启动",
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.padding(top = 4.dp),
+        )
     }
 }
 
