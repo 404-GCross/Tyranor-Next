@@ -328,8 +328,9 @@ window.addEventListener('load', () => {
         display: isKeysShown ? 'block' : 'none'
       })
       if (custom && custom.x != null && custom.y != null) {
-        el.style.left = `${custom.x}px`
-        el.style.top = `${custom.y}px`
+        const r0 = el.getBoundingClientRect()
+        el.style.left = `${custom.x - r0.width / 2}px`
+        el.style.top = `${custom.y - r0.height / 2}px`
       }
     })
     qwzxEls.forEach(el => {
@@ -343,10 +344,11 @@ window.addEventListener('load', () => {
       }
       el.style.display = isKeysShown ? 'block' : 'none'
       if (custom && custom.x != null && custom.y != null) {
+        const r0 = el.getBoundingClientRect()
         const pr = qwzxElement.getBoundingClientRect()
         el.style.transform = scale === 1 ? '' : `scale(${scale})`
-        el.style.left = `${custom.x - pr.left}px`
-        el.style.top = `${custom.y - pr.top}px`
+        el.style.left = `${custom.x - r0.width / 2 - pr.left}px`
+        el.style.top = `${custom.y - r0.height / 2 - pr.top}px`
         el.style.right = 'auto'
         el.style.transformOrigin = 'center'
       } else {
@@ -386,6 +388,7 @@ window.addEventListener('load', () => {
   }
   const setEventStart = (e, keyCodes) => {
     const press = (evt) => {
+      if (editMode) return
       evt.stopPropagation()
       evt.preventDefault()
       setKeyDownColor(e)
@@ -407,6 +410,7 @@ window.addEventListener('load', () => {
   }
   const setEventEnd = (e, keyCodes) => {
     const release = (evt) => {
+      if (editMode) return
       evt.stopPropagation()
       evt.preventDefault()
       setKeyUpColor(e)
@@ -657,19 +661,18 @@ window.addEventListener('load', () => {
       }
       entry.el.style.display = 'block'
       if (custom && custom.x != null && custom.y != null) {
+        var r0 = entry.el.getBoundingClientRect()
+        entry.el.style.transform = scale === 1 ? '' : 'scale(' + scale + ')'
+        entry.el.style.transformOrigin = 'center'
         if (entry.el.__group === 'qwzx') {
           var pr = qwzxElement.getBoundingClientRect()
-          entry.el.style.transform = scale === 1 ? '' : 'scale(' + scale + ')'
-          entry.el.style.left = (custom.x - pr.left) + 'px'
-          entry.el.style.top = (custom.y - pr.top) + 'px'
-          entry.el.style.right = 'auto'
+          entry.el.style.left = (custom.x - r0.width / 2 - pr.left) + 'px'
+          entry.el.style.top = (custom.y - r0.height / 2 - pr.top) + 'px'
         } else {
-          entry.el.style.transform = scale === 1 ? '' : 'scale(' + scale + ')'
-          entry.el.style.left = custom.x + 'px'
-          entry.el.style.top = custom.y + 'px'
-          entry.el.style.right = 'auto'
+          entry.el.style.left = (custom.x - r0.width / 2) + 'px'
+          entry.el.style.top = (custom.y - r0.height / 2) + 'px'
         }
-        entry.el.style.transformOrigin = 'center'
+        entry.el.style.right = 'auto'
       } else {
         // 复用 layout 的默认定位：先恢复列布局，再应用 scale
         entry.el.style.left = ''
@@ -722,13 +725,17 @@ window.addEventListener('load', () => {
   }
 
   function buildPanel() {
-    var style = document.createElement('style')
-    style.textContent =
-      '.tm-pad-editable{cursor:move}' +
-      '.tm-pad-btn{background:#3a3a4a;color:#fff;border:1px solid #666;border-radius:6px;padding:5px 10px;cursor:pointer;font:13px sans-serif}' +
-      '.tm-pad-btn.primary{background:#2b6cb0}' +
-      '.tm-pad-nudge{background:#3a3a4a;color:#fff;border:1px solid #666;border-radius:5px;width:26px;height:26px;cursor:pointer;font:14px sans-serif}'
-    document.body.appendChild(style)
+    var style = document.getElementById('tm-pad-edit-css')
+    if (!style) {
+      style = document.createElement('style')
+      style.id = 'tm-pad-edit-css'
+      style.textContent =
+        '.tm-pad-editable{cursor:move}' +
+        '.tm-pad-btn{background:#3a3a4a;color:#fff;border:1px solid #666;border-radius:6px;padding:5px 10px;cursor:pointer;font:13px sans-serif}' +
+        '.tm-pad-btn.primary{background:#2b6cb0}' +
+        '.tm-pad-nudge{background:#3a3a4a;color:#fff;border:1px solid #666;border-radius:5px;width:26px;height:26px;cursor:pointer;font:14px sans-serif}'
+      document.body.appendChild(style)
+    }
     panel = document.createElement('div')
     panel.className = 'tm-pad-editpanel'
     panel.style.cssText = [
@@ -778,7 +785,7 @@ window.addEventListener('load', () => {
     slider.addEventListener('input', function () {
       if (!selectedId) return
       var c = ensureButtonCfg(selectedId)
-      if (c.x == null && c.y == null) { var r = getElById(selectedId).getBoundingClientRect(); c.x = r.left; c.y = r.top }
+      if (c.x == null && c.y == null) { var r = getElById(selectedId).getBoundingClientRect(); c.x = r.left + r.width / 2; c.y = r.top + r.height / 2 }
       c.scale = Number(slider.value) / 100
       refreshEditConfig()
       setSelected(selectedId)
@@ -789,8 +796,8 @@ window.addEventListener('load', () => {
         var c = ensureButtonCfg(selectedId)
         var el = getElById(selectedId)
         var pr = el.getBoundingClientRect()
-        c.x = pr.left
-        c.y = pr.top
+        c.x = pr.left + pr.width / 2
+        c.y = pr.top + pr.height / 2
         var d = b.getAttribute('data-d')
         if (d === 'up') c.y -= NUDGE
         else if (d === 'down') c.y += NUDGE
@@ -855,8 +862,8 @@ window.addEventListener('load', () => {
       if (!c || c.x == null || c.y == null) {
         var r = entry.el.getBoundingClientRect()
         editConfig.buttons[meta.id] = c || defaultButtonFor(meta.id)
-        editConfig.buttons[meta.id].x = r.left
-        editConfig.buttons[meta.id].y = r.top
+        editConfig.buttons[meta.id].x = r.left + r.width / 2
+        editConfig.buttons[meta.id].y = r.top + r.height / 2
       }
     })
     refreshEditConfig()
@@ -877,8 +884,8 @@ window.addEventListener('load', () => {
       var c = ensureButtonCfg(meta.id)
       c.visible = true
       var r = el.getBoundingClientRect()
-      c.x = r.left
-      c.y = r.top
+      c.x = r.left + r.width / 2
+      c.y = r.top + r.height / 2
       drag = { id: meta.id, ox: ev.clientX, oy: ev.clientY, bx: c.x, by: c.y, moved: false }
     }
     function onMove(ev) {
