@@ -570,7 +570,7 @@ internal fun GameActionsSheet(
                     GameActionRow(
                         iconRes = R.drawable.ic_sheet_launch_file,
                         label = "启动文件",
-                        subtitle = game.launchFile ?: "自动 - 无法打开请手动选择游戏启动文件",
+                        subtitle = game.launchFile ?: "自动 - 如有错误请手动选择启动文件",
                     ) { showLaunchFilePicker = true }
                 }
             }
