@@ -36,6 +36,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -94,6 +95,11 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
     var showGroupDialog by remember { mutableStateOf(false) }
     var showScanDirs by remember { mutableStateOf(false) }
     var scanDirs by remember { mutableStateOf(EngineScanner.loadRoots(ctx)) }
+    LaunchedEffect(Unit) {
+        EngineScanner.rootsRevision.collect {
+            scanDirs = withContext(Dispatchers.IO) { EngineScanner.loadRoots(ctx) }
+        }
+    }
     val dirPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         uri?.let { u ->
             runCatching {

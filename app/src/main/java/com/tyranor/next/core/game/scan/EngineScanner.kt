@@ -51,6 +51,10 @@ object EngineScanner {
     // 快捷启动版本号：任何增删/刷新后自增，供首页实时感知改动后重新加载
     private val _quickLaunchRevision = MutableStateFlow(0)
     val quickLaunchRevision: StateFlow<Int> = _quickLaunchRevision.asStateFlow()
+    private val _rootsRevision = MutableStateFlow(0)
+    val rootsRevision: StateFlow<Int> = _rootsRevision.asStateFlow()
+    private val _libraryRevision = MutableStateFlow(0)
+    val libraryRevision: StateFlow<Int> = _libraryRevision.asStateFlow()
 
     /**
      * 将 SAF tree/document URI 映射为真实文件路径（用于引擎 native 启动）。
@@ -274,15 +278,19 @@ object EngineScanner {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val existing = loadRoots(context).toMutableList()
         val key = uri.toString()
-        if (!existing.contains(key)) existing.add(key)
+        val added = !existing.contains(key)
+        if (added) existing.add(key)
         prefs.edit().putString(KEY_ROOTS, existing.joinToString("\n")).apply()
+        if (added) _rootsRevision.value++
         return existing
     }
 
     fun removeRoot(context: Context, uri: Uri) {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        val existing = loadRoots(context).filterNot { it == uri.toString() }
+        val current = loadRoots(context)
+        val existing = current.filterNot { it == uri.toString() }
         prefs.edit().putString(KEY_ROOTS, existing.joinToString("\n")).apply()
+        if (existing.size != current.size) _rootsRevision.value++
     }
 
     fun removeRootAndGames(context: Context, uri: Uri) {
@@ -298,6 +306,7 @@ object EngineScanner {
         if (removedUris.isEmpty()) return
         saveRecentGames(context, loadRecentGames(context).filterNot { it.uri in removedUris })
         saveQuickLaunch(context, loadQuickLaunch(context).filterNot { it.uri in removedUris })
+        _libraryRevision.value++
     }
 
     fun loadRoots(context: Context): List<String> =
@@ -364,9 +373,15 @@ object EngineScanner {
     /** 全量刷新游戏库：以当前扫描结果为准，移除已删除/改名路径的旧缓存条目。 */
     suspend fun rescanLibrary(context: Context): List<ScanGame> = withContext(Dispatchers.IO) {
         val scanned = scanAll(context)
+        // 扫描可能耗时较长；提交结果前再次读取当前 roots，避免扫描期间设置页删除目录后，
+        // 旧 root 的扫描结果在任务结束时被重新写回游戏库。
+        val activeRoots = loadRoots(context)
+        val activeScanned = scanned.filter { game ->
+            activeRoots.any { root -> isGameUnderRoot(root, game.uri) }
+        }
         val refreshed = updateGames(context) { currentGames ->
             val existingByUri = currentGames.associateBy { it.uri }
-            scanned.map { current ->
+            activeScanned.map { current ->
                 existingByUri[current.uri]?.let { previous ->
                     current.copy(
                         coverUri = previous.coverUri ?: current.coverUri,
