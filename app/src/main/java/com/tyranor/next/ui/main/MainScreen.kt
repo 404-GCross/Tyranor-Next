@@ -42,15 +42,15 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.tyranor.next.R
-import com.tyranor.next.settings.AppSettingsStore
+import com.tyranor.next.core.settings.AppSettingsStore
 import com.tyranor.next.theme.UnselectedGrey
 import com.tyranor.next.ui.common.LiquidGlassNavItem
 import com.tyranor.next.ui.common.LiquidGlassNavigationBar
 import com.tyranor.next.ui.common.WithoutPressIndication
-import com.tyranor.next.ui.pages.EngineScreen
-import com.tyranor.next.ui.pages.GameScreen
-import com.tyranor.next.ui.pages.HomeScreen
-import com.tyranor.next.ui.pages.SettingsScreen
+import com.tyranor.next.ui.engine.EngineScreen
+import com.tyranor.next.ui.game.GameScreen
+import com.tyranor.next.ui.home.HomeScreen
+import com.tyranor.next.ui.settings.SettingsScreen
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 

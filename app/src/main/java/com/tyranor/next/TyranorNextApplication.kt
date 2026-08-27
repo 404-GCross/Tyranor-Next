@@ -5,8 +5,8 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.work.Configuration
-import com.tyranor.next.updater.BackgroundUpdateWorker
-import com.tyranor.next.updater.UpdateNotificationManager
+import com.tyranor.next.core.updater.BackgroundUpdateWorker
+import com.tyranor.next.core.updater.UpdateNotificationManager
 
 /** 在整个应用进入后台时安排一次静默更新检查。 */
 class TyranorNextApplication : Application(), DefaultLifecycleObserver, Configuration.Provider {

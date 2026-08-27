@@ -6,15 +6,52 @@
 
 - Android Jetpack Compose + Material 3
 - Kotlin
-- 底部导航结构：`app/src/main/java/com/example/tyranornext/ui/main/MainScreen.kt`
-- 各页面位于 `app/src/main/java/com/example/tyranornext/ui/pages/`
+- 底部导航结构：`app/src/main/java/com/tyranor/next/ui/main/MainScreen.kt`
+- 页面按功能域归类到 `app/src/main/java/com/tyranor/next/ui/`
+- 应用业务能力按三层架构归类到 `app/src/main/java/com/tyranor/next/core/`
+
+## 三层架构目录规范
+
+当前项目按职责划分为三层，依赖方向固定为：
+
+```
+界面 UI 交互层 -> 功能抽象层 -> 底层引擎层
+```
+
+### 1. 底层引擎层
+
+- 目录：`engine/`
+- 职责：KRKR/Kirikiroid、krkrsdl3、ONS、Artemis、Tyrano、SDL/Cocos/IJK、Native/JNI、引擎宿主 Activity、引擎资源、Native 插件底层加载。
+- 规则：不得依赖 `com.tyranor.next.ui.*`；不得关心 App 页面、Compose 状态或列表展示。
+
+### 2. 功能抽象层
+
+- 目录：`app/src/main/java/com/tyranor/next/core/`
+- 职责：游戏扫描、游戏模型、启动编排、封面抓取、存档管理、在线补丁、应用/引擎/单游戏配置、授权、后台更新。
+- 规则：可以依赖 `engine` 模块；不得依赖 Compose UI 组件；不得把页面类作为普通业务依赖。
+- 新增功能按域放入 `core/game`、`core/engine`、`core/cover`、`core/patch`、`core/settings`、`core/auth`、`core/updater` 等包。
+
+### 3. 界面 UI 交互层
+
+- 目录：`app/src/main/java/com/tyranor/next/ui/`
+- 职责：Compose 页面、Activity 壳、弹窗、导航、顶部栏、搜索框、用户输入、加载态与错误态。
+- 规则：只能调用功能抽象层；禁止直接 import `com.core`、`com.akira`、`com.yuri`、`org.tvp`、`org.libsdl`、`org.cocos2dx`、`bridge` 等底层引擎包。
+- 页面按功能域放入 `ui/home`、`ui/game`、`ui/engine`、`ui/settings`、`ui/cover`、`ui/patch`、`ui/save`、`ui/auth`，公共组件放入 `ui/common`。
+
+### 4. 资源归属
+
+- `engine/src/main/assets`：底层引擎运行资源与共享引擎脚本源头。
+- `app/src/main/assets/engine`：App 专属注入脚本；共享脚本由 Gradle 从 `engine/src/main/assets` 生成到 app assets。
+- `engine/src/main/nativeplugins`：共享 Native 插件 so 源头。
+- `app/src/main/nativeplugins`：插件 manifest 与 app-only 插件源头。
+- 禁止在 app 与 engine 两边手工维护同一份二进制或共享脚本；构建脚本会检查重复源文件。
 
 ---
 
 ## 页面顶部栏统一规范
 
 所有页面（首页 / 游戏 / 书库 / 设置）的顶部栏必须统一，规则如下。当前已由统一入口
-`com.tyranor.next.ui.pages.PlaceholderPage` 实现，新页面应复用或遵循同等效果。
+`com.tyranor.next.ui.common.PlaceholderPage` 实现，新页面应复用或遵循同等效果。
 
 ### 1. 结构
 
@@ -185,7 +222,7 @@ Column(fillMaxSize)                                // 页面根
 ### 1. 主题色的唯一定义与入口
 
 - 全局主题色唯一状态：`com.tyranor.next.theme.AppThemeColors.primary`（`mutableStateOf`，变化即触发全 App 重组）。
-- 持久化：`com.tyranor.next.settings.AppSettingsStore`（独立 prefs 文件 `app_settings`，key `theme_color`，默认 `#307DEF`）。
+- 持久化：`com.tyranor.next.core.settings.AppSettingsStore`（独立 prefs 文件 `app_settings`，key `theme_color`，默认 `#307DEF`）。
 - 修改主题色的唯一入口：持久化后调用 `AppThemeColors.refresh(context)`；任何页面不得自行修改 `primary`。
 - `TyranorNextTheme`（Material 页面）与 `MiuixSettingsTheme`（Miuix 页面）的 `primaryColor` 参数**必须为 `Color? = null`**，并在**函数体内**以 `val primary = primaryColor ?: AppThemeColors.primary` 读取全局主题色；两个主题函数都必须标注 `@NonSkippableComposable`（配合函数体内读取，保证轮盘切换时主题必然重组、全局同步变色，不依赖调用点对默认参数表达式的订阅）。内部均会先 `ensureLoaded` 从存储加载，禁止传入写死颜色。
 

@@ -5,10 +5,10 @@ import android.util.Log
 import androidx.compose.runtime.snapshotFlow
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.tyranor.next.scanner.CoverScrapeTaskManager
-import com.tyranor.next.scanner.EngineScanner
-import com.tyranor.next.scanner.ScanGame
-import com.tyranor.next.ui.pages.cleanupDeletedGame
+import com.tyranor.next.core.cover.CoverScrapeTaskManager
+import com.tyranor.next.core.game.scan.EngineScanner
+import com.tyranor.next.core.game.model.ScanGame
+import com.tyranor.next.ui.game.cleanupDeletedGame
 import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers

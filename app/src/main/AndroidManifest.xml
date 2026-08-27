@@ -34,28 +34,28 @@
         </provider>
 
         <activity
-            android:name=".ui.pages.SaveManagementActivity"
+            android:name=".ui.save.SaveManagementActivity"
             android:exported="false" />
         <activity
-            android:name=".ui.pages.KrkrOnlinePatchActivity"
+            android:name=".ui.patch.KrkrOnlinePatchActivity"
             android:exported="false" />
         <activity
-            android:name=".ui.pages.EngineSettingsActivity"
+            android:name=".ui.settings.EngineSettingsActivity"
             android:exported="false" />
         <activity
-            android:name=".ui.pages.EngineSettingsMenuActivity"
+            android:name=".ui.settings.EngineSettingsMenuActivity"
             android:exported="false" />
         <activity
-            android:name=".ui.pages.PerGameSettingsActivity"
+            android:name=".ui.settings.PerGameSettingsActivity"
             android:exported="false" />
         <activity
-            android:name=".ui.pages.AppSettingsActivity"
+            android:name=".ui.settings.AppSettingsActivity"
             android:exported="false" />
         <activity
-            android:name=".ui.pages.CoverScraperSettingsActivity"
+            android:name=".ui.cover.CoverScraperSettingsActivity"
             android:exported="false" />
         <activity
-            android:name=".ui.pages.HikarinagiOAuthCallbackActivity"
+            android:name=".ui.auth.HikarinagiOAuthCallbackActivity"
             android:exported="false"
             android:theme="@style/Theme.TyranorNext.Translucent" />
         <activity

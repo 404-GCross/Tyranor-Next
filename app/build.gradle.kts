@@ -1,3 +1,5 @@
+import org.gradle.api.file.DuplicatesStrategy
+import org.gradle.api.tasks.Sync
 import org.gradle.api.tasks.bundling.Zip
 import java.util.Properties
 
@@ -20,9 +22,17 @@ fun configValue(name: String): String =
 fun String.asBuildConfigString(): String =
     "\"" + replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 
-val nativePluginSourceDir = layout.projectDirectory.dir("src/main/nativeplugins")
+val appNativePluginSourceDir = layout.projectDirectory.dir("src/main/nativeplugins")
+val engineNativePluginSourceDir = rootProject.layout.projectDirectory.dir("engine/src/main/nativeplugins")
+val mergedNativePluginSourceDir = layout.buildDirectory.dir("generated/nativeplugin-sources")
 val bundledNativePluginAssetsDir = layout.buildDirectory.dir("generated/assets/nativeplugins")
 val bundledNativePluginEngineIds = listOf("kirikiroid2", "ons", "artemis")
+val engineAssetSourceDir = rootProject.layout.projectDirectory.dir("engine/src/main/assets")
+val sharedEngineAssetNames = listOf(
+    "__rmmz__.js",
+    "__hook_rmmz_core.js",
+    "__hook_rmmz_managers.js",
+)
 val hikarinagiClientId = configValue("HIKARINAGI_CLIENT_ID")
 val ciKeystoreFile = System.getenv("ANDROID_KEYSTORE_FILE")?.takeIf { it.isNotBlank() }
 val ciKeystorePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")?.takeIf { it.isNotBlank() }
@@ -35,11 +45,25 @@ val hasCiReleaseSigning = listOf(
     ciKeyPassword,
 ).all { !it.isNullOrBlank() }
 
+val syncBundledNativePluginSources by tasks.registering(Sync::class) {
+    group = "native plugins"
+    description = "Merges engine-owned native plugin binaries with app-owned plugin manifests."
+    duplicatesStrategy = DuplicatesStrategy.FAIL
+    from(engineNativePluginSourceDir) {
+        exclude("**/.DS_Store")
+    }
+    from(appNativePluginSourceDir) {
+        exclude("**/.DS_Store")
+    }
+    into(mergedNativePluginSourceDir)
+}
+
 val bundledNativePluginZipTasks = bundledNativePluginEngineIds.map { engineId ->
     tasks.register<Zip>("package${engineId.replaceFirstChar { it.uppercase() }}NativePlugin") {
         group = "native plugins"
         description = "Packages the $engineId native engine plugin as a compressed asset."
-        from(nativePluginSourceDir.dir(engineId))
+        dependsOn(syncBundledNativePluginSources)
+        from(mergedNativePluginSourceDir.map { it.dir(engineId) })
         destinationDirectory.set(bundledNativePluginAssetsDir)
         archiveFileName.set("$engineId.zip")
         isPreserveFileTimestamps = false
@@ -51,6 +75,19 @@ val packageBundledNativePlugins by tasks.registering {
     group = "native plugins"
     description = "Packages bundled native engine plugins as compressed assets."
     dependsOn(bundledNativePluginZipTasks)
+}
+
+val syncSharedEngineAssets by tasks.registering(Sync::class) {
+    group = "native plugins"
+    description = "Copies shared engine-owned scripts into the app asset tree."
+    from(engineAssetSourceDir) {
+        include(sharedEngineAssetNames)
+        eachFile {
+            path = "engine/$path"
+        }
+        includeEmptyDirs = false
+    }
+    into(layout.buildDirectory.dir("generated/assets"))
 }
 
 android {
@@ -114,7 +151,9 @@ android {
     // 引擎原生插件先压缩为 assets/nativeplugins/<engine>.zip，首次启动自动安装到 app 私有目录
     sourceSets {
       getByName("main") {
-        assets.setSrcDirs(listOf("src/main/assets", "build/generated/assets"))
+        assets.directories.clear()
+        assets.directories.add("src/main/assets")
+        assets.directories.add("build/generated/assets")
       }
     }
 }
@@ -124,6 +163,7 @@ tasks.matching {
         it.name.contains("Lint", ignoreCase = true)
 }.configureEach {
     dependsOn(packageBundledNativePlugins)
+    dependsOn(syncSharedEngineAssets)
 }
 
 kotlin {

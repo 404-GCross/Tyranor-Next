@@ -1,7 +1,7 @@
 package com.tyranor.next.ui.main
 
-import com.tyranor.next.scanner.EngineType
-import com.tyranor.next.scanner.ScanGame
+import com.tyranor.next.core.engine.EngineType
+import com.tyranor.next.core.game.model.ScanGame
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

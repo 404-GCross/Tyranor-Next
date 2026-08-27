@@ -14,10 +14,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import com.tyranor.next.scanner.EnginePluginBootstrap
+import com.tyranor.next.core.engine.plugin.EnginePluginBootstrap
 import com.tyranor.next.theme.AppThemeColors
 import com.tyranor.next.theme.TyranorNextTheme
-import com.tyranor.next.updater.UpdateNotificationManager
+import com.tyranor.next.core.updater.UpdateNotificationManager
 
 class MainActivity : ComponentActivity() {
   private val notificationPermissionLauncher =
