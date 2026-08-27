@@ -71,6 +71,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
@@ -531,11 +532,18 @@ internal fun GameActionsSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = MaterialTheme.colorScheme.background,
+        contentWindowInsets = { WindowInsets(0.dp) },
     ) {
+        // 小平板横屏下屏幕高度可能 < 560dp，硬编码会导致抽屉填满屏幕，
+        // SwipeableState 无法区分滚动/收起，快速滑动时高速振荡（issue #27）。
+        val sheetMaxHeight = with(LocalConfiguration.current) {
+            val available = (screenHeightDp - 120).dp
+            available.coerceIn(200.dp, 560.dp)
+        }
         LazyColumn(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(max = GameActionsSheetMaxHeight),
+                .heightIn(max = sheetMaxHeight),
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
@@ -747,8 +755,6 @@ internal fun GameActionsSheet(
         )
     }
 }
-
-private val GameActionsSheetMaxHeight: Dp = 560.dp
 
 @Composable
 private fun RenameGameDialog(
