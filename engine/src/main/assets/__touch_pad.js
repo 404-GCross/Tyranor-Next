@@ -29,12 +29,18 @@ window.addEventListener('load', () => {
   const actionsElement = document.createElement('div')
   const keySwitchElement = document.createElement('div')
   keySwitchElement.innerText = isKeysShown ? 'Hide' : 'Show'
+  keySwitchElement.__pad = { id: 'btn.hide', text: 'Hide/Show' }
   const joyStickSwitchElement = document.createElement('div')
   joyStickSwitchElement.innerText = useJoyStick ? 'Button' : 'Stick'
+  joyStickSwitchElement.__pad = { id: 'btn.stick', text: 'Button/Stick' }
   const dir8SwitchElement = document.createElement('div')
   dir8SwitchElement.innerText = useDir8 ? '4 Dir' : '8 Dir'
+  dir8SwitchElement.__pad = { id: 'btn.dir8', text: '4/8 Dir' }
   const udlrElement = document.createElement('div')
+  udlrElement.__pad = { id: 'dpad', text: '方向键' }
   const qwzxElement = document.createElement('div')
+  qwzxElement.__pad = { id: 'qwzx', text: 'QWZX 键组' }
+  joyStickStage.__pad = { id: 'joystick', text: '摇杆' }
   document.body.appendChild(actionsElement)
   actionsElement.appendChild(keySwitchElement)
   actionsElement.appendChild(joyStickSwitchElement)
@@ -46,10 +52,25 @@ window.addEventListener('load', () => {
 
   // issue #30：自定义布局。window.__touchPadConfig 由 TyranoActivity 按游戏注入：
   // { buttons: { <id>: { x, y, scale, visible } } }
+  // 坐标采用「归一化」（相对视口 0..1），横竖屏切换后按比例重映射，位置不漂移。
+  const vw = () => window.innerWidth || 1
+  const vh = () => window.innerHeight || 1
   let padConfig = null
   try {
     const raw = window.__touchPadConfig
-    if (raw && typeof raw === 'object' && raw.buttons) padConfig = raw
+    if (raw && typeof raw === 'object' && raw.buttons) {
+      // 一次性迁移：旧配置存的是视口像素（x>1），转成归一化
+      const mig = raw.buttons
+      const needsMig = Object.keys(mig).some(function (k) { var b = mig[k]; return b && (b.x > 1 || b.y > 1) })
+      if (needsMig) {
+        Object.keys(mig).forEach(function (k) {
+          var b = mig[k]
+          if (b && b.x != null) b.x = b.x / vw()
+          if (b && b.y != null) b.y = b.y / vh()
+        })
+      }
+      padConfig = raw
+    }
   } catch (e) { /* 忽略坏配置，回退默认 */ }
   const btnScale = (custom) => {
     const s = custom && custom.scale != null ? Number(custom.scale) : 1
@@ -223,6 +244,44 @@ window.addEventListener('load', () => {
 
   let actionEls = []
   const qwzxEls = []
+  // 编辑模式把「透明」渲染为醒目的蓝色占位（仍可选中/调整）；普通模式才真正隐藏。
+  // 用 CSS 类实现淡显，避免覆盖 btnStyle 的内联背景（否则普通按钮失去粉色）。
+  function applyFade(el, custom) {
+    var inv = custom && custom.visible === false
+    if (editMode && inv) {
+      el.style.display = 'block'
+      el.classList.add('tm-pad-faded')
+    } else {
+      el.classList.remove('tm-pad-faded')
+      if (inv) el.style.display = 'none'
+      else el.style.display = el.__disp || ''
+    }
+  }
+  // 中心定位统一入口：container 为元素定位参考容器（无则视口）。
+  // 用 offsetWidth/offsetHeight（布局尺寸，不受 transform scale 影响）作为未缩放盒，
+  // 使视觉中心恒定落在目标点，缩放/拖拽/微调全程不漂移。
+  // custom.x/y 为归一化坐标（0..1 相对视口），此处换算回像素。
+  function placeAtCenter(el, custom, scale, container) {
+    var baseTransform = el.__baseTransform || ''
+    if (custom && custom.x != null && custom.y != null) {
+      var w = el.offsetWidth || 0
+      var h = el.offsetHeight || 0
+      var cl = container ? container.getBoundingClientRect().left : 0
+      var ct = container ? container.getBoundingClientRect().top : 0
+      el.style.transform = scale === 1 ? '' : 'scale(' + scale + ')'
+      el.style.transformOrigin = 'center'
+      el.style.left = (custom.x * vw() - w / 2 - cl) + 'px'
+      el.style.top = (custom.y * vh() - h / 2 - ct) + 'px'
+      el.style.right = 'auto'
+    } else {
+      el.style.transform = (scale === 1 ? '' : 'scale(' + scale + ')') + baseTransform
+      el.style.transformOrigin = 'center'
+      // 恢复默认定位（qwzx 用百分比；自定义清除后必须还原，否则残留在旧像素位）
+      if (el.__baseLeft != null) el.style.left = el.__baseLeft
+      if (el.__baseTop != null) el.style.top = el.__baseTop
+      if (el.__baseLeft != null || el.__baseTop != null) el.style.right = ''
+    }
+  }
   function layout() {
     const g = gameRect()
     const r = g.rect
@@ -231,48 +290,78 @@ window.addEventListener('load', () => {
     joyStickR = joyStickSR * 0.4
     joyStickCX = r.left + joyStickSR + allMargin + lrMargin
     joyStickCY = r.top + r.height - joyStickSR - allMargin
+    const activeCfg = (editMode ? editConfig : padConfig)
+    // 编辑模式忽略「隐藏键盘」，让所有控件可选中/调整
+    const showKeys = editMode || isKeysShown
     const switchTop = (i) => `${r.top + allMargin + i * (padSize * 0.3 + 5)}px`
-    Object.assign(keySwitchElement.style, {
-      ...btnStyle,
-      width: switchSize(),
-      height: switchSize(),
-      lineHeight: switchSize(),
-      borderRadius: '50em',
-      left: `${r.left + allMargin}px`,
-      top: switchTop(0),
-      display: 'block'
+    const switches = [
+      { el: keySwitchElement, id: 'btn.hide', top: switchTop(0), disp: 'block' },
+      { el: joyStickSwitchElement, id: 'btn.stick', top: switchTop(1), disp: showKeys ? 'block' : 'none' },
+      { el: dir8SwitchElement, id: 'btn.dir8', top: switchTop(2), disp: showKeys ? 'block' : 'none' }
+    ]
+    switches.forEach(function (sw) {
+      const custom = activeCfg && activeCfg.buttons && activeCfg.buttons[sw.id]
+      const scale = btnScale(custom)
+      Object.assign(sw.el.style, {
+        ...btnStyle,
+        width: switchSize(),
+        height: switchSize(),
+        lineHeight: switchSize(),
+        borderRadius: '50em'
+      })
+      sw.el.style.left = (custom && custom.x != null ? 'auto' : `${r.left + allMargin}px`)
+      sw.el.style.top = (custom && custom.y != null ? 'auto' : sw.top)
+      sw.el.__disp = sw.disp
+      applyFade(sw.el, custom)
+      placeAtCenter(sw.el, custom, scale, null)
     })
-    Object.assign(joyStickSwitchElement.style, {
-      ...btnStyle,
-      width: switchSize(),
-      height: switchSize(),
-      lineHeight: switchSize(),
-      borderRadius: '50em',
-      left: `${r.left + allMargin}px`,
-      top: switchTop(1),
-      display: isKeysShown ? 'block' : 'none'
-    })
-    Object.assign(dir8SwitchElement.style, {
-      ...btnStyle,
-      width: switchSize(),
-      height: switchSize(),
-      lineHeight: switchSize(),
-      borderRadius: '50em',
-      left: `${r.left + allMargin}px`,
-      top: switchTop(2),
-      display: isKeysShown ? 'block' : 'none'
-    })
-    Object.assign(joyStickStage.style, {
-      ...commonStyle,
-      boxShadow: '0 0 10px 0 rgba(255,255,255,0.5)',
-      width: `${padSize}px`,
-      height: `${padSize}px`,
-      transform: 'translate(0%,-100%)',
-      borderRadius: '50em',
-      left: `${r.left + allMargin + lrMargin}px`,
-      top: `${joyStickCY + joyStickSR}px`,
-      display: useJoyStick && isKeysShown ? 'block' : 'none'
-    })
+    // 摇杆圆盘 / 方向键圆盘（可自定义，二者同一位置，useJoyStick 决定显示谁）
+    const applyStage = function (el, id, active) {
+      const custom = activeCfg && activeCfg.buttons && activeCfg.buttons[id]
+      const scale = btnScale(custom)
+      Object.assign(el.style, {
+        ...commonStyle,
+        boxShadow: '0 0 10px 0 rgba(255,255,255,0.5)',
+        width: `${padSize}px`,
+        height: `${padSize}px`,
+        borderRadius: '50em'
+      })
+      el.__disp = active ? 'block' : 'none'
+      if (editMode) {
+        // 编辑模式：当前激活的实心显示，另一个以灰色虚线 ghost 占位（仍可选中/调整）
+        el.style.display = 'block'
+        el.classList.remove('tm-pad-faded')
+        if (!active) {
+          el.style.opacity = '0.4'
+          el.style.outline = '2px dashed rgba(150,150,160,0.8)'
+        } else {
+          el.style.opacity = ''
+          el.style.outline = ''
+          applyFade(el, custom)
+        }
+      } else {
+        el.style.opacity = ''
+        el.style.outline = ''
+        applyFade(el, custom)
+      }
+      // 自定义时用新中心定位；否则按默认锚点
+      if (custom && custom.x != null && custom.y != null) {
+        placeAtCenter(el, custom, scale, null)
+      } else {
+        el.style.transform = 'translate(0%,-100%)'
+        el.style.left = `${r.left + allMargin + lrMargin}px`
+        el.style.top = `${joyStickCY + joyStickSR}px`
+        el.style.transformOrigin = 'center'
+        if (scale !== 1) el.style.transform = 'translate(0%,-100%) scale(' + scale + ')'
+      }
+      if (id === 'joystick' && custom && custom.x != null && custom.y != null) {
+        // 摇杆方向判定中心跟随新位置（归一化转像素）
+        joyStickCX = custom.x * vw()
+        joyStickCY = custom.y * vh()
+      }
+    }
+    applyStage(joyStickStage, 'joystick', useJoyStick && isKeysShown)
+    applyStage(udlrElement, 'dpad', !useJoyStick && isKeysShown)
     Object.assign(joyStick.style, {
       ...btnStyle,
       marginLeft: `${joyStickSR - joyStickR}px`,
@@ -281,79 +370,47 @@ window.addEventListener('load', () => {
       height: `${2 * joyStickR}px`,
       borderRadius: '50em'
     })
-    Object.assign(udlrElement.style, {
-      ...commonStyle,
-      boxShadow: '0 0 10px 0 rgba(255,255,255,0.5)',
-      borderRadius: '50em',
-      width: `${padSize}px`,
-      height: `${padSize}px`,
-      transform: 'translate(0%,-100%)',
-      left: `${r.left + allMargin + lrMargin}px`,
-      top: `${joyStickCY + joyStickSR}px`,
-      display: !useJoyStick && isKeysShown ? 'block' : 'none'
-    })
+    // QWZX 整组（可整体拖动/缩放/透明；默认锚定右下角菱形）
+    const qcustom = activeCfg && activeCfg.buttons && activeCfg.buttons['qwzx']
+    const qscale = btnScale(qcustom)
     Object.assign(qwzxElement.style, {
       ...commonStyle,
       width: `${padSize}px`,
       height: `${padSize}px`,
-      transform: 'translate(-100%,-100%)',
       borderRadius: '50em',
-      boxShadow: '0 0 10px 0 rgba(255,255,255,0.5)',
-      left: `${r.left + r.width - allMargin}px`,
-      top: `${r.top + r.height - allMargin}px`,
-      display: isKeysShown ? 'block' : 'none'
+      boxShadow: '0 0 10px 0 rgba(255,255,255,0.5)'
     })
+    qwzxElement.__disp = showKeys ? 'block' : 'none'
+    applyFade(qwzxElement, qcustom)
+    if (qcustom && qcustom.x != null && qcustom.y != null) {
+      placeAtCenter(qwzxElement, qcustom, qscale, null)
+    } else {
+      qwzxElement.style.transform = 'translate(-100%,-100%)'
+      qwzxElement.style.left = `${r.left + r.width - allMargin}px`
+      qwzxElement.style.top = `${r.top + r.height - allMargin}px`
+      qwzxElement.style.transformOrigin = 'center'
+      if (qscale !== 1) qwzxElement.style.transform = 'translate(-100%,-100%) scale(' + qscale + ')'
+    }
     const btnW = padSize * 0.5
     const pitch = actionBtnH() + 5
-    const activeCfg = (editMode ? editConfig : padConfig)
     actionEls.forEach((el, i) => {
       const meta = el.__pad || {}
       const custom = activeCfg && activeCfg.buttons && activeCfg.buttons[meta.id]
       const scale = btnScale(custom)
-      if (custom && custom.visible === false) {
-        el.style.display = 'none'
-        return
-      }
       Object.assign(el.style, {
         ...btnStyle,
         width: `${btnW}px`,
         height: `${actionBtnH()}px`,
         lineHeight: `${actionBtnH()}px`,
         borderRadius: '50em',
-        right: 'auto',
-        left: `${r.left + r.width - allMargin - btnW}px`,
-        top: `${r.top + allMargin + i * pitch}px`,
-        transform: scale === 1 ? '' : `scale(${scale})`,
-        transformOrigin: 'center',
-        display: isKeysShown ? 'block' : 'none'
+        right: 'auto'
       })
-      if (custom && custom.x != null && custom.y != null) {
-        const r0 = el.getBoundingClientRect()
-        el.style.left = `${custom.x - r0.width / 2}px`
-        el.style.top = `${custom.y - r0.height / 2}px`
-      }
-    })
-    qwzxEls.forEach(el => {
-      const meta = el.__pad || {}
-      const activeCfgQ = (editMode ? editConfig : padConfig)
-      const custom = activeCfgQ && activeCfgQ.buttons && activeCfgQ.buttons[meta.id]
-      const scale = btnScale(custom)
-      if (custom && custom.visible === false) {
-        el.style.display = 'none'
-        return
-      }
-      el.style.display = isKeysShown ? 'block' : 'none'
-      if (custom && custom.x != null && custom.y != null) {
-        const r0 = el.getBoundingClientRect()
-        const pr = qwzxElement.getBoundingClientRect()
-        el.style.transform = scale === 1 ? '' : `scale(${scale})`
-        el.style.left = `${custom.x - r0.width / 2 - pr.left}px`
-        el.style.top = `${custom.y - r0.height / 2 - pr.top}px`
-        el.style.right = 'auto'
-        el.style.transformOrigin = 'center'
-      } else {
-        el.style.transform = (scale === 1 ? '' : `scale(${scale})`) + (el.__baseTransform || '')
-      }
+      el.style.left = (custom && custom.x != null ? 'auto' : `${r.left + r.width - allMargin - btnW}px`)
+      el.style.top = (custom && custom.y != null ? 'auto' : `${r.top + allMargin + i * pitch}px`)
+      el.__disp = showKeys ? 'block' : 'none'
+      el.style.transformOrigin = 'center'
+      applyFade(el, custom)
+      placeAtCenter(el, custom, scale, null)
     })
     // 发布动作键列区域，供修改器悬浮球避让（见 __rpgmaker_mod_ui.js）
     window.__touchPadMetrics = {
@@ -388,9 +445,10 @@ window.addEventListener('load', () => {
   }
   const setEventStart = (e, keyCodes) => {
     const press = (evt) => {
-      if (editMode) return
+      // 编辑模式也要拦截事件冒泡到游戏（游戏在 document 监听），仅跳过按键派发
       evt.stopPropagation()
       evt.preventDefault()
+      if (editMode) return
       setKeyDownColor(e)
       keyCodes.forEach(keyCode => {
         startKeyEvent(e, keyCode, 'keydown')
@@ -410,9 +468,9 @@ window.addEventListener('load', () => {
   }
   const setEventEnd = (e, keyCodes) => {
     const release = (evt) => {
-      if (editMode) return
       evt.stopPropagation()
       evt.preventDefault()
+      if (editMode) return
       setKeyUpColor(e)
       keyCodes.forEach(keyCode => {
         startKeyEvent(e, keyCode, 'keyup')
@@ -472,17 +530,20 @@ window.addEventListener('load', () => {
     el.addEventListener('touchstart', (evt) => {
       evt.stopPropagation()
       evt.preventDefault()
+      if (editMode) return
       setKeyDownColor(el)
     })
     el.addEventListener('mousedown', (evt) => {
       evt.stopPropagation()
       evt.preventDefault()
+      if (editMode) return
       setKeyDownColor(el)
     })
     setEventMove(el)
     const release = (evt) => {
       evt.stopPropagation()
       evt.preventDefault()
+      if (editMode) return
       setKeyUpColor(el)
       onRelease()
     }
@@ -530,18 +591,21 @@ window.addEventListener('load', () => {
   joyStickStage.addEventListener('touchstart', (evt) => {
     evt.stopPropagation()
     evt.preventDefault()
+    if (editMode) return
     const touch = evt.targetTouches[0]
     joyStart(touch.clientX, touch.clientY)
   })
   joyStickStage.addEventListener('touchmove', (evt) => {
     evt.stopPropagation()
     evt.preventDefault()
+    if (editMode) return
     const touch = evt.targetTouches[0]
     joyMove(touch.clientX, touch.clientY)
   })
   joyStickStage.addEventListener('touchend', (evt) => {
     evt.stopPropagation()
     evt.preventDefault()
+    if (editMode) return
     joyEnd()
   })
   // 虚拟鼠标拖拽摇杆：光标按下后跟随 mousemove
@@ -549,15 +613,18 @@ window.addEventListener('load', () => {
   joyStickStage.addEventListener('mousedown', (evt) => {
     evt.stopPropagation()
     evt.preventDefault()
+    if (editMode) return
     joyMouseDown = true
     joyStart(evt.clientX, evt.clientY)
   })
   window.addEventListener('mousemove', (evt) => {
+    if (editMode) return
     if (!joyMouseDown) return
     evt.stopPropagation()
     joyMove(evt.clientX, evt.clientY)
   })
   window.addEventListener('mouseup', (evt) => {
+    if (editMode) return
     if (!joyMouseDown) return
     evt.stopPropagation()
     joyMouseDown = false
@@ -598,6 +665,8 @@ window.addEventListener('load', () => {
     })
     childElement.__pad = { id: it.id, text: it.text, defaultKeyCode: it.keyCode }
     childElement.__baseTransform = it.style.transform || ''
+    childElement.__baseLeft = it.style.left || ''
+    childElement.__baseTop = it.style.top || ''
     qwzxEls.push(childElement)
     setEventStart(childElement, [it.keyCode])
     setEventMove(childElement)
@@ -616,20 +685,58 @@ window.addEventListener('load', () => {
   var panel = null
   var panelGrab = null         // 顶层控制框拖拽状态
   var NUDGE = 4
-  var allEditableEls = []      // [{ el, id }]
+  var allEditableEls = []      // [{ el, id, group }]
+  // 非数组型可编辑元素：3 个开关 + 摇杆外框 + 方向键圆盘 + QWZX 整组（视口锚定）
+  var fixedEls = [
+    { el: keySwitchElement, id: 'btn.hide', group: 'switch' },
+    { el: joyStickSwitchElement, id: 'btn.stick', group: 'switch' },
+    { el: dir8SwitchElement, id: 'btn.dir8', group: 'switch' },
+    { el: joyStickStage, id: 'joystick', group: 'stage' },
+    { el: udlrElement, id: 'dpad', group: 'stage' },
+    { el: qwzxElement, id: 'qwzx', group: 'stage' }
+  ]
+  // 进入编辑时需要抬到遮罩层(100000000)之上的容器（其子元素的可点区域被其堆叠上下文包含）
+  var editContainers = [actionsElement, qwzxElement, joyStickStage, udlrElement]
+  var editContainersZ = []
+  // 编辑模式下拦截输入冒泡到 document（游戏在 document 监听，点按会穿透到游戏）。
+  // 按钮/开关/摇杆自身 handler 已改为始终 stopPropagation；这里兜底遮罩、面板与容器空白区。
+  var editBlockers = []
+  var EDIT_INPUT_EVENTS = ['touchstart', 'touchmove', 'touchend', 'mousedown', 'mousemove', 'mouseup', 'pointerdown', 'pointermove', 'pointerup', 'click', 'contextmenu']
+  function installEditBlock(el) {
+    EDIT_INPUT_EVENTS.forEach(function (name) {
+      var fn = function (ev) { ev.stopPropagation(); ev.preventDefault() }
+      el.addEventListener(name, fn)
+      editBlockers.push({ el: el, name: name, fn: fn })
+    })
+  }
+  function removeEditBlock() {
+    editBlockers.forEach(function (b) {
+      if (b.el && b.el.removeEventListener) b.el.removeEventListener(b.name, b.fn)
+    })
+    editBlockers = []
+  }
 
   function collectEditable() {
     allEditableEls = []
-    actionEls.forEach(el => { if (el.__pad) allEditableEls.push({ el: el, id: el.__pad.id }) })
-    qwzxEls.forEach(el => { if (el.__pad) allEditableEls.push({ el: el, id: el.__pad.id }) })
+    actionEls.forEach(el => { if (el.__pad) allEditableEls.push({ el: el, id: el.__pad.id, group: 'action' }) })
+    fixedEls.forEach(f => { if (f.el.__pad) allEditableEls.push({ el: f.el, id: f.id, group: f.group }) })
   }
 
   function defaultButtonFor(id) {
+    var label = null
     var found = actionsBtns.concat(qwzxBtns).filter(function (b) { return b.id === id })[0]
-    return found && { x: null, y: null, scale: 1, visible: true, keyCode: found.keyCode, label: found.text }
+    if (found) { label = found.text }
+    else {
+      for (var i = 0; i < fixedEls.length; i++) {
+        if (fixedEls[i].id === id) { label = fixedEls[i].el.__pad.text; break }
+      }
+    }
+    if (!label) return null
+    return { x: null, y: null, scale: 1, visible: true, label: label }
   }
 
   function ensureButtonCfg(id) {
+    if (!id) return null
     if (!editConfig) editConfig = { buttons: {} }
     if (!editConfig.buttons[id]) editConfig.buttons[id] = defaultButtonFor(id)
     return editConfig.buttons[id]
@@ -643,61 +750,50 @@ window.addEventListener('load', () => {
   function styleButton(el, highlight) {
     var meta = el.__pad || {}
     var custom = editConfig && editConfig.buttons && editConfig.buttons[meta.id]
-    var scale = btnScale(custom)
-    el.classList.add('tm-pad-editable')
-    el.style.outline = highlight ? '3px solid #fff' : ''
+    var hidden = custom && custom.visible === false
+    if (highlight) {
+      el.style.outline = hidden ? '3px dashed #4a9eff' : '3px solid #4a9eff'
+      el.style.boxShadow = hidden ? '0 0 0 2px rgba(74,158,255,0.5), inset 0 0 0 40px rgba(74,158,255,0.35)' : '0 0 0 2px rgba(74,158,255,0.5)'
+    } else {
+      el.style.outline = ''
+      el.style.boxShadow = ''
+    }
     el.style.zIndex = (highlight ? '100000002' : '100000001')
   }
 
+  // 统一由 layout() 负责所有可编辑元素的定位/缩放/透明（编辑与普通模式一致）
   function refreshEditConfig() {
-    collectEditable()
-    allEditableEls.forEach(function (entry) {
-      var meta = entry.el.__pad || {}
-      var custom = editConfig && editConfig.buttons && editConfig.buttons[meta.id]
-      var scale = btnScale(custom)
-      if (custom && custom.visible === false) {
-        entry.el.style.display = 'none'
-        return
-      }
-      entry.el.style.display = 'block'
-      if (custom && custom.x != null && custom.y != null) {
-        var r0 = entry.el.getBoundingClientRect()
-        entry.el.style.transform = scale === 1 ? '' : 'scale(' + scale + ')'
-        entry.el.style.transformOrigin = 'center'
-        if (entry.el.__group === 'qwzx') {
-          var pr = qwzxElement.getBoundingClientRect()
-          entry.el.style.left = (custom.x - r0.width / 2 - pr.left) + 'px'
-          entry.el.style.top = (custom.y - r0.height / 2 - pr.top) + 'px'
-        } else {
-          entry.el.style.left = (custom.x - r0.width / 2) + 'px'
-          entry.el.style.top = (custom.y - r0.height / 2) + 'px'
-        }
-        entry.el.style.right = 'auto'
-      } else {
-        // 复用 layout 的默认定位：先恢复列布局，再应用 scale
-        entry.el.style.left = ''
-        entry.el.style.top = ''
-        entry.el.style.right = ''
-        if (entry.el.__group === 'qwzx') {
-          entry.el.style.transform = (scale === 1 ? '' : 'scale(' + scale + ')') + (entry.el.__baseTransform || '')
-        } else {
-          entry.el.style.transform = scale === 1 ? '' : 'scale(' + scale + ')'
-        }
-      }
-      if (entry.el.__group !== 'qwzx') entry.el.style.display = 'block'
-    })
+    layout()
+    if (selectedId) setSelected(selectedId)
   }
 
   function setSelected(id) {
     selectedId = id
     allEditableEls.forEach(function (entry) { styleButton(entry.el, entry.id === id) })
-    var custom = editConfig.buttons && editConfig.buttons[id]
-    var slider = panel && panel.querySelector('.tm-pad-scale')
-    if (slider) slider.value = String(Math.round(btnScale(custom) * 100))
+    var custom = id && editConfig.buttons && editConfig.buttons[id]
+    var nameLabel = panel && panel.querySelector('.tm-pad-selname')
+    if (nameLabel) {
+      var el = getElById(id)
+      nameLabel.textContent = el && el.__pad ? el.__pad.text + ' (' + id + ')' : '—'
+    }
+    updatePanelControls(custom)
+  }
+
+  function updatePanelControls(custom) {
+    var scalePct = Math.round(btnScale(custom) * 100)
     var scaleLabel = panel && panel.querySelector('.tm-pad-scaleval')
-    if (scaleLabel) scaleLabel.textContent = Math.round(btnScale(custom) * 100) + '%'
+    if (scaleLabel) scaleLabel.textContent = scalePct + '%'
+    var slider = panel && panel.querySelector('.tm-pad-scale')
+    if (slider) slider.value = String(scalePct)
     var visLabel = panel && panel.querySelector('.tm-pad-vislabel')
-    if (visLabel) visLabel.textContent = custom && custom.visible === false ? '（已隐藏）' : ''
+    if (visLabel) visLabel.textContent = custom && custom.visible === false ? '（透明·编辑中蓝显）' : ''
+    var transBtn = panel && panel.querySelector('[data-act="transparent"]')
+    if (transBtn) {
+      var sel = selectedId != null
+      transBtn.style.opacity = sel ? '1' : '0.4'
+      transBtn.style.pointerEvents = sel ? 'auto' : 'none'
+      transBtn.textContent = custom && custom.visible === false ? '恢复显示' : '透明'
+    }
   }
 
   function saveAndExit(force) {
@@ -717,13 +813,89 @@ window.addEventListener('load', () => {
       exitEdit()
       layout()
     }
+    // 有 <50% 缩放的按钮时，用面板内联确认（WebView 的 window.confirm 不可靠）
     if (!force && small.length > 0) {
-      if (window.confirm('有 ' + small.length + ' 个按钮缩放小于 50%，确认保存？')) doSave()
+      showSaveConfirm(small.length, doSave)
     } else {
       doSave()
     }
   }
 
+  // 面板内联确认行
+  function showSaveConfirm(count, onConfirm) {
+    if (!panel) return
+    var row = panel.querySelector('[data-act="confirmrow"]')
+    if (!row) return
+    var msg = panel.querySelector('[data-act="confirmmsg"]')
+    if (msg) msg.textContent = count + ' 个按钮缩放小于 50%，确认保存？'
+    row.style.display = 'flex'
+    var back = panel.querySelector('[data-act="confirmback"]')
+    if (back) back.onpointerdown = function (ev) { ev.stopPropagation(); ev.preventDefault(); row.style.display = 'none' }
+    var yes = panel.querySelector('[data-act="confirmyes"]')
+    if (yes) yes.onpointerdown = function (ev) { ev.stopPropagation(); ev.preventDefault(); onConfirm() }
+  }
+
+  // 长按连发：按住持续触发回调，松开停止（用于 +/- 缩放与微调）
+  function holdRepeat(el, fn, interval) {
+    var timer = null
+    var doFn = function (ev) {
+      ev.stopPropagation()
+      ev.preventDefault()
+      fn()
+      timer = setTimeout(function tick() {
+        fn()
+        timer = setTimeout(tick, interval || 100)
+      }, 350)
+    }
+    var stop = function (ev) {
+      if (ev) { ev.stopPropagation(); ev.preventDefault() }
+      if (timer) { clearTimeout(timer); timer = null }
+    }
+    el.addEventListener('pointerdown', doFn)
+    el.addEventListener('pointerup', stop)
+    el.addEventListener('pointercancel', stop)
+    el.addEventListener('pointerleave', stop)
+  }
+  // 面板动作键：pointerdown 触发（WebView 触摸路径 click 不可靠），并吞掉合成 click 防双触发
+  function bindTap(el, fn) {
+    el.addEventListener('pointerdown', function (ev) {
+      ev.stopPropagation()
+      ev.preventDefault()
+      fn()
+    })
+    el.addEventListener('click', function (ev) {
+      ev.stopPropagation()
+      ev.preventDefault()
+    })
+  }
+  // 从滑杆值(1..200)设置选中元素缩放
+  function scaleFromValue(pct) {
+    if (!selectedId) return
+    var c = ensureButtonCfg(selectedId)
+    c.scale = Math.max(1, Math.min(200, Math.round(pct))) / 100
+    refreshEditConfig()
+    setSelected(selectedId)
+  }
+  function nudgeSelected(dx, dy) {
+    if (!selectedId) return
+    var c = ensureButtonCfg(selectedId)
+    var el = getElById(selectedId)
+    if (!el) return
+    var pr = el.getBoundingClientRect()
+    c.x = (pr.left + pr.width / 2 + dx) / vw()
+    c.y = (pr.top + pr.height / 2 + dy) / vh()
+    refreshEditConfig()
+    setSelected(selectedId)
+  }
+  function scaleSelected(delta) {
+    if (!selectedId) return
+    var c = ensureButtonCfg(selectedId)
+    var cur = Math.round(btnScale(c) * 100)
+    var next = Math.max(1, Math.min(200, cur + delta))
+    c.scale = next / 100
+    refreshEditConfig()
+    setSelected(selectedId)
+  }
   function buildPanel() {
     var style = document.getElementById('tm-pad-edit-css')
     if (!style) {
@@ -731,34 +903,53 @@ window.addEventListener('load', () => {
       style.id = 'tm-pad-edit-css'
       style.textContent =
         '.tm-pad-editable{cursor:move}' +
-        '.tm-pad-btn{background:#3a3a4a;color:#fff;border:1px solid #666;border-radius:6px;padding:5px 10px;cursor:pointer;font:13px sans-serif}' +
+        '.tm-pad-faded{opacity:0.45;filter:grayscale(1);background:rgba(100,150,255,0.5);outline:1px dashed rgba(140,180,255,0.8)}' +
+        '.tm-pad-btn{background:#3a3a4a;color:#fff;border:1px solid #666;border-radius:8px;padding:8px 12px;cursor:pointer;font:14px sans-serif;touch-action:none}' +
         '.tm-pad-btn.primary{background:#2b6cb0}' +
-        '.tm-pad-nudge{background:#3a3a4a;color:#fff;border:1px solid #666;border-radius:5px;width:26px;height:26px;cursor:pointer;font:14px sans-serif}'
+        '.tm-pad-btn:disabled{opacity:0.4}' +
+        '.tm-pad-scalebtn{background:#3a3a4a;color:#fff;border:1px solid #666;border-radius:6px;width:34px;height:34px;cursor:pointer;font:18px sans-serif;touch-action:none}' +
+        '.tm-pad-nudge{background:#3a3a4a;color:#fff;border:1px solid #666;width:34px;height:34px;cursor:pointer;font:16px sans-serif;touch-action:none;position:absolute}'
       document.body.appendChild(style)
     }
     panel = document.createElement('div')
     panel.className = 'tm-pad-editpanel'
     panel.style.cssText = [
       'position:fixed', 'left:50%', 'top:10px', 'transform:translateX(-50%)',
-      'z-index:100000003', 'background:rgba(20,20,30,0.92)', 'color:#fff',
-      'border:1px solid #555', 'border-radius:12px', 'padding:10px 14px',
-      'max-width:calc(100vw - 20px)', 'box-shadow:0 4px 20px rgba(0,0,0,0.5)',
+      'z-index:100000003', 'background:rgba(20,20,30,0.94)', 'color:#fff',
+      'border:1px solid #555', 'border-radius:14px', 'padding:14px 18px',
+      'max-width:min(340px,92vw)', 'max-height:82vh', 'overflow-y:auto',
+      'box-shadow:0 4px 20px rgba(0,0,0,0.5)',
       'user-select:none', 'font:14px/1.5 sans-serif', 'touch-action:none'
     ].join(';')
     panel.innerHTML =
-      '<div class="tm-pad-title" style="font-weight:bold;margin-bottom:6px;cursor:move">键盘映射（拖动此框移动）</div>' +
-      '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
-      '<label>缩放 <input type="range" min="1" max="200" value="100" class="tm-pad-scale" style="width:90px"></label>' +
-      '<span class="tm-pad-scaleval">100%</span>' +
+      // 标题 + 缩放（滑杆 + +/- 按钮）+ 透明
+      '<div class="tm-pad-title" style="font-weight:bold;margin-bottom:8px;cursor:move">键盘映射 · 拖动控制或按钮调整（拖动框可移动）</div>' +
+      '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">' +
+      '<span>缩放</span>' +
+      '<button class="tm-pad-scalebtn" data-scale="-1">－</button>' +
+      '<input type="range" min="1" max="200" value="100" class="tm-pad-scale" style="flex:1;min-width:90px;touch-action:none">' +
+      '<button class="tm-pad-scalebtn" data-scale="+1">＋</button>' +
+      '<span class="tm-pad-scaleval" style="min-width:42px;text-align:center">100%</span>' +
+      '</div>' +
+      '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">' +
       '<button class="tm-pad-btn" data-act="transparent">透明</button>' +
       '<span class="tm-pad-vislabel" style="color:#ff9"></span>' +
       '</div>' +
-      '<div style="display:flex;align-items:center;gap:6px;margin-top:8px;flex-wrap:wrap">' +
-      '<span>微调</span>' +
-      '<button class="tm-pad-nudge" data-d="up">↑</button>' +
-      '<button class="tm-pad-nudge" data-d="left">←</button>' +
-      '<button class="tm-pad-nudge" data-d="right">→</button>' +
-      '<button class="tm-pad-nudge" data-d="down">↓</button>' +
+      // 微调（角落十字，位于面板右下）
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px">' +
+      '<span style="opacity:0.8">选择元素：<span class="tm-pad-selname" style="color:#7fd0ff">—</span></span>' +
+      '<div class="tm-pad-cross" style="position:relative;width:102px;height:102px">' +
+      '<button class="tm-pad-nudge" data-d="up" style="left:34px;top:0">↑</button>' +
+      '<button class="tm-pad-nudge" data-d="left" style="left:0;top:34px">←</button>' +
+      '<button class="tm-pad-nudge" data-d="right" style="left:68px;top:34px">→</button>' +
+      '<button class="tm-pad-nudge" data-d="down" style="left:34px;top:68px">↓</button>' +
+      '</div>' +
+      '</div>' +
+      // 内联确认行（默认隐藏）
+      '<div data-act="confirmrow" style="display:none;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap;background:rgba(74,158,255,0.15);border:1px solid #4a9eff;border-radius:8px;padding:8px">' +
+      '<span data-act="confirmmsg" style="flex:1;min-width:140px"></span>' +
+      '<button class="tm-pad-btn primary" data-act="confirmyes">确认保存</button>' +
+      '<button class="tm-pad-btn" data-act="confirmback">返回</button>' +
       '</div>' +
       '<div style="display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap">' +
       '<button class="tm-pad-btn primary" data-act="save">保存并退出</button>' +
@@ -780,42 +971,55 @@ window.addEventListener('load', () => {
     })
     panel.addEventListener('pointerup', function () { panelGrab = null })
     panel.addEventListener('pointercancel', function () { panelGrab = null })
-
-    var slider = panel.querySelector('.tm-pad-scale')
-    slider.addEventListener('input', function () {
-      if (!selectedId) return
-      var c = ensureButtonCfg(selectedId)
-      if (c.x == null && c.y == null) { var r = getElById(selectedId).getBoundingClientRect(); c.x = r.left + r.width / 2; c.y = r.top + r.height / 2 }
-      c.scale = Number(slider.value) / 100
-      refreshEditConfig()
-      setSelected(selectedId)
-    })
-    panel.querySelectorAll('.tm-pad-nudge').forEach(function (b) {
-      b.addEventListener('click', function () {
-        if (!selectedId) return
-        var c = ensureButtonCfg(selectedId)
-        var el = getElById(selectedId)
-        var pr = el.getBoundingClientRect()
-        c.x = pr.left + pr.width / 2
-        c.y = pr.top + pr.height / 2
-        var d = b.getAttribute('data-d')
-        if (d === 'up') c.y -= NUDGE
-        else if (d === 'down') c.y += NUDGE
-        else if (d === 'left') c.x -= NUDGE
-        else if (d === 'right') c.x += NUDGE
-        refreshEditConfig()
-        setSelected(selectedId)
+    // 缩放 +/-
+    panel.querySelectorAll('.tm-pad-scalebtn').forEach(function (b) {
+      holdRepeat(b, function () {
+        var sign = b.getAttribute('data-scale') === '+1' ? 1 : -1
+        scaleSelected(sign)
       })
     })
-    panel.querySelector('[data-act="transparent"]').addEventListener('click', function () {
+    // 缩放滑杆：pointer 手动拖拽（面板 touch-action:none 下原生滑杆触摸拖动失效）
+    var slider = panel.querySelector('.tm-pad-scale')
+    var sliderDrag = null
+    var sliderSet = function (ev) {
+      var r = slider.getBoundingClientRect()
+      var pct = Math.max(1, Math.min(200, Math.round((ev.clientX - r.left) / r.width * 199) + 1))
+      slider.value = String(pct)
+      scaleFromValue(pct)
+    }
+    slider.addEventListener('pointerdown', function (ev) {
+      ev.stopPropagation()
+      ev.preventDefault()
+      sliderDrag = true
+      try { slider.setPointerCapture(ev.pointerId) } catch (e) {}
+      sliderSet(ev)
+    })
+    slider.addEventListener('pointermove', function (ev) {
+      if (!sliderDrag) return
+      sliderSet(ev)
+    })
+    slider.addEventListener('pointerup', function () { sliderDrag = false })
+    slider.addEventListener('pointercancel', function () { sliderDrag = false })
+    slider.addEventListener('input', function () { if (!sliderDrag) scaleFromValue(Number(slider.value)) })
+    // 十字微调（pointer 路径，触摸可靠）
+    panel.querySelectorAll('.tm-pad-nudge').forEach(function (b) {
+      holdRepeat(b, function () {
+        var d = b.getAttribute('data-d')
+        var dxy = { up: [0, -NUDGE], down: [0, NUDGE], left: [-NUDGE, 0], right: [NUDGE, 0] }[d]
+        nudgeSelected(dxy[0], dxy[1])
+      })
+    })
+    // 透明/恢复（pointer 路径）
+    bindTap(panel.querySelector('[data-act="transparent"]'), function () {
       if (!selectedId) return
       var c = ensureButtonCfg(selectedId)
-      c.visible = false
+      if (c.visible === false) c.visible = true
+      else c.visible = false
       refreshEditConfig()
       setSelected(selectedId)
     })
-    panel.querySelector('[data-act="save"]').addEventListener('click', function () { saveAndExit(false) })
-    panel.querySelector('[data-act="reset"]').addEventListener('click', function () {
+    bindTap(panel.querySelector('[data-act="save"]'), function () { saveAndExit(false) })
+    bindTap(panel.querySelector('[data-act="reset"]'), function () {
       collectEditable()
       allEditableEls.forEach(function (entry) {
         var meta = entry.el.__pad || {}
@@ -823,9 +1027,8 @@ window.addEventListener('load', () => {
       })
       refreshEditConfig()
       if (selectedId) setSelected(selectedId)
-      layout()
     })
-    panel.querySelector('[data-act="cancel"]').addEventListener('click', function () {
+    bindTap(panel.querySelector('[data-act="cancel"]'), function () {
       editConfig = padConfig ? JSON.parse(JSON.stringify(padConfig)) : { buttons: {} }
       exitEdit()
       layout()
@@ -846,89 +1049,104 @@ window.addEventListener('load', () => {
       'background:rgba(0,0,0,0.65);z-index:100000000;touch-action:none'
     document.body.appendChild(overlay)
     buildPanel()
+    // 拦截编辑模式下冒泡到游戏的输入（遮罩/面板/容器空白区）
+    removeEditBlock()
+    installEditBlock(overlay)
+    installEditBlock(panel)
+    editContainers.forEach(function (el) { installEditBlock(el) })
     // 收集全部按钮并打上可编辑类
     collectEditable()
+    // 抬升容器 zIndex，使 qwzx/摇杆/方向键等堆叠上下文内容可点（高于遮罩层）
+    editContainersZ = editContainers.map(function (el) { var z = el.style.zIndex; el.style.zIndex = '100000005'; return z })
     allEditableEls.forEach(function (entry) {
       var el = entry.el
-      el.__group = qwzxEls.indexOf(el) >= 0 ? 'qwzx' : 'action'
+      el.__group = entry.group
       el.classList.add('tm-pad-editable')
       el.style.pointerEvents = 'auto'
     })
-    // 从已保存配置恢复工作副本位置（若首次编辑按默认布局落位）
-    collectEditable()
     allEditableEls.forEach(function (entry) {
       var meta = entry.el.__pad || {}
       var c = editConfig.buttons[meta.id]
       if (!c || c.x == null || c.y == null) {
         var r = entry.el.getBoundingClientRect()
         editConfig.buttons[meta.id] = c || defaultButtonFor(meta.id)
-        editConfig.buttons[meta.id].x = r.left + r.width / 2
-        editConfig.buttons[meta.id].y = r.top + r.height / 2
+        editConfig.buttons[meta.id].x = (r.left + r.width / 2) / vw()
+        editConfig.buttons[meta.id].y = (r.top + r.height / 2) / vh()
       }
     })
     refreshEditConfig()
-    // 选中第一个可见按钮方便直接调整
+    // 选中第一个可见按钮方便直接调整；无可见元素时确保控件处于禁用状态
     var first = allEditableEls.filter(function (e) { var c = editConfig.buttons[e.id]; return !c || c.visible !== false })[0]
-    if (first) setSelected(first.id)
+    setSelected(first ? first.id : null)
     attachEditDrag()
   }
 
-  function attachEditDrag() {
-    var target = null
+  // 幂等的拖拽绑定：重复进入也只会绑定一次；退出时按同一闭包精确解绑（排除监听泄漏）
+  function bindDrag(el) {
+    if (el.__dragBound) return
     var drag = null
-    function onDown(ev, el) {
+    function onDown(ev) {
+      if (!editMode) return
       ev.stopPropagation()
       ev.preventDefault()
       var meta = el.__pad || {}
       setSelected(meta.id)
       var c = ensureButtonCfg(meta.id)
-      c.visible = true
+      if (!c) return
       var r = el.getBoundingClientRect()
-      c.x = r.left + r.width / 2
-      c.y = r.top + r.height / 2
+      c.x = (r.left + r.width / 2) / vw()
+      c.y = (r.top + r.height / 2) / vh()
       drag = { id: meta.id, ox: ev.clientX, oy: ev.clientY, bx: c.x, by: c.y, moved: false }
     }
     function onMove(ev) {
-      if (!drag) return
+      if (!editMode || !drag) return
       var dx = ev.clientX - drag.ox
       var dy = ev.clientY - drag.oy
       if (!drag.moved && Math.abs(dx) + Math.abs(dy) < 8) return
       drag.moved = true
       var c = ensureButtonCfg(drag.id)
-      c.x = drag.bx + dx
-      c.y = drag.by + dy
+      if (!c) return
+      c.x = drag.bx + dx / vw()
+      c.y = drag.by + dy / vh()
       refreshEditConfig()
+      setSelected(drag.id)
     }
-    function onUp() { drag = null }
-
-    allEditableEls.forEach(function (entry) {
-      entry.el.removeEventListener('pointerdown', entry._pd)
-      entry.el.removeEventListener('pointermove', entry._pm)
-      entry.el.removeEventListener('pointerup', entry._pu)
-      entry._pd = function (ev) { onDown(ev, entry.el) }
-      entry._pm = onMove
-      entry._pu = onUp
-      entry.el.addEventListener('pointerdown', entry._pd)
-      entry.el.addEventListener('pointermove', entry._pm)
-      entry.el.addEventListener('pointerup', entry._pu)
-    })
-    if (overlay) {
-      overlay.addEventListener('pointerup', onUp)
-      overlay.addEventListener('pointercancel', onUp)
+    function onUp(ev) {
+      if (ev) { ev.preventDefault(); ev.stopPropagation() }
+      drag = null
     }
+    el.__dragDown = onDown
+    el.__dragMove = onMove
+    el.__dragUp = onUp
+    el.addEventListener('pointerdown', onDown)
+    el.addEventListener('pointermove', onMove)
+    el.addEventListener('pointerup', onUp)
+    el.__dragBound = true
+  }
+  function unbindDrag(el) {
+    if (!el.__dragBound) return
+    el.removeEventListener('pointerdown', el.__dragDown)
+    el.removeEventListener('pointermove', el.__dragMove)
+    el.removeEventListener('pointerup', el.__dragUp)
+    el.__dragDown = null
+    el.__dragMove = null
+    el.__dragUp = null
+    el.__dragBound = false
+    el.style.outline = ''
+  }
+  function attachEditDrag() {
+    collectEditable()
+    allEditableEls.forEach(function (entry) { bindDrag(entry.el) })
   }
 
   function exitEdit() {
     editMode = false
+    removeEditBlock()
+    collectEditable()
     allEditableEls.forEach(function (entry) {
-      if (entry.el._pd) entry.el.removeEventListener('pointerdown', entry._pd)
-      if (entry.el._pm) entry.el.removeEventListener('pointermove', entry._pm)
-      if (entry.el._pu) entry.el.removeEventListener('pointerup', entry._pu)
-      delete entry.el._pd
-      delete entry.el._pm
-      delete entry.el._pu
+      unbindDrag(entry.el)
       entry.el.classList.remove('tm-pad-editable')
-      entry.el.style.outline = ''
+      entry.el.style.pointerEvents = ''
     })
     if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay)
     overlay = null
@@ -936,6 +1154,10 @@ window.addEventListener('load', () => {
     panel = null
     panelGrab = null
     selectedId = null
+    editContainers.forEach(function (el, i) {
+      el.style.zIndex = editContainersZ[i] || ''
+    })
+    layout()
   }
 
   // 恢复默认布局：清空配置并持久化（可在编辑面板或从悬浮球触发）
@@ -966,7 +1188,13 @@ window.addEventListener('load', () => {
   }
 
   layout()
-  window.addEventListener('resize', layout)
+  window.addEventListener('resize', function () {
+    if (editMode) refreshEditConfig()
+    else layout()
+  })
   // 旋转后画布矩形可能滞后于视口变化，延迟一帧再排
-  window.addEventListener('orientationchange', () => setTimeout(layout, 150))
+  window.addEventListener('orientationchange', () => setTimeout(function () {
+    if (editMode) refreshEditConfig()
+    else layout()
+  }, 150))
 })
