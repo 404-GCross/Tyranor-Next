@@ -145,6 +145,23 @@
     content.innerHTML = card("触屏手柄", hasPad
       ? '<p>自定义屏幕上虚拟键的位置、大小与显隐。进入映射后：</p><ul style="margin:6px 0 10px;padding-left:18px;font-size:12px"><li>拖拽按钮调整位置</li><li>缩放进度条调整大小（1%-200%）</li><li>“透明”隐藏按钮</li><li>十字键微调位置</li></ul><div class="tm-row">' + button("进入键盘映射", "enter-keys", "primary") + button("恢复默认", "reset-keys") + '</div>'
       : '<p>当前未加载触屏手柄。</p>');
+    if (!hasPad) return;
+    var names;
+    try { names = window.__touchPad.listPresets(); } catch (e) { names = []; }
+    if (names && names.length) {
+      var rows = names.map(function (name) {
+        var esc = escapeHtml(name).replace(/"/g, "&quot;");
+        return '<div class="tm-row" style="justify-content:space-between">' +
+          '<label style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:0">' + escapeHtml(name) + '</label>' +
+          '<span style="display:flex;gap:6px">' +
+          button("预览", "preview-preset", "", 'data-name="' + esc + '"') +
+          button("载入", "load-preset", "", 'data-name="' + esc + '"') +
+          '</span></div>';
+      }).join("");
+      content.innerHTML += card("预设（" + names.length + "/10）", rows);
+    } else {
+      content.innerHTML += card("预设", '<p>暂无预设。在键盘映射面板中可保存当前布局为预设。</p>');
+    }
   }
   function handleAction(action, node) {
     if (action === "close") return close();
@@ -183,6 +200,29 @@
       try {
         window.__touchPad.resetToDefaults();
         toast("已恢复默认");
+      } catch (e) { toast(String(e && e.message || e), true); }
+      return;
+    }
+    if (action === "preview-preset") {
+      if (!window.__touchPad) { toast("未加载触屏手柄", true); return; }
+      var pname = node.dataset.name;
+      close();
+      setTimeout(function () {
+        try {
+          var res = window.__touchPad.previewPreset(pname);
+          if (res && res.ok === false) toast(res.msg, true);
+        } catch (e) { toast(String(e && e.message || e), true); }
+      }, 50);
+      return;
+    }
+    if (action === "load-preset") {
+      if (!window.__touchPad) { toast("未加载触屏手柄", true); return; }
+      var lname = node.dataset.name;
+      try {
+        var lres = window.__touchPad.loadPreset(lname);
+        if (lres && lres.ok) toast(lres.msg);
+        else toast(lres && lres.msg || "载入失败", true);
+        renderKeys(root.querySelector(".tm-content"));
       } catch (e) { toast(String(e && e.message || e), true); }
       return;
     }

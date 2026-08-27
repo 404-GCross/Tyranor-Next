@@ -445,10 +445,10 @@ window.addEventListener('load', () => {
   }
   const setEventStart = (e, keyCodes) => {
     const press = (evt) => {
-      // 编辑模式也要拦截事件冒泡到游戏（游戏在 document 监听），仅跳过按键派发
+      // 编辑/预览模式也要拦截事件冒泡到游戏（游戏在 document 监听），仅跳过按键派发
       evt.stopPropagation()
       evt.preventDefault()
-      if (editMode) return
+      if (editMode || previewMode) return
       setKeyDownColor(e)
       keyCodes.forEach(keyCode => {
         startKeyEvent(e, keyCode, 'keydown')
@@ -470,7 +470,7 @@ window.addEventListener('load', () => {
     const release = (evt) => {
       evt.stopPropagation()
       evt.preventDefault()
-      if (editMode) return
+      if (editMode || previewMode) return
       setKeyUpColor(e)
       keyCodes.forEach(keyCode => {
         startKeyEvent(e, keyCode, 'keyup')
@@ -530,20 +530,20 @@ window.addEventListener('load', () => {
     el.addEventListener('touchstart', (evt) => {
       evt.stopPropagation()
       evt.preventDefault()
-      if (editMode) return
+      if (editMode || previewMode) return
       setKeyDownColor(el)
     })
     el.addEventListener('mousedown', (evt) => {
       evt.stopPropagation()
       evt.preventDefault()
-      if (editMode) return
+      if (editMode || previewMode) return
       setKeyDownColor(el)
     })
     setEventMove(el)
     const release = (evt) => {
       evt.stopPropagation()
       evt.preventDefault()
-      if (editMode) return
+      if (editMode || previewMode) return
       setKeyUpColor(el)
       onRelease()
     }
@@ -591,21 +591,21 @@ window.addEventListener('load', () => {
   joyStickStage.addEventListener('touchstart', (evt) => {
     evt.stopPropagation()
     evt.preventDefault()
-    if (editMode) return
+    if (editMode || previewMode) return
     const touch = evt.targetTouches[0]
     joyStart(touch.clientX, touch.clientY)
   })
   joyStickStage.addEventListener('touchmove', (evt) => {
     evt.stopPropagation()
     evt.preventDefault()
-    if (editMode) return
+    if (editMode || previewMode) return
     const touch = evt.targetTouches[0]
     joyMove(touch.clientX, touch.clientY)
   })
   joyStickStage.addEventListener('touchend', (evt) => {
     evt.stopPropagation()
     evt.preventDefault()
-    if (editMode) return
+    if (editMode || previewMode) return
     joyEnd()
   })
   // 虚拟鼠标拖拽摇杆：光标按下后跟随 mousemove
@@ -613,18 +613,18 @@ window.addEventListener('load', () => {
   joyStickStage.addEventListener('mousedown', (evt) => {
     evt.stopPropagation()
     evt.preventDefault()
-    if (editMode) return
+    if (editMode || previewMode) return
     joyMouseDown = true
     joyStart(evt.clientX, evt.clientY)
   })
   window.addEventListener('mousemove', (evt) => {
-    if (editMode) return
+    if (editMode || previewMode) return
     if (!joyMouseDown) return
     evt.stopPropagation()
     joyMove(evt.clientX, evt.clientY)
   })
   window.addEventListener('mouseup', (evt) => {
-    if (editMode) return
+    if (editMode || previewMode) return
     if (!joyMouseDown) return
     evt.stopPropagation()
     joyMouseDown = false
@@ -704,7 +704,12 @@ window.addEventListener('load', () => {
   var EDIT_INPUT_EVENTS = ['touchstart', 'touchmove', 'touchend', 'mousedown', 'mousemove', 'mouseup', 'pointerdown', 'pointermove', 'pointerup', 'click', 'contextmenu']
   function installEditBlock(el) {
     EDIT_INPUT_EVENTS.forEach(function (name) {
-      var fn = function (ev) { ev.stopPropagation(); ev.preventDefault() }
+      var fn = function (ev) {
+        ev.stopPropagation()
+        // 允许输入框聚焦/输入，不 preventDefault
+        var t = ev.target
+        if (!t || (t.tagName !== 'INPUT' && t.tagName !== 'TEXTAREA')) ev.preventDefault()
+      }
       el.addEventListener(name, fn)
       editBlockers.push({ el: el, name: name, fn: fn })
     })
@@ -922,6 +927,7 @@ window.addEventListener('load', () => {
       'user-select:none', 'font:14px/1.5 sans-serif', 'touch-action:none'
     ].join(';')
     panel.innerHTML =
+      '<div data-act="mainview">' +
       // 标题 + 缩放（滑杆 + +/- 按钮）+ 透明
       '<div class="tm-pad-title" style="font-weight:bold;margin-bottom:8px;cursor:move">键盘映射 · 拖动控制或按钮调整（拖动框可移动）</div>' +
       '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">' +
@@ -953,8 +959,23 @@ window.addEventListener('load', () => {
       '</div>' +
       '<div style="display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap">' +
       '<button class="tm-pad-btn primary" data-act="save">保存并退出</button>' +
+      '<button class="tm-pad-btn" data-act="presets">预设</button>' +
       '<button class="tm-pad-btn" data-act="reset">恢复默认</button>' +
       '<button class="tm-pad-btn" data-act="cancel">取消</button>' +
+      '</div>' +
+      '</div>' +
+      // 预设管理视图（默认隐藏）
+      '<div data-act="presetview" style="display:none;margin-top:4px">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between">' +
+      '<strong>预设管理（最多 10 个）</strong>' +
+      '<button class="tm-pad-btn" data-act="presetback">返回</button>' +
+      '</div>' +
+      '<div data-act="presetlist" style="margin-top:6px;max-height:38vh;overflow-y:auto"></div>' +
+      '<div style="display:flex;gap:8px;margin-top:8px;align-items:center">' +
+      '<input class="tm-pad-input" data-act="presetname" maxlength="12" placeholder="预设名（≤12 字）" style="flex:1;min-width:0;background:#2a2a38;color:#fff;border:1px solid #555;border-radius:6px;padding:8px;font:14px sans-serif;user-select:text">' +
+      '<button class="tm-pad-btn primary" data-act="presetsave">保存为新预设</button>' +
+      '</div>' +
+      '<div data-act="presetmsg" style="color:#7fd0ff;margin-top:4px;min-height:18px"></div>' +
       '</div>'
     document.body.appendChild(panel)
     var title = panel.querySelector('.tm-pad-title')
@@ -1033,6 +1054,10 @@ window.addEventListener('load', () => {
       exitEdit()
       layout()
     })
+    // 预设
+    bindTap(panel.querySelector('[data-act="presets"]'), function () { showPresetView() })
+    bindTap(panel.querySelector('[data-act="presetback"]'), function () { showMainView() })
+    bindTap(panel.querySelector('[data-act="presetsave"]'), function () { onPresetSaveClick() })
   }
 
   function getElById(id) {
@@ -1042,6 +1067,8 @@ window.addEventListener('load', () => {
 
   function enterEdit() {
     if (editMode) return
+    if (previewMode) exitPreview()
+    setFabHidden(true)
     editMode = true
     editConfig = padConfig ? JSON.parse(JSON.stringify(padConfig)) : { buttons: {} }
     overlay = document.createElement('div')
@@ -1142,6 +1169,8 @@ window.addEventListener('load', () => {
   function exitEdit() {
     editMode = false
     removeEditBlock()
+    blurPresetInput()
+    setFabHidden(false)
     collectEditable()
     allEditableEls.forEach(function (entry) {
       unbindDrag(entry.el)
@@ -1177,6 +1206,277 @@ window.addEventListener('load', () => {
     layout()
   }
 
+  // ================= 预设（保存/载入/重命名/删除，最多 10 个，名称 ≤12 字） =================
+  // 用 null-prototype 对象，避免用户命名 __proto__/constructor 污染原型
+  var presets = Object.create(null)
+  var presetMode = false    // 是否在预设管理视图
+  var presetRename = null   // 正在重命名的旧名称
+  var PRESET_MAX = 10
+  // 预览模式（只读查看预设布局）
+  var previewMode = false
+  var previewRestore = null
+  var previewBanner = null
+  var previewOverlay = null
+
+  function sanitizeName(name) {
+    return String(name || '').replace(/\s+/g, ' ').trim().slice(0, 12)
+  }
+  function loadPresetsRaw() {
+    presets = Object.create(null)
+    try {
+      if (window && window.TyranorTouchPadNative && window.TyranorTouchPadNative.getPresets) {
+        var raw = window.TyranorTouchPadNative.getPresets()
+        if (raw) {
+          var parsed = JSON.parse(raw)
+          if (parsed && typeof parsed === 'object') {
+            Object.keys(parsed).forEach(function (k) { presets[k] = parsed[k] })
+          }
+        }
+      }
+    } catch (e) { /* 忽略 */ }
+    return presets
+  }
+  function persistPresets() {
+    try {
+      if (window && window.TyranorTouchPadNative && window.TyranorTouchPadNative.savePresets) {
+        window.TyranorTouchPadNative.savePresets(JSON.stringify(presets))
+      }
+    } catch (e) { /* 忽略 */ }
+  }
+  function currentLayoutConfig() {
+    var cfg = (editMode && editConfig) ? editConfig : padConfig
+    return cfg ? JSON.parse(JSON.stringify(cfg)) : { buttons: {} }
+  }
+  function savePreset(name) {
+    name = sanitizeName(name)
+    if (!name) return { ok: false, msg: '预设名不能为空' }
+    var names = Object.keys(presets)
+    if (!(name in presets) && names.length >= PRESET_MAX) {
+      return { ok: false, msg: '预设已达上限（' + PRESET_MAX + ' 个），请先删除或重命名' }
+    }
+    presets[name] = currentLayoutConfig()
+    persistPresets()
+    return { ok: true, msg: '已保存预设「' + name + '」' }
+  }
+  function loadPreset(name) {
+    if (!(name in presets)) return { ok: false, msg: '预设「' + name + '」不存在' }
+    var cfg = JSON.parse(JSON.stringify(presets[name]))
+    if (editMode) {
+      // 编辑中仅替换工作副本，由「保存并退出」统一持久化，取消可回退
+      editConfig = JSON.parse(JSON.stringify(cfg))
+      refreshEditConfig()
+    } else {
+      padConfig = cfg
+      try {
+        if (window && window.TyranorTouchPadNative && window.TyranorTouchPadNative.saveConfig) {
+          window.TyranorTouchPadNative.saveConfig(JSON.stringify(cfg))
+        }
+      } catch (e) { /* 忽略 */ }
+      layout()
+    }
+    return { ok: true, msg: '已载入预设「' + name + '」' }
+  }
+  function renamePreset(oldName, newName) {
+    oldName = sanitizeName(oldName)
+    newName = sanitizeName(newName)
+    if (!(oldName in presets)) return { ok: false, msg: '预设不存在' }
+    if (!newName) return { ok: false, msg: '预设名不能为空' }
+    if (newName !== oldName && newName in presets) return { ok: false, msg: '预设名「' + newName + '」已存在' }
+    if (newName !== oldName) {
+      presets[newName] = presets[oldName]
+      delete presets[oldName]
+    }
+    persistPresets()
+    return { ok: true, msg: '已重命名为「' + newName + '」' }
+  }
+  function deletePreset(name) {
+    name = sanitizeName(name)
+    if (!(name in presets)) return { ok: false, msg: '预设不存在' }
+    delete presets[name]
+    persistPresets()
+    return { ok: true, msg: '已删除「' + name + '」' }
+  }
+
+  // ---------- 预设管理 UI ----------
+  function setPresetMsg(text) {
+    var m = panel && panel.querySelector('[data-act="presetmsg"]')
+    if (m) m.textContent = text || ''
+  }
+  function showMainView() {
+    presetMode = false
+    presetRename = null
+    blurPresetInput()
+    var main = panel && panel.querySelector('[data-act="mainview"]')
+    var pv = panel && panel.querySelector('[data-act="presetview"]')
+    if (main) main.style.display = ''
+    if (pv) pv.style.display = 'none'
+  }
+  function showPresetView() {
+    presetMode = true
+    presetRename = null
+    blurPresetInput()
+    var main = panel && panel.querySelector('[data-act="mainview"]')
+    var pv = panel && panel.querySelector('[data-act="presetview"]')
+    if (main) main.style.display = 'none'
+    if (pv) pv.style.display = 'block'
+    var input = panel && panel.querySelector('[data-act="presetname"]')
+    if (input) input.value = ''
+    var saveBtn = panel && panel.querySelector('[data-act="presetsave"]')
+    if (saveBtn) saveBtn.textContent = '保存为新预设'
+    setPresetMsg('')
+    loadPresetsRaw()
+    renderPresetList()
+  }
+  function renderPresetList() {
+    var list = panel && panel.querySelector('[data-act="presetlist"]')
+    if (!list) return
+    list.innerHTML = ''
+    var names = Object.keys(presets).sort()
+    if (names.length === 0) {
+      list.innerHTML = '<div style="opacity:0.6;padding:6px 0">暂无预设。输入名称可保存当前布局。</div>'
+      return
+    }
+    names.forEach(function (name) {
+      var row = document.createElement('div')
+      row.style.cssText = 'display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid #333'
+      var label = document.createElement('span')
+      label.style.cssText = 'flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'
+      label.textContent = name
+      row.appendChild(label)
+      var load = document.createElement('button')
+      var rn = document.createElement('button')
+      var del = document.createElement('button')
+      load.className = rn.className = del.className = 'tm-pad-btn'
+      load.textContent = '载入'
+      rn.textContent = '重命名'
+      del.textContent = '删除'
+      load.style.cssText = rn.style.cssText = del.style.cssText = 'padding:3px 8px;font:12px sans-serif'
+      row.appendChild(load)
+      row.appendChild(rn)
+      row.appendChild(del)
+      list.appendChild(row)
+      bindTap(load, function () { applyPresetAction('load', name) })
+      bindTap(rn, function () { startPresetRename(name) })
+      bindTap(del, function () { applyPresetAction('delete', name) })
+    })
+  }
+  function startPresetRename(name) {
+    presetRename = name
+    var input = panel && panel.querySelector('[data-act="presetname"]')
+    if (input) input.value = name
+    var saveBtn = panel && panel.querySelector('[data-act="presetsave"]')
+    if (saveBtn) saveBtn.textContent = '重命名'
+    setPresetMsg('正在重命名「' + name + '」')
+  }
+  function onPresetSaveClick() {
+    var input = panel && panel.querySelector('[data-act="presetname"]')
+    var name = sanitizeName(input ? input.value : '')
+    if (!name) { setPresetMsg('请输入预设名'); return }
+    var res = presetRename ? renamePreset(presetRename, name) : savePreset(name)
+    setPresetMsg(res.msg)
+    blurPresetInput()
+    if (res.ok) {
+      presetRename = null
+      if (input) input.value = ''
+      var saveBtn = panel && panel.querySelector('[data-act="presetsave"]')
+      if (saveBtn) saveBtn.textContent = '保存为新预设'
+      renderPresetList()
+    }
+  }
+  function applyPresetAction(action, name) {
+    var res
+    if (action === 'load') {
+      res = loadPreset(name)
+      if (res.ok) { showMainView(); return }
+    } else if (action === 'delete') {
+      res = deletePreset(name)
+    }
+    setPresetMsg(res.msg)
+    blurPresetInput()
+    renderPresetList()
+  }
+
+  // 隐藏/恢复修改器悬浮球（编辑/预览时不可点开，保持模态）
+  function setFabHidden(hidden) {
+    try {
+      var fab = document.getElementById('tyranor-mod-launcher')
+      if (fab) fab.style.display = hidden ? 'none' : ''
+    } catch (e) { /* 忽略 */ }
+  }
+
+  // 强制收起软键盘（编辑面板 preventDefault 会阻止点击外部自动失焦；
+  // 仅 blur 在部分 WebView 不可靠，配合 readonly 技巧强制收起）
+  function blurPresetInput() {
+    var inp = panel && panel.querySelector('[data-act="presetname"]')
+    if (!inp) return
+    try { inp.setAttribute('readonly', 'readonly') } catch (e) {}
+    if (inp.blur) inp.blur()
+    setTimeout(function () {
+      try { inp.removeAttribute('readonly') } catch (e) {}
+    }, 150)
+  }
+
+  // ---------- 预设预览（只读，只能退出） ----------
+  function previewPreset(name) {
+    name = sanitizeName(name)
+    loadPresetsRaw()
+    if (!(name in presets)) return { ok: false, msg: '预设「' + name + '」不存在' }
+    if (editMode) return { ok: false, msg: '请先退出键盘映射再预览' }
+    if (!previewMode) {
+      previewMode = true
+      setFabHidden(true)
+      previewRestore = padConfig
+      previewOverlay = document.createElement('div')
+      previewOverlay.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100%;' +
+        'background:rgba(0,0,0,0.25);z-index:100000000;touch-action:none'
+      document.body.appendChild(previewOverlay)
+      previewBanner = document.createElement('div')
+      previewBanner.className = 'tm-pad-preview-banner'
+      previewBanner.style.cssText = [
+        'position:fixed', 'left:50%', 'top:14px', 'transform:translateX(-50%)',
+        'z-index:100000010', 'background:rgba(20,20,30,0.95)', 'color:#fff',
+        'border:1px solid #4a9eff', 'border-radius:12px', 'padding:8px 14px',
+        'display:flex', 'align-items:center', 'gap:10px',
+        'font:14px/1.4 sans-serif', 'box-shadow:0 4px 20px rgba(0,0,0,0.5)',
+        'user-select:none', 'touch-action:none', 'max-width:92vw'
+      ].join(';')
+      var label = document.createElement('span')
+      label.className = 'tm-pad-preview-name'
+      label.style.cssText = 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis'
+      label.textContent = '预览：' + name
+      previewBanner.appendChild(label)
+      var btn = document.createElement('button')
+      btn.className = 'tm-pad-btn primary'
+      btn.textContent = '退出预览'
+      btn.style.cssText = 'padding:6px 12px;font:13px sans-serif'
+      previewBanner.appendChild(btn)
+      document.body.appendChild(previewBanner)
+      bindTap(btn, function () { exitPreview() })
+      removeEditBlock()
+      installEditBlock(previewOverlay)
+      installEditBlock(previewBanner)
+    } else {
+      var nm = previewBanner && previewBanner.querySelector('.tm-pad-preview-name')
+      if (nm) nm.textContent = '预览：' + name
+    }
+    padConfig = JSON.parse(JSON.stringify(presets[name]))
+    layout()
+    return { ok: true, msg: '' }
+  }
+  function exitPreview() {
+    if (!previewMode) return
+    previewMode = false
+    if (previewOverlay && previewOverlay.parentNode) previewOverlay.parentNode.removeChild(previewOverlay)
+    previewOverlay = null
+    if (previewBanner && previewBanner.parentNode) previewBanner.parentNode.removeChild(previewBanner)
+    previewBanner = null
+    removeEditBlock()
+    setFabHidden(false)
+    padConfig = previewRestore
+    previewRestore = null
+    layout()
+  }
+
   // 暴露 API 供修改器悬浮球（__rpgmaker_mod_ui.js）与外部调用
   window.__touchPad = {
     enterEdit: enterEdit,
@@ -1184,9 +1484,18 @@ window.addEventListener('load', () => {
     saveAndExit: saveAndExit,
     resetToDefaults: resetToDefaults,
     isEditMode: function () { return editMode },
-    getConfig: function () { return padConfig ? JSON.stringify(padConfig) : '' }
+    getConfig: function () { return padConfig ? JSON.stringify(padConfig) : '' },
+    savePreset: savePreset,
+    loadPreset: loadPreset,
+    renamePreset: renamePreset,
+    deletePreset: deletePreset,
+    listPresets: function () { loadPresetsRaw(); return Object.keys(presets) },
+    previewPreset: previewPreset,
+    exitPreview: exitPreview,
+    isPreview: function () { return previewMode }
   }
 
+  loadPresetsRaw()
   layout()
   window.addEventListener('resize', function () {
     if (editMode) refreshEditConfig()

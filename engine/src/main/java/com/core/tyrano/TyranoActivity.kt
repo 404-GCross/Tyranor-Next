@@ -886,6 +886,32 @@ class TyranoActivity : Activity() {
                 // 保留现有配置
             }
         }
+
+        @JavascriptInterface
+        fun getPresets(): String = try {
+            preferences.getString(gameId, null)?.let { raw ->
+                JSONObject(raw).optString(PER_GAME_TOUCH_PAD_PRESETS_KEY)
+            }.orEmpty()
+        } catch (_: Throwable) {
+            ""
+        }
+
+        @JavascriptInterface
+        fun savePresets(raw: String?) {
+            if (gameId.isBlank()) return
+            try {
+                val existing = runCatching { preferences.getString(gameId, null)?.let { JSONObject(it) } }
+                    .getOrNull() ?: JSONObject()
+                if (raw.isNullOrBlank() || JSONObject(raw).length() == 0) {
+                    existing.remove(PER_GAME_TOUCH_PAD_PRESETS_KEY)
+                } else {
+                    existing.put(PER_GAME_TOUCH_PAD_PRESETS_KEY, JSONObject(raw))
+                }
+                preferences.edit().putString(gameId, existing.toString()).apply()
+            } catch (_: Throwable) {
+                // 保留现有预设
+            }
+        }
     }
 
     private enum class WebGameType(val intentValue: String) {
@@ -922,6 +948,7 @@ class TyranoActivity : Activity() {
         private const val RPG_MAKER_MOD_PREFS = "tyranor_rpgmaker_mod_state"
         private const val GAME_OVERRIDES_PREFS = "tyranor_game_overrides"
         private const val PER_GAME_TOUCH_PAD_KEY = "touch_pad_config"
+        private const val PER_GAME_TOUCH_PAD_PRESETS_KEY = "touch_pad_presets"
         private const val RPG_MAKER_MOD_CORE_ASSET = "__rpgmaker_mod_core.js"
         private const val RPG_MAKER_MOD_UI_ASSET = "__rpgmaker_mod_ui.js"
         private const val RPG_MAKER_MOD_CSS_ASSET = "__rpgmaker_mod.css"
