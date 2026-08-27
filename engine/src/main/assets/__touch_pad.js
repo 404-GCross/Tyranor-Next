@@ -55,6 +55,12 @@ window.addEventListener('load', () => {
   // 坐标采用「归一化」（相对视口 0..1），横竖屏切换后按比例重映射，位置不漂移。
   const vw = () => window.innerWidth || 1
   const vh = () => window.innerHeight || 1
+  // 归一化坐标统一钳制：允许小幅出界便于摆放半出屏按钮，但杜绝坐标漂离视口后无法拖回，
+  // 也避免下次加载时被 x>1 的像素迁移启发式误判反复腐蚀
+  const clampCoord = (v) => {
+    const n = Number(v)
+    return Math.max(-0.1, Math.min(1.1, isFinite(n) ? n : 0))
+  }
   let padConfig = null
   try {
     const raw = window.__touchPadConfig
@@ -68,6 +74,10 @@ window.addEventListener('load', () => {
           if (b && b.x != null) b.x = b.x / vw()
           if (b && b.y != null) b.y = b.y / vh()
         })
+        // 迁移结果立即写回，避免未保存期间换朝向后以不同视口反复迁移、位置漂移
+        if (window.TyranorTouchPadNative && window.TyranorTouchPadNative.saveConfig) {
+          window.TyranorTouchPadNative.saveConfig(JSON.stringify(raw))
+        }
       }
       padConfig = raw
     }
@@ -840,12 +850,16 @@ window.addEventListener('load', () => {
     if (yes) yes.onpointerdown = function (ev) { ev.stopPropagation(); ev.preventDefault(); onConfirm() }
   }
 
+  // 长按连发活动终止器登记表：exitEdit 统一 clearTimeout，
+  // 防止面板被销毁/触摸流被打断后 setTimeout 链孤儿化永续空转
+  var holdStops = []
   // 长按连发：按住持续触发回调，松开停止（用于 +/- 缩放与微调）
   function holdRepeat(el, fn, interval) {
     var timer = null
     var doFn = function (ev) {
       ev.stopPropagation()
       ev.preventDefault()
+      if (timer != null) return // 重入保护：第二根手指同按不再叠加新的连发链
       fn()
       timer = setTimeout(function tick() {
         fn()
@@ -860,6 +874,7 @@ window.addEventListener('load', () => {
     el.addEventListener('pointerup', stop)
     el.addEventListener('pointercancel', stop)
     el.addEventListener('pointerleave', stop)
+    holdStops.push(stop)
   }
   // 面板动作键：pointerdown 触发（WebView 触摸路径 click 不可靠），并吞掉合成 click 防双触发
   function bindTap(el, fn) {
@@ -887,8 +902,8 @@ window.addEventListener('load', () => {
     var el = getElById(selectedId)
     if (!el) return
     var pr = el.getBoundingClientRect()
-    c.x = (pr.left + pr.width / 2 + dx) / vw()
-    c.y = (pr.top + pr.height / 2 + dy) / vh()
+    c.x = clampCoord((pr.left + pr.width / 2 + dx) / vw())
+    c.y = clampCoord((pr.top + pr.height / 2 + dy) / vh())
     refreshEditConfig()
     setSelected(selectedId)
   }
@@ -902,6 +917,8 @@ window.addEventListener('load', () => {
     setSelected(selectedId)
   }
   function buildPanel() {
+    // 每次进入编辑都重建面板：清掉上一轮会话的登记，避免 holdStops 无限增长
+    holdStops = []
     var style = document.getElementById('tm-pad-edit-css')
     if (!style) {
       style = document.createElement('style')
@@ -1034,6 +1051,12 @@ window.addEventListener('load', () => {
     bindTap(panel.querySelector('[data-act="transparent"]'), function () {
       if (!selectedId) return
       var c = ensureButtonCfg(selectedId)
+      if (selectedId === 'btn.hide' && c.visible !== false) {
+        // 隐藏键自身不允许透明：一旦真隐藏，普通模式下游戏内无出路（修改器关闭时连 FAB 都没有）
+        var hl = panel && panel.querySelector('.tm-pad-vislabel')
+        if (hl) hl.textContent = '隐藏键不可透明'
+        return
+      }
       if (c.visible === false) c.visible = true
       else c.visible = false
       refreshEditConfig()
@@ -1070,6 +1093,16 @@ window.addEventListener('load', () => {
     if (previewMode) exitPreview()
     setFabHidden(true)
     editMode = true
+    // 置位后任何一步失败都必须回滚，否则虚拟键失灵且 FAB 已隐藏、游戏内无法自救
+    try {
+      startEditSession()
+    } catch (e) {
+      console.error('enterEdit failed', e)
+      try { exitEdit() } catch (_ignored) {}
+    }
+  }
+
+  function startEditSession() {
     editConfig = padConfig ? JSON.parse(JSON.stringify(padConfig)) : { buttons: {} }
     overlay = document.createElement('div')
     overlay.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100%;' +
@@ -1091,14 +1124,18 @@ window.addEventListener('load', () => {
       el.classList.add('tm-pad-editable')
       el.style.pointerEvents = 'auto'
     })
+    // 先按编辑态布局一次：强制隐藏控件（如默认摇杆模式下的方向键、被 Hide 的键盘）
+    // 渲染出实际矩形，避免随后采集 getBoundingClientRect 得到 (0,0) 并写入持久化配置
+    refreshEditConfig()
     allEditableEls.forEach(function (entry) {
       var meta = entry.el.__pad || {}
       var c = editConfig.buttons[meta.id]
       if (!c || c.x == null || c.y == null) {
         var r = entry.el.getBoundingClientRect()
+        if (!r.width && !r.height) return
         editConfig.buttons[meta.id] = c || defaultButtonFor(meta.id)
-        editConfig.buttons[meta.id].x = (r.left + r.width / 2) / vw()
-        editConfig.buttons[meta.id].y = (r.top + r.height / 2) / vh()
+        editConfig.buttons[meta.id].x = clampCoord((r.left + r.width / 2) / vw())
+        editConfig.buttons[meta.id].y = clampCoord((r.top + r.height / 2) / vh())
       }
     })
     refreshEditConfig()
@@ -1121,8 +1158,8 @@ window.addEventListener('load', () => {
       var c = ensureButtonCfg(meta.id)
       if (!c) return
       var r = el.getBoundingClientRect()
-      c.x = (r.left + r.width / 2) / vw()
-      c.y = (r.top + r.height / 2) / vh()
+      c.x = clampCoord((r.left + r.width / 2) / vw())
+      c.y = clampCoord((r.top + r.height / 2) / vh())
       drag = { id: meta.id, ox: ev.clientX, oy: ev.clientY, bx: c.x, by: c.y, moved: false }
     }
     function onMove(ev) {
@@ -1133,8 +1170,8 @@ window.addEventListener('load', () => {
       drag.moved = true
       var c = ensureButtonCfg(drag.id)
       if (!c) return
-      c.x = drag.bx + dx / vw()
-      c.y = drag.by + dy / vh()
+      c.x = clampCoord(drag.bx + dx / vw())
+      c.y = clampCoord(drag.by + dy / vh())
       refreshEditConfig()
       setSelected(drag.id)
     }
@@ -1170,6 +1207,9 @@ window.addEventListener('load', () => {
     editMode = false
     removeEditBlock()
     blurPresetInput()
+    // 终止所有长按连发链（可能在面板销毁后因触摸流被打断而残留）
+    holdStops.forEach(function (stop) { stop() })
+    holdStops = []
     setFabHidden(false)
     collectEditable()
     allEditableEls.forEach(function (entry) {
@@ -1189,21 +1229,23 @@ window.addEventListener('load', () => {
     layout()
   }
 
-  // 恢复默认布局：清空配置并持久化（可在编辑面板或从悬浮球触发）
+  // 恢复默认布局：清空配置。非编辑态即时持久化；编辑态仅重置工作副本，与整体草稿模型
+  // 保持一致——立即持久化会让随后的「取消」无法回退到用户原有布局
   function resetToDefaults() {
-    padConfig = { buttons: {} }
-    if (editMode) editConfig = { buttons: {} }
-    try {
-      if (window && window.TyranorTouchPadNative && window.TyranorTouchPadNative.saveConfig) {
-        window.TyranorTouchPadNative.saveConfig('{}')
-      }
-    } catch (e) { /* 忽略 */ }
     if (editMode) {
+      editConfig = { buttons: {} }
       collectEditable()
       refreshEditConfig()
       if (selectedId) setSelected(selectedId)
+    } else {
+      padConfig = { buttons: {} }
+      try {
+        if (window && window.TyranorTouchPadNative && window.TyranorTouchPadNative.saveConfig) {
+          window.TyranorTouchPadNative.saveConfig('{}')
+        }
+      } catch (e) { /* 忽略 */ }
+      layout()
     }
-    layout()
   }
 
   // ================= 预设（保存/载入/重命名/删除，最多 10 个，名称 ≤12 字） =================
@@ -1426,35 +1468,14 @@ window.addEventListener('load', () => {
       previewMode = true
       setFabHidden(true)
       previewRestore = padConfig
-      previewOverlay = document.createElement('div')
-      previewOverlay.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100%;' +
-        'background:rgba(0,0,0,0.25);z-index:100000000;touch-action:none'
-      document.body.appendChild(previewOverlay)
-      previewBanner = document.createElement('div')
-      previewBanner.className = 'tm-pad-preview-banner'
-      previewBanner.style.cssText = [
-        'position:fixed', 'left:50%', 'top:14px', 'transform:translateX(-50%)',
-        'z-index:100000010', 'background:rgba(20,20,30,0.95)', 'color:#fff',
-        'border:1px solid #4a9eff', 'border-radius:12px', 'padding:8px 14px',
-        'display:flex', 'align-items:center', 'gap:10px',
-        'font:14px/1.4 sans-serif', 'box-shadow:0 4px 20px rgba(0,0,0,0.5)',
-        'user-select:none', 'touch-action:none', 'max-width:92vw'
-      ].join(';')
-      var label = document.createElement('span')
-      label.className = 'tm-pad-preview-name'
-      label.style.cssText = 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis'
-      label.textContent = '预览：' + name
-      previewBanner.appendChild(label)
-      var btn = document.createElement('button')
-      btn.className = 'tm-pad-btn primary'
-      btn.textContent = '退出预览'
-      btn.style.cssText = 'padding:6px 12px;font:13px sans-serif'
-      previewBanner.appendChild(btn)
-      document.body.appendChild(previewBanner)
-      bindTap(btn, function () { exitPreview() })
-      removeEditBlock()
-      installEditBlock(previewOverlay)
-      installEditBlock(previewBanner)
+      // 建场失败必须回滚：否则 previewMode 卡在 true 且 FAB 已隐藏，游戏内没有退出入口
+      try {
+        startPreviewSession(name)
+      } catch (e) {
+        console.error('previewPreset failed', e)
+        try { exitPreview() } catch (_ignored) {}
+        return { ok: false, msg: '预览开启失败' }
+      }
     } else {
       var nm = previewBanner && previewBanner.querySelector('.tm-pad-preview-name')
       if (nm) nm.textContent = '预览：' + name
@@ -1463,6 +1484,40 @@ window.addEventListener('load', () => {
     layout()
     return { ok: true, msg: '' }
   }
+
+  // 建立预览遮罩与只读横幅；异常由 previewPreset 兜底回滚（原 padConfig 已存入 previewRestore）
+  function startPreviewSession(name) {
+    previewOverlay = document.createElement('div')
+    previewOverlay.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100%;' +
+      'background:rgba(0,0,0,0.25);z-index:100000000;touch-action:none'
+    document.body.appendChild(previewOverlay)
+    previewBanner = document.createElement('div')
+    previewBanner.className = 'tm-pad-preview-banner'
+    previewBanner.style.cssText = [
+      'position:fixed', 'left:50%', 'top:14px', 'transform:translateX(-50%)',
+      'z-index:100000010', 'background:rgba(20,20,30,0.95)', 'color:#fff',
+      'border:1px solid #4a9eff', 'border-radius:12px', 'padding:8px 14px',
+      'display:flex', 'align-items:center', 'gap:10px',
+      'font:14px/1.4 sans-serif', 'box-shadow:0 4px 20px rgba(0,0,0,0.5)',
+      'user-select:none', 'touch-action:none', 'max-width:92vw'
+    ].join(';')
+    var label = document.createElement('span')
+    label.className = 'tm-pad-preview-name'
+    label.style.cssText = 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis'
+    label.textContent = '预览：' + name
+    previewBanner.appendChild(label)
+    var btn = document.createElement('button')
+    btn.className = 'tm-pad-btn primary'
+    btn.textContent = '退出预览'
+    btn.style.cssText = 'padding:6px 12px;font:13px sans-serif'
+    previewBanner.appendChild(btn)
+    document.body.appendChild(previewBanner)
+    bindTap(btn, function () { exitPreview() })
+    removeEditBlock()
+    installEditBlock(previewOverlay)
+    installEditBlock(previewBanner)
+  }
+
   function exitPreview() {
     if (!previewMode) return
     previewMode = false

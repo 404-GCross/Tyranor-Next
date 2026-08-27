@@ -139,7 +139,7 @@ class TyranoActivity : Activity() {
             // issue #30：游戏内可自定义按钮布局，逐游戏配置在此注入供 JS 读取。
             val isRpgWebGame = webGameType == WebGameType.RPG_MV || webGameType == WebGameType.RPG_MZ
             val touchPadConf = if (isRpgWebGame && rpgMakerModGameId.isNotBlank()) {
-                getSharedPreferences(GAME_OVERRIDES_PREFS, Context.MODE_PRIVATE)
+                getSharedPreferences(EnginePrefs.GAME_OVERRIDES_PREFS, Context.MODE_PRIVATE)
                     .getString(rpgMakerModGameId, null)?.let { raw ->
                         runCatching { JSONObject(raw).optString(PER_GAME_TOUCH_PAD_KEY) }
                             .getOrNull()?.takeIf { it.isNotBlank() }
@@ -855,59 +855,65 @@ class TyranoActivity : Activity() {
         }
     }
 
-    /** 触屏手柄游戏内布局保存桥（issue #30）：按游戏持久化自定义布局。 */
+    /** 触屏手柄游戏内布局保存桥（issue #30）：按游戏持久化自定义布局与预设。 */
     inner class TouchPadSaveBridge(private val gameId: String) {
         private val preferences
-            get() = getSharedPreferences(GAME_OVERRIDES_PREFS, Context.MODE_PRIVATE)
+            get() = getSharedPreferences(EnginePrefs.GAME_OVERRIDES_PREFS, Context.MODE_PRIVATE)
 
-        @JavascriptInterface
-        fun getConfig(): String = try {
+        // touch_pad_config / touch_pad_presets 键目前仅 engine 侧读写（常量留在本文件）；
+        // 与 PerGameSettingsStore 的其它引擎字段共存于同一条 JSON 记录，必须整条读改写以保留他人字段。
+        // 已知限制：app 主线程的设置页写路径与本桥线程之间暂无跨层互斥，极端并发下存在丢更新窗口，
+        // 后续如需彻底收口应把该记录的全部读写收敛到单一同步入口。
+        private fun readField(key: String): String = try {
             preferences.getString(gameId, null)?.let { raw ->
-                JSONObject(raw).optString(PER_GAME_TOUCH_PAD_KEY)
+                JSONObject(raw).optString(key)
             }.orEmpty()
         } catch (_: Throwable) {
             ""
         }
+
+        private fun updateRecord(mutate: (JSONObject) -> Unit) {
+            val existing = runCatching { preferences.getString(gameId, null)?.let { JSONObject(it) } }
+                .getOrNull() ?: JSONObject()
+            mutate(existing)
+            preferences.edit().putString(gameId, existing.toString()).apply()
+        }
+
+        @JavascriptInterface
+        fun getConfig(): String = readField(PER_GAME_TOUCH_PAD_KEY)
 
         @JavascriptInterface
         fun saveConfig(raw: String?) {
             if (gameId.isBlank() || raw.isNullOrBlank()) return
             try {
                 val input = JSONObject(raw)
-                val existing = runCatching { preferences.getString(gameId, null)?.let { JSONObject(it) } }
-                    .getOrNull() ?: JSONObject()
-                if (input.length() == 0) {
-                    existing.remove(PER_GAME_TOUCH_PAD_KEY)
-                } else {
-                    existing.put(PER_GAME_TOUCH_PAD_KEY, input)
+                updateRecord { record ->
+                    if (input.length() == 0) {
+                        record.remove(PER_GAME_TOUCH_PAD_KEY)
+                    } else {
+                        // 统一字符串形态落盘，与 PerGameSettingsStore.setStr 的包裹方式一致
+                        record.put(PER_GAME_TOUCH_PAD_KEY, input.toString())
+                    }
                 }
-                preferences.edit().putString(gameId, existing.toString()).apply()
             } catch (_: Throwable) {
                 // 保留现有配置
             }
         }
 
         @JavascriptInterface
-        fun getPresets(): String = try {
-            preferences.getString(gameId, null)?.let { raw ->
-                JSONObject(raw).optString(PER_GAME_TOUCH_PAD_PRESETS_KEY)
-            }.orEmpty()
-        } catch (_: Throwable) {
-            ""
-        }
+        fun getPresets(): String = readField(PER_GAME_TOUCH_PAD_PRESETS_KEY)
 
         @JavascriptInterface
         fun savePresets(raw: String?) {
             if (gameId.isBlank()) return
             try {
-                val existing = runCatching { preferences.getString(gameId, null)?.let { JSONObject(it) } }
-                    .getOrNull() ?: JSONObject()
-                if (raw.isNullOrBlank() || JSONObject(raw).length() == 0) {
-                    existing.remove(PER_GAME_TOUCH_PAD_PRESETS_KEY)
-                } else {
-                    existing.put(PER_GAME_TOUCH_PAD_PRESETS_KEY, JSONObject(raw))
+                updateRecord { record ->
+                    if (raw.isNullOrBlank() || JSONObject(raw).length() == 0) {
+                        record.remove(PER_GAME_TOUCH_PAD_PRESETS_KEY)
+                    } else {
+                        record.put(PER_GAME_TOUCH_PAD_PRESETS_KEY, JSONObject(raw).toString())
+                    }
                 }
-                preferences.edit().putString(gameId, existing.toString()).apply()
             } catch (_: Throwable) {
                 // 保留现有预设
             }
@@ -946,7 +952,6 @@ class TyranoActivity : Activity() {
         private const val EXTRA_RPG_MAKER_MOD_ENABLED = "rpgMakerModEnabled"
         private const val EXTRA_RPG_MAKER_MOD_GAME_ID = "rpgMakerModGameId"
         private const val RPG_MAKER_MOD_PREFS = "tyranor_rpgmaker_mod_state"
-        private const val GAME_OVERRIDES_PREFS = "tyranor_game_overrides"
         private const val PER_GAME_TOUCH_PAD_KEY = "touch_pad_config"
         private const val PER_GAME_TOUCH_PAD_PRESETS_KEY = "touch_pad_presets"
         private const val RPG_MAKER_MOD_CORE_ASSET = "__rpgmaker_mod_core.js"

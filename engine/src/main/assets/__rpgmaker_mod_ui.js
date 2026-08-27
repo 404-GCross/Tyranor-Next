@@ -12,7 +12,7 @@
   var context = { actorId: 0, itemKind: "item", systemKind: "switch" };
   var tabs = [
     ["quick", "快捷"], ["items", "物品"], ["actors", "角色"], ["system", "系统"],
-    ["map", "地图"], ["battle", "战斗"], ["save", "存档"], ["keys", "键盘"]
+    ["map", "地图"], ["battle", "战斗"], ["save", "存档"], ["keys", "键盘"], ["about", "说明"]
   ];
   var flags = [
     ["godMode", "无敌"], ["oneHit", "一击必杀"], ["alwaysCrit", "必定暴击"],
@@ -150,7 +150,8 @@
     try { names = window.__touchPad.listPresets(); } catch (e) { names = []; }
     if (names && names.length) {
       var rows = names.map(function (name) {
-        var esc = escapeHtml(name).replace(/"/g, "&quot;");
+        // escapeHtml 已覆盖引号转义，data-name 属性可直接使用
+        var esc = escapeHtml(name);
         return '<div class="tm-row" style="justify-content:space-between">' +
           '<label style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:0">' + escapeHtml(name) + '</label>' +
           '<span style="display:flex;gap:6px">' +

@@ -1,6 +1,7 @@
 package com.tyranor.next.core.settings
 
 import android.content.Context
+import com.core.engine.EnginePrefs
 import org.json.JSONObject
 
 /**
@@ -10,7 +11,9 @@ import org.json.JSONObject
  */
 object PerGameSettingsStore {
 
-    private const val PREF_NAME = "tyranor_game_overrides"
+    // prefs 文件名契约锚点在 engine（引擎 TyranoActivity/TouchPadSaveBridge 直读写同一文件），
+    // 改名只需改 EnginePrefs 一处。
+    private val PREF_NAME = EnginePrefs.GAME_OVERRIDES_PREFS
 
     // KR 覆盖字段名
     const val F_ENGINE_VERSION = "engine_version"
@@ -38,7 +41,6 @@ object PerGameSettingsStore {
 
     // RPG Maker MV/MZ
     const val F_RPG_MAKER_MOD_ENABLED = "rpg_maker_mod_enabled"
-    const val F_TOUCH_PAD_CONFIG = "touch_pad_config"
 
     // ONS 子对象键
     const val ONS_KEY = "ons"
@@ -106,18 +108,6 @@ object PerGameSettingsStore {
     fun clear(context: Context, gameId: String) {
         if (gameId.isBlank()) return
         prefs(context).edit().remove(gameId).apply()
-    }
-
-    /** 读取触屏手柄配置 JSON；null=使用默认布局。 */
-    fun getTouchPadConfig(context: Context, gameId: String): String? {
-        if (gameId.isBlank()) return null
-        return getStr(context, gameId, F_TOUCH_PAD_CONFIG)
-    }
-
-    /** 保存触屏手柄配置 JSON。null=移除自定义（恢复默认）。 */
-    fun setTouchPadConfig(context: Context, gameId: String, json: String?) {
-        if (gameId.isBlank()) return
-        setStr(context, gameId, F_TOUCH_PAD_CONFIG, json)
     }
 
     private fun persist(context: Context, gameId: String, json: JSONObject) {
