@@ -33,7 +33,7 @@ object RpgMakerExternalEngineModule : ExternalEngineModule {
         "internal.mkxpz",
     )
     override val installUrl: String =
-        "https://github.com/Weiss-UltimateSavior/RinneMobile/releases/download/test/RPGMPlugin-1.22.00-patreon-release.apk"
+        "https://github.com/Weiss-UltimateSavior/RinneMobile/releases/download/test/RPGM-Plugin.apk"
 
     override fun prepareForLaunch(
         context: Context,

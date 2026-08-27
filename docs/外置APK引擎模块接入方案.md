@@ -764,7 +764,7 @@ RPGM 作为外置 APK 模块，默认启用，不需要手动开关。
 RPGM 下载地址沿用 RinneMobile：
 
 ```text
-https://github.com/Weiss-UltimateSavior/RinneMobile/releases/download/test/RPGMPlugin-1.22.00-patreon-release.apk
+https://github.com/Weiss-UltimateSavior/RinneMobile/releases/download/test/RPGM-Plugin.apk
 ```
 
 ### 9.5.10 游戏抽屉与存档管理

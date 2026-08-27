@@ -26,6 +26,6 @@ class ExternalEngineModuleRegistryTest {
         assertSame(RpgMakerExternalEngineModule, ExternalEngineModuleRegistry.moduleForAlias("internal.mkxp-z"))
         assertSame(RpgMakerExternalEngineModule, ExternalEngineModuleRegistry.moduleForAlias(RpgMakerExternalEngineModule.packageName))
         assertTrue(ExternalEngineModuleRegistry.isExternalEngine(EngineType.RPGMAKER))
-        assertTrue(RpgMakerExternalEngineModule.installUrl.orEmpty().contains("RPGMPlugin"))
+        assertTrue(RpgMakerExternalEngineModule.installUrl.orEmpty().endsWith("/RPGM-Plugin.apk"))
     }
 }
