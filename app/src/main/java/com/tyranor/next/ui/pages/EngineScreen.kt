@@ -61,7 +61,7 @@ fun EngineScreen(modifier: Modifier = Modifier) {
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             items(
-                items = engines,
+                items = engines.distinctBy { engineDisplayName(it) },
                 key = { it.name },
                 contentType = { "engine" },
             ) { engine ->
@@ -92,7 +92,7 @@ private fun EngineRow(engine: EngineType) {
             )
             Column(Modifier.weight(1f).padding(start = 14.dp)) {
                 Text(
-                    engine.displayName,
+                    engineDisplayName(engine),
                     style = MaterialTheme.typography.titleMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -116,14 +116,19 @@ private fun EngineRow(engine: EngineType) {
     }
 }
 
+/** 列表展示名：RPG Maker MV 与 MZ、WebOther 与 VN 各合并为一项。 */
+private fun engineDisplayName(engine: EngineType): String = when (engine) {
+    EngineType.RPG_MV, EngineType.RPG_MZ -> "RPG Maker MV/MZ"
+    EngineType.WEB_OTHER, EngineType.VN -> "WebOther/VN"
+    else -> engine.displayName
+}
+
 private fun engineDescription(engine: EngineType): String = when (engine) {
-    EngineType.KIRIKIRI -> "Kirikiri2 / 吉里吉里，.xp3 与 startup.tjs 游戏"
+    EngineType.KIRIKIRI -> "Kirikiri2 / krkrsdl3，.xp3 与 startup.tjs 游戏"
     EngineType.ONS -> "ONScripter，nscript.dat 与 .nsa 归档游戏"
     EngineType.TYRANO -> "TyranoBuilder，index.html 与 tyrano/ 脚本游戏"
-    EngineType.RPG_MV -> "RPG Maker MV，www 与 js/rpg_core.js 游戏"
-    EngineType.RPG_MZ -> "RPG Maker MZ，www 与 js/rmmz_core.js 游戏"
-    EngineType.VN -> "VN，globalData.vndata 网页游戏"
-    EngineType.WEB_OTHER -> "WebOther，通用 index.html 网页游戏"
+    EngineType.RPG_MV, EngineType.RPG_MZ -> "RPG Maker MV/MZ，www 与 js/rpg_core.js、rmmz_core.js 游戏"
+    EngineType.VN, EngineType.WEB_OTHER -> "WebOther/VN，globalData.vndata 或通用 index.html 网页游戏"
     EngineType.ARTEMIS -> "Artemis，system.ini 与 .pfs 归档游戏"
     EngineType.UNKNOWN -> "未知引擎"
 }
