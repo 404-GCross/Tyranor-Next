@@ -266,6 +266,16 @@ fun PerGameSettingsScreen(game: ScanGame) {
                             )
                         }
                     }
+                    EngineType.RPGMAKER -> item {
+                        SectionCard("RPG Maker") {
+                            Text(
+                                "RPG Maker XP/VX/VX Ace/mkxp-z 使用外置 APK 引擎模块，模块安装后默认启用；当前没有可由主应用覆盖的单游戏设置。",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+                            )
+                        }
+                    }
                     EngineType.TYRANO,
                     EngineType.RPG_MV,
                     EngineType.RPG_MZ,

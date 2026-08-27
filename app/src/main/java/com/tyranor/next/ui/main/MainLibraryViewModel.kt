@@ -246,6 +246,11 @@ internal fun mergeChangedGameFields(base: ScanGame, before: ScanGame, updated: S
     coverSource = if (updated.coverSource != before.coverSource) updated.coverSource else base.coverSource,
     vndbId = if (updated.vndbId != before.vndbId) updated.vndbId else base.vndbId,
     metadataTitle = if (updated.metadataTitle != before.metadataTitle) updated.metadataTitle else base.metadataTitle,
+    externalModuleAlias = if (updated.externalModuleAlias != before.externalModuleAlias) {
+        updated.externalModuleAlias
+    } else {
+        base.externalModuleAlias
+    },
     launchFile = if (updated.launchFile != before.launchFile) updated.launchFile else base.launchFile,
     openTime = if (updated.openTime != before.openTime) updated.openTime else base.openTime,
 )

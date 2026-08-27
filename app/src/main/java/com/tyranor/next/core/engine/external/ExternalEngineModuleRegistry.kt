@@ -6,6 +6,7 @@ import com.tyranor.next.core.engine.EngineType
 object ExternalEngineModuleRegistry {
     val modules: List<ExternalEngineModule> = listOf(
         RenPyExternalEngineModule,
+        RpgMakerExternalEngineModule,
     )
 
     fun moduleForEngine(engine: EngineType): ExternalEngineModule? =

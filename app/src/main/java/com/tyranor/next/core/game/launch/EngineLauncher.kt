@@ -48,6 +48,7 @@ object EngineLauncher {
         EngineType.KIRIKIRI,
         EngineType.ONS,
         EngineType.TYRANO,
+        EngineType.RPGMAKER,
         EngineType.RPG_MV,
         EngineType.RPG_MZ,
         EngineType.VN,
@@ -247,7 +248,8 @@ object EngineLauncher {
 
             EngineType.ARTEMIS -> buildArtemisIntent(context, path, game, patchChoice)
 
-            EngineType.RENPY -> error("Ren'Py is handled by external engine launcher")
+            EngineType.RPGMAKER,
+            EngineType.RENPY -> error("${engine.displayName} is handled by external engine launcher")
 
             EngineType.UNKNOWN -> Intent(context, TyranoActivity::class.java).apply {
                 putExtra("path", path)

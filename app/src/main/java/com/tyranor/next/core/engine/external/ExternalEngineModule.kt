@@ -1,6 +1,7 @@
 package com.tyranor.next.core.engine.external
 
 import android.content.Intent
+import android.content.Context
 import com.tyranor.next.core.engine.EngineType
 import java.util.Locale
 
@@ -14,6 +15,8 @@ interface ExternalEngineModule {
     val defaultAlias: String
     val supportedAliases: Set<String>
     val installUrl: String?
+
+    fun prepareForLaunch(context: Context, request: ExternalEngineLaunchRequest): ExternalEngineLaunchResult? = null
 
     fun buildLaunchIntent(request: ExternalEngineLaunchRequest): Intent
 

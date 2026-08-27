@@ -41,6 +41,7 @@ object ExternalEngineLauncher {
                 "package_not_installed",
             )
         }
+        module.prepareForLaunch(context, request)?.let { return it }
 
         val intent = module.buildLaunchIntent(request).addFlags(
             Intent.FLAG_ACTIVITY_NEW_TASK or

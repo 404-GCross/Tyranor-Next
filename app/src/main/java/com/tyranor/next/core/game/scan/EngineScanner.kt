@@ -26,7 +26,7 @@ import kotlin.math.abs
 
 /**
  * 精简版游戏扫描器，识别逻辑移植自 RinneMobile 的 EngineDetector/GameScanner。
- * 支持引擎：Kirikiri、ONS、Tyrano、RPG Maker MV/MZ、VN、WebOther、Artemis。
+ * 支持引擎：Kirikiri、ONS、Tyrano、RPG Maker XP/VX/VX Ace、RPG Maker MV/MZ、VN、WebOther、Artemis、Ren'Py。
  */
 object EngineScanner {
 
@@ -252,6 +252,7 @@ object EngineScanner {
             g.launchFile.orEmpty(),
             g.openTime.toString(),
             g.coverSource.orEmpty(),
+            g.externalModuleAlias.orEmpty(),
         ).joinToString("\u0001")
     }
 
@@ -269,6 +270,7 @@ object EngineScanner {
             launchFile = p.getOrElse(7) { "" }.takeIf { it.isNotBlank() },
             openTime = p.getOrElse(8) { "" }.toLongOrNull() ?: 0,
             coverSource = p.getOrElse(9) { "" }.takeIf { it.isNotBlank() },
+            externalModuleAlias = p.getOrElse(10) { "" }.takeIf { it.isNotBlank() },
         )
     }
 
@@ -391,6 +393,7 @@ object EngineScanner {
                             },
                         vndbId = previous.vndbId,
                         metadataTitle = previous.metadataTitle,
+                        externalModuleAlias = previous.externalModuleAlias ?: current.externalModuleAlias,
                         launchFile = previous.launchFile,
                         openTime = previous.openTime,
                     )
@@ -451,6 +454,7 @@ object EngineScanner {
                     uri = dir.uri.toString(),
                     engine = detected.engine,
                     launchTarget = detected.launchTarget,
+                    externalModuleAlias = detected.externalModuleAlias,
                     coverUri = coverUri,
                     coverSource = if (coverUri.isNullOrBlank()) null else AppSettingsStore.COVER_SOURCE_LOCAL,
                 )
@@ -505,6 +509,7 @@ object EngineScanner {
                     uri = dir.uri.toString(),
                     engine = detected.engine,
                     launchTarget = detected.launchTarget,
+                    externalModuleAlias = detected.externalModuleAlias,
                     coverUri = coverUri,
                     coverSource = if (coverUri.isNullOrBlank()) null else AppSettingsStore.COVER_SOURCE_LOCAL,
                 )
@@ -656,6 +661,7 @@ object EngineScanner {
                     uri = dir.absolutePath,
                     engine = detected.engine,
                     launchTarget = detected.launchTarget,
+                    externalModuleAlias = detected.externalModuleAlias,
                     coverUri = coverUri,
                     coverSource = if (coverUri.isNullOrBlank()) null else AppSettingsStore.COVER_SOURCE_LOCAL,
                 )
@@ -686,6 +692,7 @@ object EngineScanner {
                     uri = dir.absolutePath,
                     engine = detected.engine,
                     launchTarget = detected.launchTarget,
+                    externalModuleAlias = detected.externalModuleAlias,
                     coverUri = coverUri,
                     coverSource = if (coverUri.isNullOrBlank()) null else AppSettingsStore.COVER_SOURCE_LOCAL,
                 )
@@ -716,7 +723,12 @@ object EngineScanner {
 
     // ============ 引擎识别（移植自 EngineDetector） ============
 
-    data class Detection(val engine: EngineType, val confidence: Int, val launchTarget: String)
+    data class Detection(
+        val engine: EngineType,
+        val confidence: Int,
+        val launchTarget: String,
+        val externalModuleAlias: String? = null,
+    )
 
     fun detectEngine(dir: DocumentFile): Detection {
         if (!dir.isDirectory) return UNKNOWN_DETECTION
@@ -779,6 +791,13 @@ object EngineScanner {
         var hasRpyc = false
         var hasGameScriptRpy = false
         var hasGameOptionsRpy = false
+        var firstRgssad: String? = null
+        var firstRgss2a: String? = null
+        var firstRgss3a: String? = null
+        var hasGameIni = false
+        var hasRxdata = false
+        var hasRvdata = false
+        var hasRvdata2 = false
 
         fun collect(entry: T, rel: String) {
             val lower = nameOf(entry).lowercase(Locale.ROOT)
@@ -799,6 +818,7 @@ object EngineScanner {
                 childRel == "js/rpg_core.js" || childRel.endsWith("/js/rpg_core.js") -> hasRpgMvCore = true
                 childRel == "js/rmmz_core.js" || childRel.endsWith("/js/rmmz_core.js") -> hasRpgMzCore = true
                 lower == "globaldata.vndata" -> hasVnData = true
+                lower == "game.ini" -> hasGameIni = true
                 lower == "app.asar" || childRel.endsWith("/app.asar") -> hasAppAsar = true
                 lower == "startup.tjs" -> hasStartupTjs = true
                 lower == "config.tjs" -> hasConfigTjs = true
@@ -810,6 +830,12 @@ object EngineScanner {
                     lower == "onscript.nt2" || lower == "onscript.nt3" -> hasOnsScript = true
                 lower.endsWith(".nsa") || lower.endsWith(".sar") -> hasOnsArchive = true
                 lower.endsWith(".xp3") -> xp3Files.add(childRel)
+                lower.endsWith(".rgssad") -> if (firstRgssad == null) firstRgssad = childRel
+                lower.endsWith(".rgss2a") -> if (firstRgss2a == null) firstRgss2a = childRel
+                lower.endsWith(".rgss3a") -> if (firstRgss3a == null) firstRgss3a = childRel
+                childRel.startsWith("data/") && lower.endsWith(".rxdata") -> hasRxdata = true
+                childRel.startsWith("data/") && lower.endsWith(".rvdata") -> hasRvdata = true
+                childRel.startsWith("data/") && lower.endsWith(".rvdata2") -> hasRvdata2 = true
                 lower.endsWith(".rpa") -> hasRpa = true
                 lower.endsWith(".rpy") -> {
                     hasRpy = true
@@ -843,6 +869,24 @@ object EngineScanner {
         if (hasAppAsar) {
             return Detection(EngineType.TYRANO, 80, "[游戏目录]")
         }
+        firstRgss3a?.let {
+            return Detection(EngineType.RPGMAKER, 96, it, "internal.rpgmvxace")
+        }
+        firstRgss2a?.let {
+            return Detection(EngineType.RPGMAKER, 96, it, "internal.rpgmvx")
+        }
+        firstRgssad?.let {
+            return Detection(EngineType.RPGMAKER, 96, it, "internal.rpgmxp")
+        }
+        if (hasGameIni && hasRvdata2) {
+            return Detection(EngineType.RPGMAKER, 92, "[游戏目录]", "internal.rpgmvxace")
+        }
+        if (hasGameIni && hasRvdata) {
+            return Detection(EngineType.RPGMAKER, 92, "[游戏目录]", "internal.rpgmvx")
+        }
+        if (hasGameIni && hasRxdata) {
+            return Detection(EngineType.RPGMAKER, 92, "[游戏目录]", "internal.rpgmxp")
+        }
         if (hasRpa || hasGameScriptRpy || hasGameOptionsRpy || (hasRenpyDir && (hasRpy || hasRpyc)) || (hasGameDir && hasRpy)) {
             val confidence = when {
                 hasRpa -> 96
@@ -850,7 +894,7 @@ object EngineScanner {
                 hasRenpyDir && (hasRpy || hasRpyc) -> 90
                 else -> 85
             }
-            return Detection(EngineType.RENPY, confidence, "[游戏目录]")
+            return Detection(EngineType.RENPY, confidence, "[游戏目录]", "internal.renpy")
         }
         if (hasIndex) {
             return Detection(EngineType.WEB_OTHER, 70, "[游戏目录]")

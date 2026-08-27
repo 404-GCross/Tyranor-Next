@@ -216,6 +216,7 @@ private fun engineDescription(engine: EngineType): String = when (engine) {
     EngineType.KIRIKIRI -> "Kirikiroid2 / krkrsdl3，.xp3 与 startup.tjs 游戏"
     EngineType.ONS -> "ONScripter，nscript.dat 与 .nsa 归档游戏"
     EngineType.TYRANO -> "TyranoBuilder，index.html 与 tyrano/ 脚本游戏"
+    EngineType.RPGMAKER -> "RPG Maker XP/VX/VX Ace/mkxp-z 外置 APK 模块"
     EngineType.RPG_MV, EngineType.RPG_MZ -> "RPG Maker MV/MZ，www 与 js/rpg_core.js、rmmz_core.js 游戏"
     EngineType.VN, EngineType.WEB_OTHER -> "WebOther/VN，globalData.vndata 或通用 index.html 网页游戏"
     EngineType.ARTEMIS -> "Artemis，system.ini 与 .pfs 归档游戏"
