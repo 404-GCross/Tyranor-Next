@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -220,16 +221,24 @@ internal fun CoverScraperSettingsScreen() {
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
-                            Button(
-                                enabled = !scraping,
-                                onClick = { startBatchScrape() },
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(8.dp),
-                            ) {
-                                Text(
-                                    if (scraping) "正在批量刮削封面" else "开始批量刮削封面",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                )
+                            // 无按压涟漪（WithoutPressIndication），且禁用态底色与常态一致，无变色效果
+                            WithoutPressIndication {
+                                Button(
+                                    enabled = !scraping,
+                                    onClick = { startBatchScrape() },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(8.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.primary,
+                                        disabledContainerColor = MaterialTheme.colorScheme.primary,
+                                    ),
+                                ) {
+                                    Text(
+                                        if (scraping) "正在批量刮削封面" else "开始批量刮削封面",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = androidx.compose.ui.graphics.Color.White,
+                                    )
+                                }
                             }
                         }
                     }
