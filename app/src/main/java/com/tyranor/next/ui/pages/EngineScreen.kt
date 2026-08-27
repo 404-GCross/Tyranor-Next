@@ -124,7 +124,7 @@ private fun engineDisplayName(engine: EngineType): String = when (engine) {
 }
 
 private fun engineDescription(engine: EngineType): String = when (engine) {
-    EngineType.KIRIKIRI -> "Kirikiri2 / krkrsdl3，.xp3 与 startup.tjs 游戏"
+    EngineType.KIRIKIRI -> "Kirikiroid2 / krkrsdl3，.xp3 与 startup.tjs 游戏"
     EngineType.ONS -> "ONScripter，nscript.dat 与 .nsa 归档游戏"
     EngineType.TYRANO -> "TyranoBuilder，index.html 与 tyrano/ 脚本游戏"
     EngineType.RPG_MV, EngineType.RPG_MZ -> "RPG Maker MV/MZ，www 与 js/rpg_core.js、rmmz_core.js 游戏"
