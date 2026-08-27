@@ -1,6 +1,7 @@
 package com.tyranor.next.core.settings
 
 import android.content.Context
+import com.core.engine.EnginePrefs
 import org.json.JSONObject
 
 /**
@@ -10,7 +11,9 @@ import org.json.JSONObject
  */
 object PerGameSettingsStore {
 
-    private const val PREF_NAME = "tyranor_game_overrides"
+    // prefs 文件名契约锚点在 engine（引擎 TyranoActivity/TouchPadSaveBridge 直读写同一文件），
+    // 改名只需改 EnginePrefs 一处。
+    private val PREF_NAME = EnginePrefs.GAME_OVERRIDES_PREFS
 
     // KR 覆盖字段名
     const val F_ENGINE_VERSION = "engine_version"

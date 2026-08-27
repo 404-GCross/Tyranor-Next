@@ -780,6 +780,7 @@ private fun RenameGameDialog(
                 onSearch = { if (canConfirm) onConfirm(normalizedTitle) },
                 leadingIcon = painterResource(R.drawable.ic_sheet_rename),
                 iconContentDescription = "Rename",
+                textStyle = MaterialTheme.typography.bodyMedium,
             )
         },
         confirmButton = {
