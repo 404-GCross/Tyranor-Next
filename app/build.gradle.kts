@@ -82,12 +82,13 @@ val syncSharedEngineAssets by tasks.registering(Sync::class) {
     description = "Copies shared engine-owned scripts into the app asset tree."
     from(engineAssetSourceDir) {
         include(sharedEngineAssetNames)
-        eachFile {
-            path = "engine/$path"
-        }
         includeEmptyDirs = false
     }
-    into(layout.buildDirectory.dir("generated/assets"))
+    // 必须落在独立子目录：Sync 会清空目标目录下所有“非本次拷贝”的文件，
+    // 若与 packageXNativePlugin 的输出（generated/assets/nativeplugins）共享父目录，
+    // 一旦执行顺序为 zip → sync → mergeAssets，插件 zip 会被整目录抹掉，
+    // 产出缺失运行库的 APK（beta-1.21 事故根因，顺序无保证故本地难复现）。
+    into(layout.buildDirectory.dir("generated/assets/engine"))
 }
 
 android {
@@ -102,8 +103,8 @@ android {
         applicationId = "com.tyranor.next"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.21"
+        versionCode = 2
+        versionName = "1.22"
         buildConfigField("String", "HIKARINAGI_CLIENT_ID", hikarinagiClientId.asBuildConfigString())
     }
 
