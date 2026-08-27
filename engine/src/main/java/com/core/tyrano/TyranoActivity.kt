@@ -136,9 +136,24 @@ class TyranoActivity : Activity() {
             }
             // 触屏手柄（issue #35）：MV/MZ 共用 __touch_pad.js，拼接进 hook 注入，
             // 独立于修改器开关。手柄代码零引擎依赖，MV/MZ 的 Input 均读 keyCode。
+            // issue #30：游戏内可自定义按钮布局，逐游戏配置在此注入供 JS 读取。
+            val isRpgWebGame = webGameType == WebGameType.RPG_MV || webGameType == WebGameType.RPG_MZ
+            val touchPadConf = if (isRpgWebGame && rpgMakerModGameId.isNotBlank()) {
+                getSharedPreferences(GAME_OVERRIDES_PREFS, Context.MODE_PRIVATE)
+                    .getString(rpgMakerModGameId, null)?.let { raw ->
+                        runCatching { JSONObject(raw).optString(PER_GAME_TOUCH_PAD_KEY) }
+                            .getOrNull()?.takeIf { it.isNotBlank() }
+                    }
+            } else {
+                null
+            }
+            val touchPadConfigJs = touchPadConf?.takeIf { it.isNotBlank() }?.let {
+                "window.__touchPadConfig=$it;"
+            }.orEmpty()
             val touchPad =
-                if (webGameType == WebGameType.RPG_MV || webGameType == WebGameType.RPG_MZ) {
-                    try { loadAsset(TOUCH_PAD_ASSET) } catch (_: Exception) { ByteArray(0) }
+                if (isRpgWebGame) {
+                    val pad = try { String(loadAsset(TOUCH_PAD_ASSET), Charsets.UTF_8) } catch (_: Exception) { "" }
+                    (touchPadConfigJs + "\n" + pad).toByteArray(Charsets.UTF_8)
                 } else {
                     ByteArray(0)
                 }
@@ -205,6 +220,10 @@ class TyranoActivity : Activity() {
         when (webGameType) {
             WebGameType.RPG_MV, WebGameType.RPG_MZ -> {
                 browser.addJavascriptInterface(RpgMakerSaveBridge(saves), RPG_MAKER_SAVE_BRIDGE_NAME)
+                browser.addJavascriptInterface(
+                    TouchPadSaveBridge(rpgMakerModGameId),
+                    TOUCH_PAD_BRIDGE_NAME,
+                )
                 if (rpgMakerModEnabled) {
                     browser.addJavascriptInterface(
                         RpgMakerModBridge(rpgMakerModGameId),
@@ -836,6 +855,39 @@ class TyranoActivity : Activity() {
         }
     }
 
+    /** 触屏手柄游戏内布局保存桥（issue #30）：按游戏持久化自定义布局。 */
+    inner class TouchPadSaveBridge(private val gameId: String) {
+        private val preferences
+            get() = getSharedPreferences(GAME_OVERRIDES_PREFS, Context.MODE_PRIVATE)
+
+        @JavascriptInterface
+        fun getConfig(): String = try {
+            preferences.getString(gameId, null)?.let { raw ->
+                JSONObject(raw).optString(PER_GAME_TOUCH_PAD_KEY)
+            }.orEmpty()
+        } catch (_: Throwable) {
+            ""
+        }
+
+        @JavascriptInterface
+        fun saveConfig(raw: String?) {
+            if (gameId.isBlank() || raw.isNullOrBlank()) return
+            try {
+                val input = JSONObject(raw)
+                val existing = runCatching { preferences.getString(gameId, null)?.let { JSONObject(it) } }
+                    .getOrNull() ?: JSONObject()
+                if (input.length() == 0) {
+                    existing.remove(PER_GAME_TOUCH_PAD_KEY)
+                } else {
+                    existing.put(PER_GAME_TOUCH_PAD_KEY, input)
+                }
+                preferences.edit().putString(gameId, existing.toString()).apply()
+            } catch (_: Throwable) {
+                // 保留现有配置
+            }
+        }
+    }
+
     private enum class WebGameType(val intentValue: String) {
         TYRANO("Tyrano"),
         RPG_MV("RPG"),
@@ -861,12 +913,15 @@ class TyranoActivity : Activity() {
         private const val JS_BRIDGE_NAME = "appJsInterface"
         private const val RPG_MAKER_SAVE_BRIDGE_NAME = "saveDataManager"
         private const val RPG_MAKER_MOD_BRIDGE_NAME = "TyranorModNative"
+        private const val TOUCH_PAD_BRIDGE_NAME = "TyranorTouchPadNative"
         private const val RPG_MV_SAVE_EXTENSION = ".bin"
         private const val EXTRA_SCOPED_SAVE_DIR = "scopedSaveDir"
         private const val EXTRA_SCOPED_SAVE_ROOT = "scopedSaveRoot"
         private const val EXTRA_RPG_MAKER_MOD_ENABLED = "rpgMakerModEnabled"
         private const val EXTRA_RPG_MAKER_MOD_GAME_ID = "rpgMakerModGameId"
         private const val RPG_MAKER_MOD_PREFS = "tyranor_rpgmaker_mod_state"
+        private const val GAME_OVERRIDES_PREFS = "tyranor_game_overrides"
+        private const val PER_GAME_TOUCH_PAD_KEY = "touch_pad_config"
         private const val RPG_MAKER_MOD_CORE_ASSET = "__rpgmaker_mod_core.js"
         private const val RPG_MAKER_MOD_UI_ASSET = "__rpgmaker_mod_ui.js"
         private const val RPG_MAKER_MOD_CSS_ASSET = "__rpgmaker_mod.css"
