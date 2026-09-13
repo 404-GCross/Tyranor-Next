@@ -6,6 +6,11 @@
 
 基于 **Tyranor 模拟器逆向重写**的多引擎视觉小说（Galgame）聚合启动器，面向 Android 平台。内置 Kirikiri / ONScripter / Tyrano / Artemis 四套引擎运行环境，并支持 Ren'Py、RPG Maker RGSS 外置 APK 引擎模块，可识别和启动多类游戏，提供游戏库管理、封面获取、存档镜像、引擎参数调节等一体化体验。
 
+mac原生版本如下：
+- [Tyranor Next for macOS](https://github.com/Weiss-UltimateSavior/Tyranor-Mac)
+
+iOS版本计划中...
+
 主打轻便、简单、快捷，不引入其他冗余功能的简约设计思路
 
 企鹅群：364439133
