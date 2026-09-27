@@ -16,7 +16,7 @@ import java.util.Locale
  */
 data class ScannedArchive(
     val id: String,
-    /** 列表展示名（相对扫描根的路径，便于区分同名）。 */
+    /** 相对扫描根的路径，仅作排序键；列表展示用 [fileName]。 */
     val displayName: String,
     /** 归档文件自身的名字（含扩展名），用于派生输出文件夹名。 */
     val fileName: String,

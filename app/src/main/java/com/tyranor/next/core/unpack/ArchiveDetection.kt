@@ -1,7 +1,5 @@
 package com.tyranor.next.core.unpack
 
-import java.io.File
-import java.io.FileInputStream
 import java.util.Locale
 
 /** 受支持封包的扩展名（含 `.` 前缀，小写）。 */
@@ -14,20 +12,8 @@ fun isArchiveFileName(name: String): Boolean {
     }
 }
 
-/**
- * 判定封包文件：扩展名先行；未知/无扩展名时读头字节嗅探（XP3=`58 50 33`）。
- *
- * SAF 下 `content://` 的 lastPathSegment 常无扩展名，中转后的真实文件名同样适用本函数。
- */
-fun isArchiveFile(file: File): Boolean {
-    if (isArchiveFileName(file.name)) return true
-    return try {
-        FileInputStream(file).use { input ->
-            val head = ByteArray(3)
-            if (input.read(head) < 3) return false
-            head[0] == 0x58.toByte() && head[1] == 0x50.toByte() && head[2] == 0x33.toByte()
-        }
-    } catch (_: Exception) {
-        false
-    }
+/** 去掉最后一个扩展名的基名：解包输出文件夹、封包展示名共用。 */
+fun baseNameWithoutExtension(fileName: String): String {
+    val dot = fileName.lastIndexOf('.')
+    return if (dot > 0) fileName.substring(0, dot) else fileName
 }

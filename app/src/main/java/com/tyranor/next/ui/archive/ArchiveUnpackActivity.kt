@@ -68,6 +68,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tyranor.next.R
 import com.tyranor.next.core.game.model.GamePathUtils
 import com.tyranor.next.core.unpack.ScannedArchive
+import com.tyranor.next.core.unpack.baseNameWithoutExtension
 import com.tyranor.next.theme.AppComponentShape
 import com.tyranor.next.theme.MiuixSettingsTheme
 import com.tyranor.next.theme.NavWhite
@@ -367,7 +368,7 @@ private fun UnpackPane(vm: ArchiveViewModel, appContext: Context, onPickDir: () 
                         modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
                     ) {
                         Text(
-                            stringResource(R.string.archive_extract_to, baseNameOf(selected.fileName)),
+                            stringResource(R.string.archive_extract_to, baseNameWithoutExtension(selected.fileName)),
                             style = MaterialTheme.typography.bodyMedium,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -676,7 +677,7 @@ private fun ArchiveProgressDialog(vm: ArchiveViewModel, onDismissRequest: () -> 
         },
         confirmButton = {
             if (vm.working) {
-                DialogTextButton(stringResource(R.string.archive_cancel), onClick = { vm.cancel() })
+                DialogTextButton(stringResource(R.string.common_cancel), onClick = { vm.cancel() })
             } else {
                 DialogTextButton(stringResource(R.string.common_done), onClick = { vm.dismissDialog() })
             }
@@ -719,11 +720,6 @@ private fun ArchiveCard(title: String, content: @Composable androidx.compose.fou
             }
         }
     }
-}
-
-private fun baseNameOf(fileName: String): String {
-    val dot = fileName.lastIndexOf('.')
-    return if (dot > 0) fileName.substring(0, dot) else fileName
 }
 
 private fun formatBytes(bytes: Long): String {

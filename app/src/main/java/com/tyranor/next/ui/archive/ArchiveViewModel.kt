@@ -25,6 +25,7 @@ import com.tyranor.next.core.unpack.ArchiveScanner
 import com.tyranor.next.core.unpack.ArchiveStaging
 import com.tyranor.next.core.unpack.ScannedArchive
 import com.tyranor.next.core.unpack.Xp3Archive
+import com.tyranor.next.core.unpack.baseNameWithoutExtension
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -44,8 +45,11 @@ data class EntryRow(val name: String, val size: Long, val isDirectory: Boolean)
 /**
  * 解包/封包页状态机（ViewModel 常驻，旋转不丢目录/扫描结果/选中项）。
  *
- * 解包：选目录 → 扫描目录内 XP3 → 主从预览（左归档、右条目）→ 全量解压到归档同名文件夹（去重）。
- * 封包：选目录 → 选压缩等级 → 封包为同级同名 .xp3 文件（去重）。
+ * 解包：选目录 → 扫描目录内 XP3 → 主从预览（左归档、右条目）→ 整体解包到归档同名文件夹（同名拒绝）。
+ * 封包：选目录 → 选压缩等级 → 封包为同级同名 .xp3 文件（同名拒绝）。
+ *
+ * 状态载体用 Compose mutableStateOf（与 MainLibraryViewModel 的 StateFlow 先例不同）：
+ * 本页状态全部由单一 Compose 树消费、无跨页面订阅，取舍记录于此。
  */
 class ArchiveViewModel : ViewModel() {
 
@@ -58,8 +62,6 @@ class ArchiveViewModel : ViewModel() {
     var sourceDirName by mutableStateOf("")
         private set
     var archives by mutableStateOf<List<ScannedArchive>>(emptyList())
-        private set
-    var scanned by mutableStateOf(false)
         private set
     var selectedId by mutableStateOf<String?>(null)
         private set
@@ -257,7 +259,6 @@ class ArchiveViewModel : ViewModel() {
         sourceTreeUri = uri
         sourceDirName = displayName
         archives = emptyList()
-        scanned = false
         selectedId = null
         entries = emptyList()
         entriesListed = false
@@ -271,7 +272,6 @@ class ArchiveViewModel : ViewModel() {
         launchOp(appContext, scanning, determinate = false) {
             val found = withContext(Dispatchers.IO) { ArchiveScanner.scan(appContext, uri, isCancelled) }
             archives = found
-            scanned = true
             if (found.isEmpty()) message = noArchives
             // 扫描后自动选中第一个并预览。
             if (found.isNotEmpty()) {
@@ -339,7 +339,7 @@ class ArchiveViewModel : ViewModel() {
         }
         val doneFormat = appContext.getString(R.string.archive_extract_created)
         val doneSkippedFormat = appContext.getString(R.string.archive_done_extract_skipped)
-        val baseName = baseNameWithoutExt(archive.fileName)
+        val baseName = baseNameWithoutExtension(archive.fileName)
         launchOp(appContext, archive.fileName, determinate = true) {
             // 包内重名预检放 IO：敌意大索引的全量小写化不卡主线程。大小写折叠后同名
             // （含仅大小写不同）即拒绝——/sdcard 等大小写不敏感文件系统上后写会覆盖
@@ -599,11 +599,6 @@ class ArchiveViewModel : ViewModel() {
     }
 
     // ==================== 工具 ====================
-
-    private fun baseNameWithoutExt(fileName: String): String {
-        val dot = fileName.lastIndexOf('.')
-        return if (dot > 0) fileName.substring(0, dot) else fileName
-    }
 
     override fun onCleared() {
         cancelFlag.set(true)
