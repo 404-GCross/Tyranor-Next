@@ -149,11 +149,16 @@ object Xp3Archive {
 
     /** 纯解析（不碰 native 库，单测可直测）：`[{"n","s","d","e"}]` → 条目表。 */
     fun parseListEntries(json: String): List<EntryInfo> {
+        val array = try {
+            org.json.JSONArray(json)
+        } catch (error: Exception) {
+            // 敌意归档的条目表可达数 MB：异常消息只带前缀，防止在 compose 状态里驻留大字符串。
+            throw IOException("XP3 list unparseable: ${json.take(200)}")
+        }
+        // 条目数上限在解析 try 外判定：超限按"过大"如实报，不被重新包装成 unparseable。
+        val count = array.length()
+        if (count > MAX_LIST_ENTRIES) throw IOException("XP3 index too large: $count entries")
         return try {
-            val array = org.json.JSONArray(json)
-            val count = array.length()
-            // 敌意索引条目数上限：真实游戏索引远低于此；超限拒绝，防跨 JNI 巨串与主线程大遍历。
-            if (count > MAX_LIST_ENTRIES) throw IOException("XP3 index too large: $count entries")
             List(count) { i ->
                 val obj = array.getJSONObject(i)
                 EntryInfo(
@@ -163,7 +168,6 @@ object Xp3Archive {
                 )
             }
         } catch (error: Exception) {
-            // 敌意归档的条目表可达数 MB：异常消息只带前缀，防止在 compose 状态里驻留大字符串。
             throw IOException("XP3 list unparseable: ${json.take(200)}")
         }
     }
