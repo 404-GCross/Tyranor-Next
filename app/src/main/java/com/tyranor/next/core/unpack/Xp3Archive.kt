@@ -155,7 +155,7 @@ object Xp3Archive {
             // 敌意归档的条目表可达数 MB：异常消息只带前缀，防止在 compose 状态里驻留大字符串。
             throw IOException("XP3 list unparseable: ${json.take(200)}")
         }
-        // 条目数上限在解析 try 外判定：超限按"过大"如实报，不被重新包装成 unparseable。
+        // 条目数上限在解析 try 外判定：超限按「过大」如实报，不被重新包装成 unparseable。
         val count = array.length()
         if (count > MAX_LIST_ENTRIES) throw IOException("XP3 index too large: $count entries")
         return try {

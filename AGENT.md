@@ -368,10 +368,23 @@ Column(fillMaxSize)                                // 页面根
 | 单游戏覆盖文本弹窗（Winlator 容器、Web 端口等） | `ui/settings/PerGameSettingsScreen.kt`（`OverrideText`） | `DialogTextButton` + 输入区包 `NoIndication` |
 | 添加 PC 游戏弹窗 | `ui/game/PcGameAddDialog.kt` | `DialogTextButton` + 行内 `indication = null` |
 
-### 3. 存量对齐
+### 3. 页内按钮（同一意图，非弹窗）
+
+`AppScreenScaffold` 的 `WithoutPressIndication` 只影响走 `LocalIndication` 的组件；Material3 的
+`Button` / `TextButton` 内部显式使用 `ripple()`，**不受其约束**。页内需要无按压反馈的按钮统一使用
+`ui/common/NoPressFeedbackButtons.kt`：
+
+- 填充按钮：`NoRippleButton`（`tonal = true` 为浅底次级样式，可用于「前往授权」类动作）；
+- 文本按钮：`NoRippleTextButton`。
+
+| 场景 | 位置 | 组件 |
+| --- | --- | --- |
+| 解包 / 封包页（授权 / 选择目录 / 解包 / 封包 / 重新扫描 / 更换目录） | `ui/archive/ArchiveUnpackActivity.kt` | `NoRippleButton` / `NoRippleTextButton` |
+
+### 4. 存量对齐
 
 其余既有弹窗（`GameScreen`、`LaunchErrorDialog`、`CoverScraperSettingsActivity` 等仍有 Material
-`TextButton`）按「改动即对齐」迁移：任何弹窗被修改时，须同步替换为无点击反馈实现。
+`TextButton`）与页内 M3 `Button` 按「改动即对齐」迁移：任何页面/弹窗被修改时，须同步替换为无点击反馈实现。
 
 ***
 
@@ -404,6 +417,10 @@ Column(fillMaxSize)                                // 页面根
 - `PageGrey` 页面背景色、`NavWhite` 卡片/导航栏组件色；二者由应用设置「色调切换」控制是否互换。`TextColor` 正文深灰、`UnselectedGrey` 导航栏未选中灰。
 
 - 语义色：`colorScheme.error`（错误/删除）、引擎封面色（`EngineType.coverColor()`）、封面占位白字等。
+
+- **主题色实底组件**（背景为不透明 `primary` 的按钮/徽标等）内的文字与图标**固定使用白色**（`Color.White`），
+  **禁止**使用 `MaterialTheme.colorScheme.onPrimary` 等会随主题色变化的跟随色；浅底（primary 加透明度）
+  的次级样式才使用主题色文字。
 
 - 新增任何颜色先检查 `Color.kt` 是否已有现成常量；中性色必须统一收口到 `Color.kt`，不在页面内散落硬编码。
 

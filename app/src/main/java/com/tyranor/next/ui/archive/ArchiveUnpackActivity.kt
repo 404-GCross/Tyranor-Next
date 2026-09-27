@@ -36,15 +36,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -78,6 +75,8 @@ import com.tyranor.next.ui.common.AppScreenActivity
 import com.tyranor.next.ui.common.AppAlertDialog
 import com.tyranor.next.ui.common.AppTopBar
 import com.tyranor.next.ui.common.DialogTextButton
+import com.tyranor.next.ui.common.NoRippleTextButton
+import com.tyranor.next.ui.common.NoRippleButton
 import top.yukonga.miuix.kmp.basic.Slider
 import top.yukonga.miuix.kmp.basic.SliderDefaults
 import java.util.Locale
@@ -192,18 +191,12 @@ private fun ArchiveScreen(vm: ArchiveViewModel = viewModel()) {
 
         if (!allFilesGranted) {
             ArchiveCard(title = stringResource(R.string.archive_permission_rationale)) {
-                Button(
-                    onClick = { launchAllFilesAccessSettings(appContext) },
-                    shape = AppComponentShape,
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
+                NoRippleButton(
+                    text = stringResource(R.string.archive_permission_grant),
+                    tonal = true,
                     modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(
-                        stringResource(R.string.archive_permission_grant),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                }
+                    onClick = { launchAllFilesAccessSettings(appContext) },
+                )
             }
         }
 
@@ -288,8 +281,8 @@ private fun ModeTab(label: String, selected: Boolean, onClick: () -> Unit) {
     ) {
         Text(
             label,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
             color = fg,
         )
     }
@@ -361,19 +354,12 @@ private fun UnpackPane(vm: ArchiveViewModel, appContext: Context, onPickDir: () 
                             selected.fileName
                         },
                     )
-                    Button(
-                        onClick = { vm.extractSelected(appContext) },
+                    NoRippleButton(
+                        text = stringResource(R.string.archive_extract_to, baseNameWithoutExtension(selected.fileName)),
                         enabled = !vm.working && vm.entriesListed,
-                        shape = AppComponentShape,
                         modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-                    ) {
-                        Text(
-                            stringResource(R.string.archive_extract_to, baseNameWithoutExtension(selected.fileName)),
-                            style = MaterialTheme.typography.bodyMedium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
+                        onClick = { vm.extractSelected(appContext) },
+                    )
                     // 展开集合随 entries 换包自动重置；默认全收起
                     val expandedDirs = remember(vm.entries) { mutableStateOf(setOf<String>()) }
                     val visibleRows = remember(vm.entries, expandedDirs.value) {
@@ -423,26 +409,14 @@ private fun PackPane(vm: ArchiveViewModel, appContext: Context, onPickDir: () ->
     ) {
         item {
             ArchiveCard(title = stringResource(R.string.archive_pack_pick_dir)) {
-                Button(
-                    onClick = onPickDir,
+                NoRippleButton(
+                    text = if (vm.packDirName.isBlank()) stringResource(R.string.archive_pack_pick_dir)
+                    else vm.packDirName,
                     enabled = !vm.working,
-                    shape = AppComponentShape,
+                    leadingIcon = painterResource(R.drawable.ic_sheet_folder),
                     modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Icon(
-                        painter = painterResource(R.drawable.ic_sheet_folder),
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        if (vm.packDirName.isBlank()) stringResource(R.string.archive_pack_pick_dir)
-                        else vm.packDirName,
-                        style = MaterialTheme.typography.bodyMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
+                    onClick = onPickDir,
+                )
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -472,14 +446,12 @@ private fun PackPane(vm: ArchiveViewModel, appContext: Context, onPickDir: () ->
                         modifier = Modifier.padding(horizontal = 16.dp),
                     )
                 }
-                Button(
-                    onClick = { vm.pack(appContext) },
+                NoRippleButton(
+                    text = stringResource(R.string.archive_pack_action),
                     enabled = !vm.working && vm.packTreeUri != null,
-                    shape = AppComponentShape,
                     modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                ) {
-                    Text(stringResource(R.string.archive_pack_action), style = MaterialTheme.typography.bodyMedium)
-                }
+                    onClick = { vm.pack(appContext) },
+                )
             }
         }
     }
@@ -518,12 +490,8 @@ private fun DirStrip(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
-        TextButton(onClick = onRescan, enabled = enabled) {
-            Text(rescanLabel, style = MaterialTheme.typography.bodyMedium)
-        }
-        TextButton(onClick = onRePick, enabled = enabled) {
-            Text(rePickLabel, style = MaterialTheme.typography.bodyMedium)
-        }
+        NoRippleTextButton(text = rescanLabel, enabled = enabled, onClick = onRescan)
+        NoRippleTextButton(text = rePickLabel, enabled = enabled, onClick = onRePick)
     }
 }
 
@@ -695,9 +663,7 @@ private fun progressBytesText(vm: ArchiveViewModel): String {
 
 @Composable
 private fun BigAction(label: String, onClick: () -> Unit, enabled: Boolean) {
-    Button(onClick = onClick, enabled = enabled, shape = AppComponentShape) {
-        Text(label, style = MaterialTheme.typography.bodyMedium)
-    }
+    NoRippleButton(text = label, enabled = enabled, onClick = onClick)
 }
 
 @Composable
