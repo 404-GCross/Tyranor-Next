@@ -59,7 +59,10 @@ object ArchiveScanner {
             if (isCancelled()) throw ArchiveCancelledException(root.path)
             val (dir, rel) = stack.removeLast()
             if (rel.count { it == '/' } >= MAX_DEPTH) continue
-            val children = runCatching { dir.listFiles() }.getOrNull() ?: continue
+            // listFiles 返回 null = 该目录不可读（未授权/权限收窄）：真实路径遍历
+            // 已不完整，立即放弃 File 结果交由 scan() 回退 SAF 全量遍历——
+            // 若只 continue 跳过，已找到的条目会让回退被跳过，漏掉子树里的封包。
+            val children = runCatching { dir.listFiles() }.getOrNull() ?: return emptyList()
             for (child in children) {
                 val childRel = if (rel.isEmpty()) child.name else "$rel/${child.name}"
                 if (child.isDirectory) {
