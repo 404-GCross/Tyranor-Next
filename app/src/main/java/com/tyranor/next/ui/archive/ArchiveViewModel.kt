@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
+import android.util.Log
 import android.widget.Toast
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -31,6 +32,8 @@ import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
 
 enum class ArchiveMode { UNPACK, PACK }
+
+private const val TAG = "ArchiveViewModel"
 
 data class EntryRow(val name: String, val size: Long, val isDirectory: Boolean)
 
@@ -196,6 +199,7 @@ class ArchiveViewModel : ViewModel() {
                 ArchiveConflictKind.OUTPUT_DIR_EXISTS -> R.string.archive_conflict_dir
                 ArchiveConflictKind.OUTPUT_FILE_EXISTS -> R.string.archive_conflict_file
                 ArchiveConflictKind.DUPLICATE_ENTRY -> R.string.archive_conflict_inside
+                ArchiveConflictKind.ROLLBACK_INCOMPLETE -> R.string.archive_conflict_rollback
             },
         ).format(conflict.subject)
 
@@ -331,16 +335,24 @@ class ArchiveViewModel : ViewModel() {
                         extractTo(file, outDir, isCancelled) to outDir.absolutePath
                     } catch (error: Throwable) {
                         // 取消/失败回滚：刚建出的输出目录（可能已有半成品）整体移除，
-                        // 与 SAF 路径（Path B）的回滚语义保持一致。
-                        runCatching { outDir.deleteRecursively() }
+                        // 与 SAF 路径的回滚语义保持一致；删除必须复核，残留按类型化错误上报。
+                        if (!runCatching { outDir.deleteRecursively() }.getOrDefault(false)) {
+                            Log.w(TAG, "rollback incomplete for ${outDir.path}", error)
+                            throw ArchiveConflictException(ArchiveConflictKind.ROLLBACK_INCOMPLETE, baseName)
+                        }
                         throw error
                     }
                 } else {
                     val treeRoot = sourceTreeUri
                         ?: throw java.io.IOException("missing source directory")
-                    val outDoc = ArchiveStaging.createChildDirectoryExclusive(appContext, treeRoot, baseName)
+                    val docUri = archive.docUri
+                        ?: throw java.io.IOException("archive source missing: ${archive.fileName}")
+                    // 与真实路径链路对齐：输出目录建在归档所在目录（docId 层级推导），
+                    // 而非扫描根——否则嵌套归档的落点随路径映射成败漂移。
+                    val parentUri = ArchiveStaging.parentDocumentUriOf(treeRoot, docUri)
+                    val outDocUri = ArchiveStaging.createChildDirectoryExclusive(appContext, parentUri, baseName)
                         ?: throw ArchiveConflictException(ArchiveConflictKind.OUTPUT_DIR_EXISTS, baseName)
-                    if (outDoc.listFiles().isNotEmpty()) {
+                    if (ArchiveStaging.hasChildren(appContext, outDocUri)) {
                         // provider 对已存在目录可能返回成功：非空即视作同名冲突，
                         // 绝不进入写回流程——否则取消回滚会误删目录树里的既有内容。
                         throw ArchiveConflictException(ArchiveConflictKind.OUTPUT_DIR_EXISTS, baseName)
@@ -353,13 +365,17 @@ class ArchiveViewModel : ViewModel() {
                         // 长时间停格在 ~100%，看起来像卡死——用户反馈的“解包没多久就卡住”。
                         val base = progressBytes.second
                         val publishTotal = tmp.walkBottomUp().filter { it.isFile }.sumOf { it.length() }
-                        ArchiveStaging.publishDir(appContext, tmp, outDoc, isCancelled) { copied, total, name ->
+                        ArchiveStaging.publishDir(appContext, tmp, outDocUri, isCancelled) { copied, total, name ->
                             reportProgress(base + copied, base + publishTotal, copied, total, name)
                         }
-                        counts to (GamePathUtils.safUriToPath(outDoc.uri.toString()) ?: outDoc.name)
+                        counts to (GamePathUtils.safUriToPath(outDocUri.toString()) ?: baseName)
                     } catch (error: Throwable) {
-                        // 失败/取消回滚：刚在用户目录树里建出的输出目录（可能已有半成品）整体移除。
-                        runCatching { outDoc.delete() }
+                        // 失败/取消回滚：删除自建输出目录并复核——第三方 provider 可能
+                        // 拒绝递归删除，残留半成品必须按类型化错误如实上报，绝不静默。
+                        if (!ArchiveStaging.rollbackCreatedDirectory(appContext, outDocUri)) {
+                            Log.w(TAG, "rollback incomplete for $outDocUri", error)
+                            throw ArchiveConflictException(ArchiveConflictKind.ROLLBACK_INCOMPLETE, baseName)
+                        }
                         throw error
                     } finally {
                         runCatching { tmp.deleteRecursively() }

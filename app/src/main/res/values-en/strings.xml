@@ -619,6 +619,7 @@
     <string name="archive_conflict_dir">Folder “%1$s” already exists — back it up or rename it first</string>
     <string name="archive_conflict_file">Output “%1$s” already exists — back it up or rename it first</string>
     <string name="archive_conflict_inside">Duplicate entry “%1$s” inside the archive — extraction refused to avoid overwriting</string>
+    <string name="archive_conflict_rollback">Rollback of output folder “%1$s” did not finish — partial files may remain, please check and delete manually</string>
     <string name="archive_no_dir">Select a folder first</string>
     <string name="archive_empty_list">Empty or unreadable</string>
     <string name="archive_entries_summary">%1$d entries, %2$s total</string>
