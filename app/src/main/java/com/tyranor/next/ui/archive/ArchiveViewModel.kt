@@ -17,7 +17,9 @@ import com.tyranor.next.core.game.model.GamePathUtils
 import com.tyranor.next.core.unpack.ArchiveCancelledException
 import com.tyranor.next.core.unpack.ArchiveConflictException
 import com.tyranor.next.core.unpack.ArchiveConflictKind
+import com.tyranor.next.core.unpack.ArchiveEmptyInputException
 import com.tyranor.next.core.unpack.ArchiveNativeMissingException
+import com.tyranor.next.core.unpack.ArchiveOpGate
 import com.tyranor.next.core.unpack.ArchiveScanner
 import com.tyranor.next.core.unpack.ArchiveStaging
 import com.tyranor.next.core.unpack.ScannedArchive
@@ -126,7 +128,10 @@ class ArchiveViewModel : ViewModel() {
     fun cleanStaleStagingOnce(appContext: Context) {
         if (sessionCleaned) return
         sessionCleaned = true
-        staleCleanupJob = viewModelScope.launch(Dispatchers.IO) { ArchiveStaging.clearStaging(appContext) }
+        staleCleanupJob = viewModelScope.launch(Dispatchers.IO) {
+            // 首清也过闸：另一实例正拿着暂存区干活时跳过本次清理，防止误删在用的暂存。
+            ArchiveOpGate.runIfIdle { ArchiveStaging.clearStaging(appContext) }
+        }
     }
 
     private suspend fun awaitStaleCleanup() {
@@ -154,35 +159,55 @@ class ArchiveViewModel : ViewModel() {
         message = null
         dialogVisible = true
         cancelFlag.set(false)
-        val failedFormat = appContext.getString(R.string.archive_failed)
+        val failedMessage = appContext.getString(R.string.archive_failed_generic)
         val cancelledMessage = appContext.getString(R.string.archive_cancelled)
         val nativeMissingMessage = appContext.getString(R.string.archive_native_missing)
+        val busyMessage = appContext.getString(R.string.archive_busy)
         val job = viewModelScope.launch {
-            try {
-                block()
-            } catch (cancelled: CancellationException) {
-                message = cancelledMessage
-                throw cancelled
-            } catch (cancelled: ArchiveCancelledException) {
-                message = cancelledMessage
-            } catch (missing: ArchiveNativeMissingException) {
-                message = nativeMissingMessage
-            } catch (conflict: ArchiveConflictException) {
-                // 同名产物拒绝：core 只给类型与主体，本地化文案在此统一格式化。
-                // 不进结果弹窗，就地 toast + 状态栏提示。
-                val text = conflictMessage(appContext, conflict)
-                message = text
+            if (!ArchiveOpGate.tryLock()) {
+                // 分屏/平行窗口可能出现两个页面实例：Rust 全局进度/取消槽与暂存区
+                // 是进程级资源，与其互踩（莫名取消/进度互串/暂存互删）不如就地拒绝。
+                message = busyMessage
                 dialogVisible = false
-                Toast.makeText(appContext, text, Toast.LENGTH_LONG).show()
-            } catch (error: Exception) {
-                message = failedFormat.format(error.message ?: error.javaClass.simpleName)
-            } finally {
                 working = false
                 currentJob = null
-                // 暂存拷贝必须随操作结束立即收回（大包可达 GB 级），成功/取消/失败一律释放。
-                releaseStagedArchive()
-                // 结果需要展示（成功提示/取消/失败）则保留弹窗等待「完成」；静默成功（如扫描）自动关闭。
-                if (message == null) dialogVisible = false
+                Toast.makeText(appContext, busyMessage, Toast.LENGTH_LONG).show()
+                return@launch
+            }
+            try {
+                try {
+                    block()
+                } catch (cancelled: CancellationException) {
+                    message = cancelledMessage
+                    throw cancelled
+                } catch (cancelled: ArchiveCancelledException) {
+                    message = cancelledMessage
+                } catch (missing: ArchiveNativeMissingException) {
+                    message = nativeMissingMessage
+                } catch (conflict: ArchiveConflictException) {
+                    // 同名产物拒绝：core 只给类型与主体，本地化文案在此统一格式化。
+                    // 不进结果弹窗，就地 toast + 状态栏提示。
+                    val text = conflictMessage(appContext, conflict)
+                    message = text
+                    dialogVisible = false
+                    Toast.makeText(appContext, text, Toast.LENGTH_LONG).show()
+                } catch (empty: ArchiveEmptyInputException) {
+                    message = appContext.getString(R.string.archive_input_empty)
+                } catch (error: Exception) {
+                    // 错误协议收口：泛化失败不再把 core 技术消息拼上屏（AGENT.md core→ui
+                    // 协议），本地化兜底 + 日志留痕。
+                    Log.w(TAG, "archive op failed: $label", error)
+                    message = failedMessage
+                } finally {
+                    working = false
+                    currentJob = null
+                    // 暂存拷贝必须随操作结束立即收回（大包可达 GB 级），成功/取消/失败一律释放。
+                    releaseStagedArchive()
+                    // 结果需要展示（成功提示/取消/失败）则保留弹窗等待「完成」；静默成功（如扫描）自动关闭。
+                    if (message == null) dialogVisible = false
+                }
+            } finally {
+                ArchiveOpGate.unlock()
             }
         }
         currentJob = job

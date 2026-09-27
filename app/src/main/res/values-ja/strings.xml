@@ -623,7 +623,9 @@
     <string name="archive_no_dir">先にフォルダを選択してください</string>
     <string name="archive_empty_list">空または読み取れません</string>
     <string name="archive_entries_summary">%1$d 件、合計 %2$s</string>
-    <string name="archive_failed">失敗：%1$s</string>
+    <string name="archive_failed_generic">操作に失敗しました。もう一度お試しください</string>
+    <string name="archive_busy">既に解凍/圧縮操作が実行中です</string>
+    <string name="archive_input_empty">選択したフォルダに圧縮できるファイルがありません</string>
     <string name="archive_cancelled">キャンセルしました</string>
 
     <string name="patch_error_only_kirikiri">オンラインパッチは Kirikiri ゲームのみ対応しています</string>
