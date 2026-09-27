@@ -2,6 +2,8 @@ package com.tyranor.next.core.unpack
 
 import android.content.Context
 import android.net.Uri
+import android.os.Build
+import android.os.Environment
 import android.provider.OpenableColumns
 import androidx.documentfile.provider.DocumentFile
 import com.tyranor.next.core.game.model.GamePathUtils
@@ -83,8 +85,12 @@ object ArchiveStaging {
     ): File {
         GamePathUtils.safUriToPath(uri.toString())?.let { path ->
             val direct = File(path)
-            // canRead：未授权时 isDirectory 仍为真但内容不可读，必须回退 SAF 暂存。
-            if (direct.isDirectory && direct.canRead()) return direct
+            // 与 ViewModel 的权限模型对齐：R+ 需要「所有文件访问」才能完整
+            // read_dir 目录树；canRead/isDirectory 在未授权时仍可能为真，
+            // 不满足时必须回退 SAF 暂存而不是把不可读的真实路径交给 native。
+            val fullAccess = Build.VERSION.SDK_INT < Build.VERSION_CODES.R ||
+                Environment.isExternalStorageManager()
+            if (direct.isDirectory && direct.canRead() && fullAccess) return direct
         }
         val root = DocumentFile.fromTreeUri(context, uri)
             ?: throw IOException("Cannot open directory tree: $uri")
