@@ -329,28 +329,11 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                                     }
                                 },
                             )
-                            var cardStyle by remember { mutableStateOf(AppSettingsStore.getGameCardStyle(ctx)) }
-                            val cardStyleModes = listOf(
-                                AppSettingsStore.GAME_CARD_STYLE_GRID to stringResource(R.string.settings_game_card_style_grid),
-                                AppSettingsStore.GAME_CARD_STYLE_COVER_FLOW to stringResource(R.string.settings_game_card_style_cover_flow),
-                            )
-                            val cardStyleIndex = cardStyleModes.indexOfFirst { it.first == cardStyle }
-                                .let { if (it < 0) 0 else it }
-                            OverlayDropdownPreference(
-                                title = stringResource(R.string.settings_game_card_style),
-                                items = cardStyleModes.map { it.second },
-                                selectedIndex = cardStyleIndex,
-                                onSelectedIndexChange = { index ->
-                                    cardStyleModes.getOrNull(index)?.first?.let { style ->
-                                        cardStyle = style
-                                        AppSettingsStore.setGameCardStyle(ctx, style)
-                                    }
-                                },
-                            )
                         }
                     }
                 }
                 item {
+                    // 引擎设置与拆封包合入同一卡片（同类工具入口）
                     MiuixCard(modifier = Modifier.fillMaxWidth().glassShadow().glassBorder(), cornerRadius = AppComponentCornerRadius) {
                         Column(Modifier.padding(vertical = 4.dp)) {
                             ArrowPreference(
@@ -358,12 +341,6 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                                 startAction = { SettingsItemIcon(R.drawable.ic_engine_manage) },
                                 onClick = { startActivityWithPageTransition(ctx, EngineSettingsMenuActivity.createIntent(ctx)) },
                             )
-                        }
-                    }
-                }
-                item {
-                    MiuixCard(modifier = Modifier.fillMaxWidth().glassShadow().glassBorder(), cornerRadius = AppComponentCornerRadius) {
-                        Column(Modifier.padding(vertical = 4.dp)) {
                             ArrowPreference(
                                 title = stringResource(R.string.archive_title),
                                 startAction = { SettingsItemIcon(R.drawable.ic_sheet_archive) },

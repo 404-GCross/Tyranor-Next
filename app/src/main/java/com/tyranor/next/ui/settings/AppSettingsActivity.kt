@@ -81,6 +81,7 @@ internal fun AppSettingsScreen() {
     val engineTabs by AppSettingsStore.engineTabsState.collectAsState()
     val sideRailEnabled by AppSettingsStore.sideRailState.collectAsState()
     val hideCardTitleTag by AppSettingsStore.gameCardTitleTagState.collectAsState()
+    val gameCardStyle by AppSettingsStore.gameCardStyleState.collectAsState()
     val glass = AppThemeColors.isGlass
     // 平板/大窗口 + 侧边栏开关开启：导航以侧栏显示（液态玻璃两档不参与侧栏适配）
     val railLayout = isSideRailLayout()
@@ -92,6 +93,7 @@ internal fun AppSettingsScreen() {
             AppSettingsStore.initNavStyle(ctx)
             AppSettingsStore.initSideRail(ctx)
             AppSettingsStore.initGameCardHideTitleTag(ctx)
+            AppSettingsStore.initGameCardStyle(ctx)
         }
     }
 
@@ -328,6 +330,23 @@ internal fun AppSettingsScreen() {
                 item {
                     MiuixCard(modifier = Modifier.fillMaxWidth().glassShadow().glassBorder(), cornerRadius = AppComponentCornerRadius) {
                         Column(Modifier.padding(vertical = 4.dp)) {
+                            // 游戏页卡片风格：网格 / 列表（封面流）
+                            val cardStyleModes = listOf(
+                                AppSettingsStore.GAME_CARD_STYLE_GRID to stringResource(R.string.settings_game_card_style_grid),
+                                AppSettingsStore.GAME_CARD_STYLE_COVER_FLOW to stringResource(R.string.settings_game_card_style_cover_flow),
+                            )
+                            val cardStyleIndex = cardStyleModes.indexOfFirst { it.first == gameCardStyle }
+                                .coerceAtLeast(0)
+                            OverlayDropdownPreference(
+                                title = stringResource(R.string.settings_game_card_style),
+                                items = cardStyleModes.map { it.second },
+                                selectedIndex = cardStyleIndex,
+                                onSelectedIndexChange = { index ->
+                                    cardStyleModes.getOrNull(index)?.first?.let { style ->
+                                        AppSettingsStore.setGameCardStyle(ctx, style)
+                                    }
+                                },
+                            )
                             // 游戏页卡片名称隐藏【】/[] 标签（切换即时生效并持久化）
                             SwitchPreference(
                                 title = stringResource(R.string.settings_game_card_hide_title_tag),
