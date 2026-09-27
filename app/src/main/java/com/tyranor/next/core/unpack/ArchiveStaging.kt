@@ -83,7 +83,8 @@ object ArchiveStaging {
     ): File {
         GamePathUtils.safUriToPath(uri.toString())?.let { path ->
             val direct = File(path)
-            if (direct.isDirectory) return direct
+            // canRead：未授权时 isDirectory 仍为真但内容不可读，必须回退 SAF 暂存。
+            if (direct.isDirectory && direct.canRead()) return direct
         }
         val root = DocumentFile.fromTreeUri(context, uri)
             ?: throw IOException("Cannot open directory tree: $uri")
