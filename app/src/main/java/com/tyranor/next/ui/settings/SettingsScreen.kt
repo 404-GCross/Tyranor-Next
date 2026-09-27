@@ -328,6 +328,15 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                                     }
                                 },
                             )
+                            var hideCardTitleTag by remember { mutableStateOf(AppSettingsStore.isGameCardHideTitleTag(ctx)) }
+                            SwitchPreference(
+                                title = stringResource(R.string.settings_game_card_hide_title_tag),
+                                checked = hideCardTitleTag,
+                                onCheckedChange = {
+                                    hideCardTitleTag = it
+                                    AppSettingsStore.setGameCardHideTitleTag(ctx, it)
+                                },
+                            )
                         }
                     }
                 }

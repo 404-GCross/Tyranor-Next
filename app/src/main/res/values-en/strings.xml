@@ -54,6 +54,7 @@
     <string name="settings_scan_depth_level">%1$d levels</string>
     <string name="settings_sort_alpha">Alphabetical</string>
     <string name="settings_sort_bracket_tag">Bracket tag</string>
+    <string name="settings_game_card_hide_title_tag">Hide name tags on cards</string>
     <string name="settings_game_sort">Game sorting</string>
     <string name="settings_engine_settings">Engine settings</string>
     <string name="settings_app_summary">Application-level preferences</string>

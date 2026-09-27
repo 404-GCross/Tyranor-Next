@@ -54,6 +54,7 @@
     <string name="settings_scan_depth_level">%1$d 階層</string>
     <string name="settings_sort_alpha">名前順</string>
     <string name="settings_sort_bracket_tag">括弧タグ</string>
+    <string name="settings_game_card_hide_title_tag">カードの名前タグを非表示</string>
     <string name="settings_game_sort">ゲームの並び替え</string>
     <string name="settings_engine_settings">エンジン設定</string>
     <string name="settings_app_summary">アプリ内の各種設定</string>

@@ -54,6 +54,7 @@
     <string name="settings_scan_depth_level">%1$d 级</string>
     <string name="settings_sort_alpha">字母大小</string>
     <string name="settings_sort_bracket_tag">括号标签</string>
+    <string name="settings_game_card_hide_title_tag">卡片隐藏名称标签</string>
     <string name="settings_game_sort">游戏排序</string>
     <string name="settings_engine_settings">引擎设置</string>
     <string name="settings_app_summary">有关应用内的各项配置</string>
