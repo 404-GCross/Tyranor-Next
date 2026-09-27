@@ -25,7 +25,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -37,7 +36,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -70,6 +68,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tyranor.next.R
 import com.tyranor.next.core.game.model.GamePathUtils
 import com.tyranor.next.core.unpack.ScannedArchive
+import com.tyranor.next.theme.AppComponentShape
 import com.tyranor.next.theme.MiuixSettingsTheme
 import com.tyranor.next.theme.NavWhite
 import com.tyranor.next.theme.glassBorder
@@ -100,8 +99,6 @@ class ArchiveUnpackActivity : AppScreenActivity() {
 
 private const val TAG = "ArchiveUnpack"
 
-/// 拆包页统一圆角：卡片/容器/玻璃描边共用同一轮廓。
-private val ArchCardShape = RoundedCornerShape(8.dp)
 private const val MAX_LISTED_ENTRIES = 2000
 
 /** 目录展示名：优先映射真实路径（从 /storage/emulated/0 起），映射失败退回解码的文档 id 路径。 */
@@ -196,7 +193,7 @@ private fun ArchiveScreen(vm: ArchiveViewModel = viewModel()) {
             ArchiveCard(title = stringResource(R.string.archive_permission_rationale)) {
                 Button(
                     onClick = { launchAllFilesAccessSettings(appContext) },
-                    shape = RoundedCornerShape(8.dp),
+                    shape = AppComponentShape,
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
@@ -251,9 +248,9 @@ private fun ModeTabs(mode: ArchiveMode, onSelect: (ArchiveMode) -> Unit) {
     Row(
         modifier = Modifier
             .padding(horizontal = 16.dp, vertical = 6.dp)
-            .clip(ArchCardShape)
+            .clip(AppComponentShape)
             .background(NavWhite)
-            .glassBorder(ArchCardShape)
+            .glassBorder(AppComponentShape)
             .padding(4.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
@@ -282,7 +279,7 @@ private fun ModeTab(label: String, selected: Boolean, onClick: () -> Unit) {
     )
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
+            .clip(AppComponentShape)
             .background(bg)
             .clickable(onClick = onClick)
             .padding(horizontal = 18.dp, vertical = 8.dp),
@@ -366,7 +363,7 @@ private fun UnpackPane(vm: ArchiveViewModel, appContext: Context, onPickDir: () 
                     Button(
                         onClick = { vm.extractSelected(appContext) },
                         enabled = !vm.working && vm.entriesListed,
-                        shape = RoundedCornerShape(8.dp),
+                        shape = AppComponentShape,
                         modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
                     ) {
                         Text(
@@ -428,7 +425,7 @@ private fun PackPane(vm: ArchiveViewModel, appContext: Context, onPickDir: () ->
                 Button(
                     onClick = onPickDir,
                     enabled = !vm.working,
-                    shape = RoundedCornerShape(8.dp),
+                    shape = AppComponentShape,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Icon(
@@ -477,7 +474,7 @@ private fun PackPane(vm: ArchiveViewModel, appContext: Context, onPickDir: () ->
                 Button(
                     onClick = { vm.pack(appContext) },
                     enabled = !vm.working && vm.packTreeUri != null,
-                    shape = RoundedCornerShape(8.dp),
+                    shape = AppComponentShape,
                     modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
                 ) {
                     Text(stringResource(R.string.archive_pack_action), style = MaterialTheme.typography.bodyMedium)
@@ -500,9 +497,9 @@ private fun DirStrip(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 4.dp)
-            .clip(ArchCardShape)
+            .clip(AppComponentShape)
             .background(NavWhite)
-            .glassBorder(ArchCardShape)
+            .glassBorder(AppComponentShape)
             .padding(start = 12.dp, end = 2.dp, top = 2.dp, bottom = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -547,8 +544,9 @@ private fun ArchiveListRow(archive: ScannedArchive, selected: Boolean, onClick: 
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 2.dp)
-            .clip(RoundedCornerShape(8.dp))
+            .clip(AppComponentShape)
             .background(if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f) else NavWhite)
+            .glassBorder()
             .clickable(onClick = onClick)
             .padding(horizontal = 10.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
@@ -577,7 +575,7 @@ private fun EntryListRow(row: VisibleEntry, onToggle: (Boolean) -> Unit) {
         modifier = Modifier.fillMaxWidth()
             .padding(start = (depth * 14).dp)
             .padding(vertical = 1.dp)
-            .clip(RoundedCornerShape(8.dp))
+            .clip(AppComponentShape)
             .then(if (entry.isDirectory) Modifier.clickable { onToggle(!expanded) } else Modifier),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -696,7 +694,7 @@ private fun progressBytesText(vm: ArchiveViewModel): String {
 
 @Composable
 private fun BigAction(label: String, onClick: () -> Unit, enabled: Boolean) {
-    Button(onClick = onClick, enabled = enabled) {
+    Button(onClick = onClick, enabled = enabled, shape = AppComponentShape) {
         Text(label, style = MaterialTheme.typography.bodyMedium)
     }
 }
@@ -704,10 +702,10 @@ private fun BigAction(label: String, onClick: () -> Unit, enabled: Boolean) {
 @Composable
 private fun ArchiveCard(title: String, content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
     Card(
-        modifier = Modifier.fillMaxWidth().glassShadow(ArchCardShape).glassBorder(ArchCardShape),
+        modifier = Modifier.fillMaxWidth().glassShadow(AppComponentShape).glassBorder(AppComponentShape),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         colors = CardDefaults.cardColors(containerColor = NavWhite),
-        shape = ArchCardShape,
+        shape = AppComponentShape,
     ) {
         Column(Modifier.fillMaxWidth().padding(14.dp)) {
             Text(
