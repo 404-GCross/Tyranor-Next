@@ -23,6 +23,11 @@ data class ScannedArchive(
     val size: Long,
     val realFile: File?,
     val docUri: Uri?,
+    /**
+     * 归档所在父目录的 document URI（扫描期记录，SAF 条目必非空）——解包输出目录
+     * 的落点依据。document ID 是 provider 不透明标识，运行期不得再按其推导层级。
+     */
+    val parentDocUri: Uri? = null,
 )
 
 /**
@@ -131,6 +136,9 @@ object ArchiveScanner {
                                 size = size,
                                 realFile = null,
                                 docUri = docUri,
+                                // 父目录就是当前正被枚举的这一层：扫描期记下 URI，
+                                // 运行期不解析不透明的 document ID。
+                                parentDocUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, docId),
                             ),
                         )
                     }

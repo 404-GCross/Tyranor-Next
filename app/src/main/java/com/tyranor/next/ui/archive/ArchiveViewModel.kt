@@ -375,13 +375,11 @@ class ArchiveViewModel : ViewModel() {
                         throw error
                     }
                 } else {
-                    val treeRoot = sourceTreeUri
-                        ?: throw java.io.IOException("missing source directory")
-                    val docUri = archive.docUri
-                        ?: throw java.io.IOException("archive source missing: ${archive.fileName}")
-                    // 与真实路径链路对齐：输出目录建在归档所在目录（docId 层级推导），
-                    // 而非扫描根——否则嵌套归档的落点随路径映射成败漂移。
-                    val parentUri = ArchiveStaging.parentDocumentUriOf(treeRoot, docUri)
+                    // 与真实路径链路对齐：输出目录建在归档所在目录（扫描期记录的父目录
+                    // URI），而非扫描根——否则嵌套归档的落点随路径映射成败漂移。
+                    // document ID 是 provider 不透明标识，运行期绝不按其推导层级。
+                    val parentUri = archive.parentDocUri
+                        ?: throw java.io.IOException("missing parent directory: ${archive.fileName}")
                     val outDocUri = ArchiveStaging.createChildDirectoryExclusive(appContext, parentUri, baseName)
                         ?: throw ArchiveConflictException(ArchiveConflictKind.OUTPUT_DIR_EXISTS, baseName)
                     if (ArchiveStaging.hasChildren(appContext, outDocUri)) {

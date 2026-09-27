@@ -49,18 +49,6 @@ object ArchiveStaging {
         return path == root || path.startsWith(root + File.separator)
     }
 
-    /**
-     * 归档文档在目录树内的父目录 document URI（docId 层级推导）：解包输出与真实
-     * 路径链路一致落在归档旁，而非扫描根。docId 无层级（个别 provider）或推导失败
-     * 时回退树根。
-     */
-    fun parentDocumentUriOf(treeUri: Uri, docUri: Uri): Uri {
-        val treeDocId = DocumentsContract.getTreeDocumentId(treeUri)
-        val docId = runCatching { DocumentsContract.getDocumentId(docUri) }.getOrNull() ?: treeDocId
-        val parentDocId = if (docId.contains('/')) docId.substringBeforeLast('/') else treeDocId
-        return DocumentsContract.buildDocumentUriUsingTree(treeUri, parentDocId)
-    }
-
     /** 目录是否有子项（单查询；provider 异常如实上抛，绝不静默当空）。 */
     fun hasChildren(context: Context, parentDocUri: Uri): Boolean =
         listChildren(context, parentDocUri).isNotEmpty()
