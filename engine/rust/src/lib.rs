@@ -288,7 +288,7 @@ fn collect_files_xp3(base: &Path) -> Result<Vec<(PathBuf, String)>, String> {
     while let Some((dir, rel)) = stack.pop() {
         // 取消检查点：GB 级目录树的 collect 阶段此前完全不响应取消。
         if compress_progress::cancelled() { return Err("cancelled".to_string()); }
-        let mut entries: Vec<_> = fs::read_dir(&dir).map_err(|e| format!("read_dir {}: {e}", dir.display()))?
+        let entries: Vec<_> = fs::read_dir(&dir).map_err(|e| format!("read_dir {}: {e}", dir.display()))?
             .collect::<Result<_, _>>().map_err(|e| format!("read_dir {}: {e}", dir.display()))?;
         for entry in entries {
             let path = entry.path();
@@ -481,6 +481,44 @@ mod tests {
         extract_xp3(xp3.to_str().unwrap(), out.to_str().unwrap()).unwrap();
         let got = std::fs::read(out.join("script.txt")).unwrap();
         assert_eq!(got, text, "KSD wrapper must be unwrapped to the original text");
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn duplicate_entry_names_are_renamed_not_overwritten() {
+        // 同步自上游 usefulunpack f0620cac：XP3 索引可携带同名条目，/sdcard+FAT
+        // 大小写不敏感——没有去重时后写 File::create 会截断先写条目（last-wins），
+        // 结果 JSON 还报成功。两个条目都必须落盘。
+        let _g = locked();
+        let dir = tmp("dupnames");
+        std::fs::create_dir_all(&dir).unwrap();
+        let xp3 = dir.join("dup.xp3");
+        let out = dir.join("out");
+        std::fs::create_dir_all(&out).unwrap();
+
+        let out_file = std::fs::File::create(&xp3).unwrap();
+        let mut writer = oneshot_async(XP3Writer::new(
+            XP3Version::Current { minor: 0 },
+            SyncIo(BufWriter::new(out_file)),
+        )).unwrap();
+        for (name, mut payload) in [("Readme.txt", &b"payload-one"[..]), ("readme.txt", &b"payload-two"[..])] {
+            let mut fw = oneshot_async(writer.file(name.to_string(), false, Some(6))).unwrap();
+            oneshot_async(tokio::io::copy(&mut payload, &mut fw)).unwrap();
+            oneshot_async(fw.finish()).unwrap();
+        }
+        oneshot_async(writer.finish(None)).unwrap();
+
+        let (_, error) = extract_xp3(xp3.to_str().unwrap(), out.to_str().unwrap()).unwrap();
+        assert_eq!(error, 0);
+        let mut names: Vec<String> = std::fs::read_dir(&out).unwrap()
+            .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+            .collect();
+        names.sort();
+        assert_eq!(names.len(), 2, "both entries must exist, got {names:?}");
+        // 大小写折叠唯一才是真正保护 /sdcard 与 FAT 的关键。
+        let folded: HashSet<String> = names.iter().map(|n| n.to_lowercase()).collect();
+        assert_eq!(folded.len(), 2, "case-only collision must be renamed, got {names:?}");
+        assert!(names.iter().any(|n| n.contains("(1)")), "renamed variant expected, got {names:?}");
         std::fs::remove_dir_all(&dir).ok();
     }
 }

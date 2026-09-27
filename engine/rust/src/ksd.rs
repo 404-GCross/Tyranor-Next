@@ -46,15 +46,31 @@ fn decompress_mode2(data: &[u8]) -> Result<(Vec<u8>, u64), String> {
     Ok((out, uncompressed_len as u64))
 }
 
+/// Probe 解码结果的弱合理性校验（同步自上游 usefulunpack f0620cac）。
+/// 真实 KSD mode-2 载荷是 UTF-16 LE 文本：要求 UTF-16 严格合法（无未配对
+/// 代理）且除换行/回车/制表外不含控制字符。任何 ≤16 MiB 的条目都能通过
+/// 5 字节魔数探测——头字节恰好为 `FE FE 02 FF FE` 的二进制（如某些 TGA）
+/// 否则会被"解码"成垃圾覆盖原文件；校验不过就原样透传。
+fn plausible_utf16_text(bytes: &[u8]) -> bool {
+    if bytes.len() % 2 != 0 { return false; }
+    let units = bytes.chunks_exact(2).map(|c| u16::from_le_bytes([c[0], c[1]]));
+    std::char::decode_utf16(units).all(|r| {
+        r.map(|c| !c.is_control() || matches!(c, '\n' | '\r' | '\t')).unwrap_or(false)
+    })
+}
+
 /// Detects a KSD mode-2 scrambled blob — used as a Kirikiri filter inside XP3
-/// archives. Returns the decoded bytes when the magic matches, else None so
-/// the caller writes the content as-is.
+/// archives. Returns the decoded bytes when the magic matches AND the decode
+/// passes the UTF-16 plausibility check, else None so the caller writes the
+/// content as-is.
 pub fn ksd_mode2_decode(data: &[u8]) -> Option<Vec<u8>> {
     if data.len() >= 5
         && data[0] == 0xFE && data[1] == 0xFE && data[2] == 0x02
         && data[3] == 0xFF && data[4] == 0xFE
     {
-        decompress_mode2(&data[5..]).ok().map(|(bytes, _)| bytes)
+        decompress_mode2(&data[5..]).ok()
+            .filter(|(bytes, _)| plausible_utf16_text(bytes))
+            .map(|(bytes, _)| bytes)
     } else {
         None
     }
@@ -103,5 +119,19 @@ mod tests {
         assert!(ksd_mode2_decode(b"plain text file").is_none());
         // 魔数不足 5 字节也不得误判。
         assert!(ksd_mode2_decode(&[0xFE, 0xFE, 0x02]).is_none());
+    }
+
+    #[test]
+    fn mode2_probe_rejects_non_text_magic_collision() {
+        // 任何 ≤16MiB 条目都能过 XP3 探测的 5 字节魔数；二进制（TGA 型碰撞）
+        // 不得被"解码"成垃圾。非法 UTF-16（孤立高位代理）→ None → 原样透传。
+        let mut inner = vec![0x41u8, 0x00]; // 'A'
+        inner.extend_from_slice(&[0x00, 0xD8]); // 孤立高位代理 U+D800
+        inner.extend_from_slice(&[0x42u8, 0x00]); // 'B'，无低位代理跟随
+        assert_eq!(ksd_mode2_decode(&wrap(&inner, inner.len() as i64)), None);
+
+        // UTF-16 合法但含非空白控制字符（U+0001）→ 同样拒绝。
+        let inner2 = vec![0x41u8, 0x00, 0x01, 0x00, 0x42u8, 0x00];
+        assert_eq!(ksd_mode2_decode(&wrap(&inner2, inner2.len() as i64)), None);
     }
 }
