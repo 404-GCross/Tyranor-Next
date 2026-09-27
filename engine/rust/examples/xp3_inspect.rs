@@ -101,6 +101,35 @@ fn main() -> ExitCode {
     let input = &args[1];
     let extract_dir = args.get(2).map(PathBuf::from);
 
+    // 诊断工具常用来检查来源不明的归档：条目名先做与 safe_join 等价的清洗，
+    // 拒绝绝对路径/`..`/`:`/NUL，扁平化为安全的本地相对名。
+    fn sanitize_entry_name(name: &str) -> String {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+        let norm = name.replace('\\', "/");
+        if norm.starts_with('/') || norm.contains('\0') {
+            return format!("unsafe_{:016x}.bin", {
+                let mut h = DefaultHasher::new();
+                norm.hash(&mut h);
+                h.finish()
+            });
+        }
+        let flat: String = norm
+            .split('/')
+            .filter(|c| !c.is_empty() && *c != "." && *c != ".." && !c.contains(':'))
+            .collect::<Vec<_>>()
+            .join("_");
+        if flat.is_empty() {
+            format!("empty_{:016x}.bin", {
+                let mut h = DefaultHasher::new();
+                norm.hash(&mut h);
+                h.finish()
+            })
+        } else {
+            flat
+        }
+    }
+
     let file = match File::open(input) {
         Ok(f) => f,
         Err(e) => {
@@ -122,7 +151,7 @@ fn main() -> ExitCode {
     let mut err_count = 0usize;
     let len = archive.entries().len();
     for i in 0..len {
-        let name = archive.entries()[i].name.replace('\\', "/");
+        let name = sanitize_entry_name(&archive.entries()[i].name.replace('\\', "/"));
         let declared = archive.entries()[i].size;
         let dest = extract_dir.as_ref().map(|d| d.join(&name));
         if let Some(dest) = &dest {

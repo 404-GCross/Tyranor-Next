@@ -181,7 +181,7 @@ private fun ArchiveScreen(vm: ArchiveViewModel = viewModel()) {
             ArchiveCard(title = stringResource(R.string.archive_permission_rationale)) {
                 Button(
                     onClick = { launchAllFilesAccessSettings(appContext) },
-                    shape = RoundedCornerShape(10.dp),
+                    shape = RoundedCornerShape(8.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
@@ -196,17 +196,20 @@ private fun ArchiveScreen(vm: ArchiveViewModel = viewModel()) {
 
         ModeTabs(mode = vm.mode, onSelect = { vm.switchMode(it) })
 
-        when (vm.mode) {
-            ArchiveMode.UNPACK -> UnpackPane(
-                vm = vm,
-                appContext = appContext,
-                onPickDir = { pickSourceDir.launch(null) },
-            )
-            ArchiveMode.PACK -> PackPane(
-                vm = vm,
-                appContext = appContext,
-                onPickDir = { pickPackDir.launch(null) },
-            )
+        // 面板占剩余空间：给关闭弹窗后的结果消息（StatusBar）留出可见区域
+        Box(Modifier.fillMaxWidth().weight(1f)) {
+            when (vm.mode) {
+                ArchiveMode.UNPACK -> UnpackPane(
+                    vm = vm,
+                    appContext = appContext,
+                    onPickDir = { pickSourceDir.launch(null) },
+                )
+                ArchiveMode.PACK -> PackPane(
+                    vm = vm,
+                    appContext = appContext,
+                    onPickDir = { pickPackDir.launch(null) },
+                )
+            }
         }
 
         if (vm.message != null && !vm.dialogVisible) {
@@ -222,7 +225,7 @@ private fun ModeTabs(mode: ArchiveMode, onSelect: (ArchiveMode) -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 6.dp)
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(8.dp))
             .background(NavWhite)
             .padding(4.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -245,7 +248,7 @@ private fun RowScope.ModeTab(label: String, selected: Boolean, onClick: () -> Un
     Box(
         modifier = Modifier
             .weight(1f)
-            .clip(RoundedCornerShape(9.dp))
+            .clip(RoundedCornerShape(8.dp))
             .background(if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f) else Color.Transparent)
             .clickable(onClick = onClick)
             .padding(vertical = 8.dp),
@@ -319,7 +322,7 @@ private fun UnpackPane(vm: ArchiveViewModel, appContext: Context, onPickDir: () 
                     Button(
                         onClick = { vm.extractSelected(appContext) },
                         enabled = !vm.working && vm.entriesListed,
-                        shape = RoundedCornerShape(10.dp),
+                        shape = RoundedCornerShape(8.dp),
                         modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
                     ) {
                         Text(
@@ -381,7 +384,7 @@ private fun PackPane(vm: ArchiveViewModel, appContext: Context, onPickDir: () ->
                 Button(
                     onClick = onPickDir,
                     enabled = !vm.working,
-                    shape = RoundedCornerShape(10.dp),
+                    shape = RoundedCornerShape(8.dp),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Icon(
@@ -426,7 +429,7 @@ private fun PackPane(vm: ArchiveViewModel, appContext: Context, onPickDir: () ->
                 Button(
                     onClick = { vm.pack(appContext) },
                     enabled = !vm.working && vm.packTreeUri != null,
-                    shape = RoundedCornerShape(10.dp),
+                    shape = RoundedCornerShape(8.dp),
                     modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
                 ) {
                     Text(stringResource(R.string.archive_pack_action), style = MaterialTheme.typography.bodyMedium)
@@ -449,7 +452,7 @@ private fun DirStrip(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 4.dp)
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(8.dp))
             .background(NavWhite)
             .padding(start = 12.dp, end = 2.dp, top = 2.dp, bottom = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -495,7 +498,7 @@ private fun ArchiveListRow(archive: ScannedArchive, selected: Boolean, onClick: 
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 2.dp)
-            .clip(RoundedCornerShape(10.dp))
+            .clip(RoundedCornerShape(8.dp))
             .background(if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f) else NavWhite)
             .clickable(onClick = onClick)
             .padding(horizontal = 10.dp, vertical = 8.dp),
@@ -525,7 +528,7 @@ private fun EntryListRow(row: VisibleEntry, onToggle: (Boolean) -> Unit) {
         modifier = Modifier.fillMaxWidth()
             .padding(start = (depth * 14).dp)
             .padding(vertical = 1.dp)
-            .clip(RoundedCornerShape(6.dp))
+            .clip(RoundedCornerShape(8.dp))
             .then(if (entry.isDirectory) Modifier.clickable { onToggle(!expanded) } else Modifier),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -540,7 +543,7 @@ private fun EntryListRow(row: VisibleEntry, onToggle: (Boolean) -> Unit) {
         if (!entry.isDirectory) {
             Text(
                 formatBytes(entry.size),
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(start = 6.dp),
             )
@@ -659,7 +662,7 @@ private fun ArchiveCard(title: String, content: @Composable androidx.compose.fou
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         colors = CardDefaults.cardColors(containerColor = NavWhite),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(8.dp),
     ) {
         Column(Modifier.fillMaxWidth().padding(14.dp)) {
             Text(

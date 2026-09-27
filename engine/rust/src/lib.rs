@@ -43,13 +43,19 @@ fn copy_xp3_entry<R: tokio::io::AsyncRead + Unpin>(
     if size <= KSD_PROBE_MAX {
         // Buffer up to a hard cap so a crafted entry that inflates far beyond
         // its declared size can't grow the Vec unboundedly (zlib bomb → OOM).
+        // hit_limit：probe 触达 16 MiB 窗口而非自然 EOF——解码流比声明 size 长
+        // （劣质/敌意流），此时按"宽容提取"约定不得截断，转续流路径处理。
+        let mut hit_limit = false;
         let copied: Result<Vec<u8>, std::io::Error> = oneshot_async(async {
             let x = &mut xf; // borrow, not consume — we may stream the rest below
             let mut buf2 = Vec::with_capacity(size as usize);
             let limit = (KSD_PROBE_MAX + 1) as usize;
             let mut tmp = [0u8; 8192];
             loop {
-                if buf2.len() >= limit { break; }
+                if buf2.len() >= limit {
+                    hit_limit = true;
+                    break;
+                }
                 let want = (limit - buf2.len()).min(tmp.len());
                 let n = x.read(&mut tmp[..want]).await?;
                 if n == 0 { break; }
@@ -63,27 +69,47 @@ fn copy_xp3_entry<R: tokio::io::AsyncRead + Unpin>(
             // 续流只会得到 0 字节——直接判失败，调用方删半成品。
             Err(_) => return Err(()),
         };
-        // KSD unwrap 把 wrapper 解成 UTF-16 文本，输出与声明 size 的差值由调用方
-        // 校正进 TOTAL；非 KSD 内容原样透传（劣质包解出 ≠ size 也照写）。
-        let payload = match ksd_mode2_decode(&buf) {
-            Some(p) => {
-                extract_progress::set_file(p.len() as u64);
-                p
+        if !hit_limit {
+            // KSD unwrap 把 wrapper 解成 UTF-16 文本，输出与声明 size 的差值由调用方
+            // 校正进 TOTAL；非 KSD 内容原样透传（劣质包解出 ≠ size 也照写）。
+            // 注意：解码流恰在窗口内自然 EOF 时才可能走 KSD 解码——
+            // KSD wrapper 长度恒等于声明 size（≤16 MiB），超窗口的必非 KSD。
+            let payload = match ksd_mode2_decode(&buf) {
+                Some(p) => {
+                    extract_progress::set_file(p.len() as u64);
+                    p
+                }
+                None => buf,
+            };
+            if oneshot_async(async { out_stream.write_all(&payload).await }).is_err() {
+                return Err(());
             }
-            None => buf,
-        };
-        if oneshot_async(async { out_stream.write_all(&payload).await }).is_err() {
+            if oneshot_async(async { out_stream.flush().await }).is_err() {
+                return Err(());
+            }
+            return Ok(payload.len() as u64);
+        }
+        // 续流（宽容提取约定）：已缓冲的 buf 先写出，剩余解码内容用与流式路径
+        // 相同的 cap（声明 size + 1 GiB）继续复制，绝不按窗口截断。
+        if oneshot_async(async { out_stream.write_all(&buf).await }).is_err() {
             return Err(());
         }
+        let cap = size.saturating_add(1024 * 1024 * 1024).saturating_sub(buf.len() as u64);
+        let copied = oneshot_async(tokio::io::copy(&mut xf.take(cap), out_stream)).unwrap_or(0);
         if oneshot_async(async { out_stream.flush().await }).is_err() {
             return Err(());
         }
-        return Ok(payload.len() as u64);
+        return Ok(buf.len() as u64 + copied);
     }
     // 炸弹护栏：声明 size + 1 GiB 硬上限。良构包解出 == size；劣质包的口径差
     // 远小于 1 GiB；敌意灌盘最多多写 1 GiB 即被截停。
     let cap = size.saturating_add(1024 * 1024 * 1024);
-    let copied = oneshot_async(tokio::io::copy(&mut xf.take(cap), out_stream)).unwrap_or(0);
+    // 读错误必须如实上抛（与"宽容提取"约定一致：只容忍口径差，不容忍静默截断），
+    // 由调用方删半成品并计失败；unwrap_or(0) 会把损坏流/加密包的解码失败吞成成功。
+    let copied = match oneshot_async(tokio::io::copy(&mut xf.take(cap), out_stream)) {
+        Ok(c) => c,
+        Err(_) => return Err(()),
+    };
     if oneshot_async(async { out_stream.flush().await }).is_err() {
         return Err(());
     }

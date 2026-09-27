@@ -608,14 +608,7 @@
     <string name="archive_pack_pick_dir">圧縮するフォルダを選択</string>
     <string name="archive_pack_action">圧縮</string>
     <string name="archive_pack_done">圧縮完了：%1$s</string>
-    <string name="archive_section_unpack">解凍</string>
-    <string name="archive_section_pack">圧縮</string>
-    <string name="archive_pick_file">アーカイブを選択</string>
     <string name="archive_pick_dir">フォルダを選択</string>
-    <string name="archive_output_dir">出力フォルダ</string>
-    <string name="archive_list_entries">内容を一覧表示</string>
-    <string name="archive_extract_all">すべて解凍</string>
-    <string name="archive_pack_save">圧縮して保存</string>
     <string name="archive_done_extract_skipped">解凍完了：%1$d ファイル、スキップ %2$d 件</string>
     <string name="archive_native_missing">解凍コンポーネントが見つかりません。アプリを再インストールしてください</string>
     <string name="archive_level">圧縮レベル（0=無圧縮）</string>
@@ -623,15 +616,11 @@
     <string name="archive_conflict_dir">同名フォルダ「%1$s」が既に存在します。バックアップまたは名前変更後に再試行してください</string>
     <string name="archive_conflict_file">同名ファイル「%1$s」が既に存在します。事前にバックアップまたは名前を変更してください</string>
     <string name="archive_conflict_inside">アーカイブ内に重複エントリ「%1$s」があるため、上書き防止のため解凍を拒否しました</string>
-    <string name="archive_no_file">先にアーカイブを選択してください</string>
     <string name="archive_no_dir">先にフォルダを選択してください</string>
     <string name="archive_empty_list">空または読み取れません</string>
     <string name="archive_entries_summary">%1$d 件、合計 %2$s</string>
-    <string name="archive_done_extract">解凍完了：%1$d ファイル</string>
-    <string name="archive_done_pack">圧縮完了：%1$d ファイル</string>
     <string name="archive_failed">失敗：%1$s</string>
     <string name="archive_cancelled">キャンセルしました</string>
-    <string name="archive_picked">選択中：%1$s</string>
 
     <string name="patch_error_only_kirikiri">オンラインパッチは Kirikiri ゲームのみ対応しています</string>
     <string name="patch_error_select_patch">ダウンロードするパッチを選択してください</string>

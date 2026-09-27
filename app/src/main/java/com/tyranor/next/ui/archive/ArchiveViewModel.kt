@@ -2,6 +2,8 @@ package com.tyranor.next.ui.archive
 
 import android.content.Context
 import android.net.Uri
+import android.os.Build
+import android.os.Environment
 import android.widget.Toast
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -13,6 +15,7 @@ import com.tyranor.next.R
 import com.tyranor.next.core.game.model.GamePathUtils
 import com.tyranor.next.core.unpack.ArchiveCancelledException
 import com.tyranor.next.core.unpack.ArchiveConflictException
+import com.tyranor.next.core.unpack.ArchiveConflictKind
 import com.tyranor.next.core.unpack.ArchiveNativeMissingException
 import com.tyranor.next.core.unpack.ArchiveScanner
 import com.tyranor.next.core.unpack.ArchiveStaging
@@ -162,10 +165,12 @@ class ArchiveViewModel : ViewModel() {
             } catch (missing: ArchiveNativeMissingException) {
                 message = nativeMissingMessage
             } catch (conflict: ArchiveConflictException) {
-                // 同名产物拒绝：不进结果弹窗，就地 toast + 状态栏提示。
-                message = conflict.message
+                // 同名产物拒绝：core 只给类型与主体，本地化文案在此统一格式化。
+                // 不进结果弹窗，就地 toast + 状态栏提示。
+                val text = conflictMessage(appContext, conflict)
+                message = text
                 dialogVisible = false
-                Toast.makeText(appContext, conflict.message, Toast.LENGTH_LONG).show()
+                Toast.makeText(appContext, text, Toast.LENGTH_LONG).show()
             } catch (error: Exception) {
                 message = failedFormat.format(error.message ?: error.javaClass.simpleName)
             } finally {
@@ -183,6 +188,16 @@ class ArchiveViewModel : ViewModel() {
     fun dismissDialog() {
         dialogVisible = false
     }
+
+    /** core 层冲突异常 → UI 本地化文案（AGENT.md：core 错误不带本地化文本）。 */
+    private fun conflictMessage(appContext: Context, conflict: ArchiveConflictException): String =
+        appContext.getString(
+            when (conflict.kind) {
+                ArchiveConflictKind.OUTPUT_DIR_EXISTS -> R.string.archive_conflict_dir
+                ArchiveConflictKind.OUTPUT_FILE_EXISTS -> R.string.archive_conflict_file
+                ArchiveConflictKind.DUPLICATE_ENTRY -> R.string.archive_conflict_inside
+            },
+        ).format(conflict.subject)
 
     /** 释放当前操作的暂存输入拷贝（cacheDir/archive_staging/input 目录）。 */
     private fun releaseStagedArchive() {
@@ -286,7 +301,6 @@ class ArchiveViewModel : ViewModel() {
         }
         val doneFormat = appContext.getString(R.string.archive_extract_created)
         val doneSkippedFormat = appContext.getString(R.string.archive_done_extract_skipped)
-        val conflictDirFormat = appContext.getString(R.string.archive_conflict_dir)
         val baseName = baseNameWithoutExt(archive.fileName)
         // 包内重名预检：大小写折叠后同名（含仅大小写不同）即拒绝解压——
         // /sdcard 等大小写不敏感文件系统上后写会覆盖先写，静默丢数据。
@@ -308,7 +322,7 @@ class ArchiveViewModel : ViewModel() {
                     // 同名拒绝：不静默去重，提示用户先备份或改名。
                     val outDir = File(parent, baseName)
                     if (outDir.exists()) {
-                        throw ArchiveConflictException(conflictDirFormat.format(outDir.absolutePath))
+                        throw ArchiveConflictException(ArchiveConflictKind.OUTPUT_DIR_EXISTS, outDir.absolutePath)
                     }
                     if (!outDir.mkdirs()) {
                         throw java.io.IOException("cannot create directory: ${outDir.path}")
@@ -325,11 +339,11 @@ class ArchiveViewModel : ViewModel() {
                     val treeRoot = sourceTreeUri
                         ?: throw java.io.IOException("missing source directory")
                     val outDoc = ArchiveStaging.createChildDirectoryExclusive(appContext, treeRoot, baseName)
-                        ?: throw ArchiveConflictException(conflictDirFormat.format(baseName))
+                        ?: throw ArchiveConflictException(ArchiveConflictKind.OUTPUT_DIR_EXISTS, baseName)
                     if (outDoc.listFiles().isNotEmpty()) {
                         // provider 对已存在目录可能返回成功：非空即视作同名冲突，
                         // 绝不进入写回流程——否则取消回滚会误删目录树里的既有内容。
-                        throw ArchiveConflictException(conflictDirFormat.format(baseName))
+                        throw ArchiveConflictException(ArchiveConflictKind.OUTPUT_DIR_EXISTS, baseName)
                     }
                     val tmp = File(ArchiveStaging.stagingDir(appContext), "extract_${System.currentTimeMillis()}")
                     try {
@@ -410,34 +424,40 @@ class ArchiveViewModel : ViewModel() {
         val ext = ".xp3"
         val level = packLevel
         val doneFormat = appContext.getString(R.string.archive_pack_done)
-        val conflictFileFormat = appContext.getString(R.string.archive_conflict_file)
         launchOp(appContext, packDirName, determinate = true) {
             // SAF 专有 provider 下 stageInputDir 的整棵输入拷贝必须随操作回收
             var stagedDir: File? = null
             try {
                 val mappedPath = GamePathUtils.safUriToPath(uri.toString())
-                val mappedDir = mappedPath?.let { File(it) }?.takeIf { it.isDirectory }
+                // canRead + 所有文件访问双重门禁：未授权时 File 直读会得到残缺结果
+                //（read_dir 失败 → 封包失败），必须回退 SAF 暂存路径。
+                val mappedDir = mappedPath
+                    ?.let { File(it) }
+                    ?.takeIf {
+                        it.isDirectory && it.canRead() &&
+                            (Build.VERSION.SDK_INT < Build.VERSION_CODES.R || Environment.isExternalStorageManager())
+                    }
                 if (mappedDir != null) {
                     // 真实路径：输出为同级同名文件，同名拒绝（提示提前备份/改名）。
                     val parent = mappedDir.parentFile ?: mappedDir
                     val outFile = File(parent, "${mappedDir.name}$ext")
                     if (outFile.exists()) {
-                        throw ArchiveConflictException(conflictFileFormat.format(outFile.absolutePath))
+                        throw ArchiveConflictException(ArchiveConflictKind.OUTPUT_FILE_EXISTS, outFile.absolutePath)
                     }
                     withContext(Dispatchers.IO) { runPack(mappedDir, outFile, level) }
                     message = doneFormat.format(outFile.absolutePath)
-            } else {
-                // SAF 专有 provider：封到 cache，交给系统保存框。
-                awaitStaleCleanup()
-                val srcDir = withContext(Dispatchers.IO) { ArchiveStaging.stageInputDir(appContext, uri, isCancelled) }
+                } else {
+                    // SAF 专有 provider：封到 cache，交给系统保存框。
+                    awaitStaleCleanup()
+                    val srcDir = withContext(Dispatchers.IO) { ArchiveStaging.stageInputDir(appContext, uri, isCancelled) }
                     stagedDir = srcDir
                     val outFile = File(ArchiveStaging.stagingDir(appContext), "packed/resolved$ext")
                     outFile.parentFile?.mkdirs()
                     if (outFile.exists()) outFile.delete()
                     withContext(Dispatchers.IO) { runPack(srcDir, outFile, level) }
                     pendingSaveFile = outFile
-                    pendingSaveName = "${packDirName.trimStart('/').ifBlank { "archive" }}$ext"
-                    saveDialogActive = true
+                    // 保存框建议名取末级目录名（packDirName 是完整展示路径，含分隔符）。
+                    pendingSaveName = "${packDirName.substringAfterLast('/').ifBlank { "archive" }}$ext"
                 }
             } finally {
                 // stageInputDir 理论上也可能零拷贝返回用户原目录（与 stageInputFile 同款
@@ -469,6 +489,9 @@ class ArchiveViewModel : ViewModel() {
         }
         val doneFormat = appContext.getString(R.string.archive_pack_done)
         launchOp(appContext, packed.name, determinate = false) {
+            // 回写成功前记录状态：失败/取消时用户目录里已经建出的目标文档必须清理，
+            // 否则会残留一个名字正确但内容截断的 .xp3，看起来像有效封包。
+            var written = false
             try {
                 withContext(Dispatchers.IO) {
                     appContext.contentResolver.openOutputStream(targetUri)?.use { output ->
@@ -484,8 +507,15 @@ class ArchiveViewModel : ViewModel() {
                         }
                     } ?: throw java.io.IOException("Cannot open output: $targetUri")
                 }
+                written = true
                 message = doneFormat.format(packed.name)
             } finally {
+                if (!written) {
+                    // 目标文档由 CreateDocument 预先创建：失败/取消时尽力删除半成品。
+                    runCatching {
+                        android.provider.DocumentsContract.deleteDocument(appContext.contentResolver, targetUri)
+                    }
+                }
                 runCatching { packed.delete() }
             }
         }

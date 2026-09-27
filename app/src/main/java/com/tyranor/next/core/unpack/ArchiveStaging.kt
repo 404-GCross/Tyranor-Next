@@ -21,8 +21,11 @@ object ArchiveStaging {
     private const val STAGING_DIR = "archive_staging"
     private const val IO_CHUNK = 64 * 1024
 
-    /** 封包格式上限同样约束中转拷贝，避免异常 provider 无限流写满磁盘。 */
-    private const val MAX_STAGING_BYTES = 0xFFFFFFFFL
+    /**
+     * 暂存卷最低保留水位：拷贝过程中低于该值即中止。注意 XP3 索引是 64 位
+     * offset/size，不存在 4 GiB 格式上限——约束只能来自磁盘可用空间。
+     */
+    private const val STAGING_FREE_HEADROOM = 256L * 1024 * 1024
 
     data class PublishStats(val files: Int, val bytes: Long)
 
@@ -55,9 +58,14 @@ object ArchiveStaging {
         try {
             context.contentResolver.openInputStream(uri)?.use { input ->
                 target.outputStream().use { output ->
-                    copyBounded(input, output, what = "staging input", isCancelled = isCancelled) { copied ->
-                        onProgress?.invoke(copied, total)
-                    }
+                    copyBounded(
+                        input,
+                        output,
+                        what = "staging input",
+                        isCancelled = isCancelled,
+                        onBytes = { copied -> onProgress?.invoke(copied, total) },
+                        freeSpaceDir = stagingDir(context),
+                    )
                 }
             } ?: throw IOException("Cannot open document: $uri")
         } catch (error: Throwable) {
@@ -99,7 +107,7 @@ object ArchiveStaging {
                         val dest = uniqueFile(outDir, childName)
                         context.contentResolver.openInputStream(child.uri)?.use { input ->
                             dest.outputStream().use { output ->
-                                bytes += copyBounded(input, output, bytes, "staging directory", isCancelled)
+                                bytes += copyBounded(input, output, bytes, "staging directory", isCancelled, freeSpaceDir = stagingDir(context))
                             }
                         } ?: throw IOException("Cannot read document: ${child.uri}")
                     }
@@ -134,7 +142,14 @@ object ArchiveStaging {
         val root = DocumentFile.fromTreeUri(context, treeUri) ?: return null
         val taken = root.listFiles().mapNotNull { it.name?.lowercase(Locale.ROOT) }.toHashSet()
         if (baseName.lowercase(Locale.ROOT) in taken) return null
-        return root.createDirectory(baseName)
+        val created = root.createDirectory(baseName) ?: return null
+        // provider 可能对已存在目录返回成功：创建后核对名称（大小写不敏感），
+        // 不一致即删除并返回 null，交由调用方走同名拒绝。
+        if (created.name?.equals(baseName, ignoreCase = true) != true) {
+            runCatching { created.delete() }
+            return null
+        }
+        return created
     }
 
     /** 把 [srcDir] 树写进已打开的 SAF 目录（幂等覆盖：同名文件删后重建）。
@@ -156,22 +171,32 @@ object ArchiveStaging {
             if (isCancelled()) throw ArchiveCancelledException(docDir.uri.toString())
             val (dir, target) = stack.removeLast()
             val children = dir.listFiles() ?: throw IOException("Cannot list: ${dir.path}")
+            // 每个目标目录只列一次子项建名字映射：findFile 每次调用都是全量
+            // listFiles + 逐条 getName binder 查询，大目录回写是 O(n²) 次跨进程调用。
+            val existing = target.listFiles()?.associateBy { it.name }
             for (child in children.sortedBy { it.name }) {
                 if (child.isDirectory) {
-                    val sub = target.findFile(child.name)?.takeIf { it.isDirectory }
+                    val sub = existing?.get(child.name)?.takeIf { it.isDirectory }
                         ?: target.createDirectory(child.name)
                         ?: throw IOException("Cannot create directory: ${child.name}")
                     stack.add(child to sub)
                 } else if (child.isFile) {
-                    target.findFile(child.name)?.delete()
+                    existing?.get(child.name)?.delete()
                     val dest = target.createFile("application/octet-stream", child.name)
                         ?: throw IOException("Cannot create file: ${child.name}")
                     try {
                         context.contentResolver.openOutputStream(dest.uri)?.use { output ->
                             child.inputStream().use { input ->
-                                val copied = copyBounded(input, output, bytes, "publishing results", isCancelled) { chunk ->
-                                    onProgress?.invoke(published + chunk, publishTotal, child.name)
-                                }
+                                val copied = copyBounded(
+                                    input,
+                                    output,
+                                    bytes,
+                                    "publishing results",
+                                    isCancelled,
+                                    onBytes = { chunk ->
+                                        onProgress?.invoke(published + chunk, publishTotal, child.name)
+                                    },
+                                )
                                 bytes += copied
                                 published += copied
                             }
@@ -226,7 +251,10 @@ object ArchiveStaging {
         return candidate
     }
 
-    /** 返回本次拷贝字节数；累计超 [MAX_STAGING_BYTES] 或已超 [already] 抛错并由调用方清理。 */
+    /**
+     * 返回本次拷贝字节数；[freeSpaceDir] 非空时按卷剩余水位中止（XP3 无 4 GiB
+     * 格式上限，约束只能来自磁盘可用空间），失败由调用方清理。
+     */
     private fun copyBounded(
         input: java.io.InputStream,
         output: java.io.OutputStream,
@@ -234,16 +262,19 @@ object ArchiveStaging {
         what: String,
         isCancelled: () -> Boolean = { false },
         onBytes: ((copied: Long) -> Unit)? = null,
+        freeSpaceDir: File? = null,
     ): Long {
         val chunk = ByteArray(IO_CHUNK)
         var total = 0L
         while (true) {
             if (isCancelled()) throw ArchiveCancelledException(what)
+            if (freeSpaceDir != null && total % (4L * IO_CHUNK) == 0L &&
+                freeSpaceDir.usableSpace < STAGING_FREE_HEADROOM
+            ) {
+                throw IOException("Insufficient cache space for staging: $what")
+            }
             val n = input.read(chunk)
             if (n < 0) break
-            if (already + total + n > MAX_STAGING_BYTES) {
-                throw IOException("Staging too large (>4GB): $what")
-            }
             output.write(chunk, 0, n)
             total += n
             onBytes?.invoke(total)

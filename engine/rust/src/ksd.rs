@@ -27,7 +27,8 @@ fn decompress_mode2(data: &[u8]) -> Result<(Vec<u8>, u64), String> {
     }
     let compressed_len = compressed_i as usize;
     let uncompressed_len = uncompressed_i as usize;
-    if compressed_len < 2 || 16 + compressed_len > data.len() {
+    // checked_add：compressed_len 来自归档内容（攻击者可控），杜绝任何平台上的溢出/回绕。
+    if compressed_len < 2 || 16usize.checked_add(compressed_len).map_or(true, |end| end > data.len()) {
         return Err(format!("KSD: bad compressed_len {compressed_len}"));
     }
     if uncompressed_len > MAX_MODE2_OUT {

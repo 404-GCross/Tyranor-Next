@@ -1,7 +1,7 @@
 # XP3 拆封包功能方案（解包 / 封包独立工具页）
 
 > 状态：**已实施**；实现说明见文末「实施记录」
-> 目标：在应用设置内提供独立的「解包 / 封包」工具页（`ui/archive`）：解包=选目录扫描 XP3 封包、主从预览条目并整体解包到归档同名文件夹（去重）；封包=选目录压成同级同名 `.xp3`（0=明文存放，1–9 zlib 等级）。核心解封包逻辑为 Rust 实现（`engine/rust`，源自 UsefulUnpack，MIT）。
+> 目标：在应用设置内提供独立的「解包 / 封包」工具页（`ui/archive`）：解包=选目录扫描 XP3 封包、主从预览条目并整体解包到归档同名文件夹（同名拒绝，不自动改名）；封包=选目录压成同级同名 `.xp3`（0=明文存放，1–9 zlib 等级）。核心解封包逻辑为 Rust 实现（`engine/rust`，源自 UsefulUnpack，MIT）。
 > 关联：`CONTEXT.md`「拆封包」术语节、`README.md` 致谢（UsefulUnpack）、`docs/Artemis基础补丁与Windows环境补丁逆向分析.md`（启动链 PFS 解包，与本功能互不依赖）。
 
 ---
@@ -11,8 +11,8 @@
 | 项 | 要求 |
 |---|---|
 | 入口 | 应用设置页新增「解包 / 封包」跳转条目（`ArrowPreference` → `ArchiveUnpackActivity`，`exported=false`） |
-| 解包 | 选目录 → 递归扫描 `.xp3`（深度 ≤6、数量 ≤500）→ 左右主从预览（左归档、右条目）→ 解到归档同名文件夹（已存在则 `名字(1)` 去重） |
-| 封包 | 选目录 → 压成同级同名 `.xp3`（去重）；SAF 专有 provider 下封到 cache 后交系统保存框 |
+| 解包 | 选目录 → 递归扫描 `.xp3`（深度 ≤6、数量 ≤500）→ 左右主从预览（左归档、右条目）→ 解到归档同名文件夹（已存在则**拒绝并提示**，不自动改名） |
+| 封包 | 选目录 → 压成同级同名 `.xp3`（已存在则**拒绝并提示**）；SAF 专有 provider 下封到 cache 后交系统保存框 |
 | 进度/取消 | 字节级进度（独立轮询线程读 Rust 全局进度槽），随时取消（哨兵异常 `ArchiveCancelledException`） |
 | 文案 | 三语言（values / values-en / values-ja） |
 | 后端 | **仅 XP3**；native 库仅 `arm64-v8a`（与全 App 一致） |
@@ -31,7 +31,7 @@ core/unpack（app）
   ArchiveScanner     目录树递归扫描（真实路径优先，SAF DocumentFile 兜底）
   ArchiveDetection   按名/按魔数判定 XP3（`58 50 33`）
   ArchiveStaging     SAF 双轨桥：可映射直用，否则拷入 cacheDir/archive_staging 中转，
-                     产物经 publishDir 写回目录树（同名删后重建）
+                     产物经 publishDir 写回目录树（输出目录为本次新建，写入前校验为空）
   Xp3Archive         阻塞式门面：listEntries / extractAll / pack（调用方切 Dispatchers.IO）
   NativeArchiveOp    阻塞 native 调用 + 轮询进度 + 取消转译的公共脚手架
         │  JNI
@@ -72,7 +72,7 @@ engine/rust（单 crate cdylib，产物 libarchive_xp3_core.so）
 ## 6. 实施记录
 
 - **Rust**：`engine/rust` 单 crate（`Cargo.toml` cdylib + lto，`build-archives.sh` 跑 host 测试后 cargo-ndk 产 arm64 .so，NDK 版本对齐 engine/build.gradle）；进度槽测试与打包往返测试共用 `TEST_LOCK` 串行（合并单测试二进制后静态量互踩），并修 reader 测试漏清 cancel 毒化后续用例的问题
-- **Kotlin**：`core/unpack` 新增 `ArchiveDetection/ArchiveScanner/ArchiveStaging/ArchiveCancelledException/ArchiveNativeMissingException/NativeArchiveOp/Xp3Archive`；`ui/archive` 新增 `ArchiveUnpackActivity/ArchiveViewModel`（ViewModel 常驻，旋转不丢扫描结果）；设置页 `AppSettingsActivity` 增跳转条目
+- **Kotlin**：`core/unpack` 新增 `ArchiveDetection/ArchiveScanner/ArchiveStaging/ArchiveCancelledException/ArchiveNativeMissingException/NativeArchiveOp/Xp3Archive`；`ui/archive` 新增 `ArchiveUnpackActivity/ArchiveViewModel`（ViewModel 常驻，旋转不丢扫描结果）；设置中心 `SettingsScreen` 增跳转条目（一级卡片）
 - **文案**：三语言新增 `archive_*` 键（三侧齐全性已脚本核验）
 - **文档**：`AGENT.md`（core/ui 域清单）、`README.md`（core/unpack 与 ui/archive 登记、engine/rust 目录、UsefulUnpack 致谢）、`CONTEXT.md`（拆封包术语节）
-- **校验**：Rust `cargo test` 15/15；Kotlin `testDebugUnitTest` 346/346；`assembleDebug`（136M）与 `assembleRelease`（R8，112M）通过；release dex 确认 `com/core/archive/Xp3Core` 按名保留、`libarchive_xp3_core.so` 在包
+- **校验**：Rust `cargo test` 17/17；Kotlin `testDebugUnitTest` 346/346；`assembleDebug`（136M）与 `assembleRelease`（R8，112M）通过；release dex 确认 `com/core/archive/Xp3Core` 按名保留、`libarchive_xp3_core.so` 在包

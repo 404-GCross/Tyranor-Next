@@ -175,7 +175,7 @@ _Avoid_: 云同步、备份（与存档镜像不同）
 ## 拆封包
 
 **拆封包（Archive Unpack / Pack）**:
-设置内独立工具页（`ui/archive`）：扫描所选目录下的 XP3 封包、主从预览条目并整体解包到归档同名文件夹（去重）；封包把所选目录压成同级同名 `.xp3`（0=明文存放，1–9 zlib 等级）。Rust 实现（`engine/rust`），与 Artemis 启动链的 `ArtemisPfsUnpacker`（仅启动补丁，纯 Kotlin）互不依赖。
+设置内独立工具页（`ui/archive`）：扫描所选目录下的 XP3 封包、主从预览条目并整体解包到归档同名文件夹（同名拒绝，不自动改名）；封包把所选目录压成同级同名 `.xp3`（0=明文存放，1–9 zlib 等级）。Rust 实现（`engine/rust`），与 Artemis 启动链的 `ArtemisPfsUnpacker`（仅启动补丁，纯 Kotlin）互不依赖。
 _Avoid_: 解压（系统压缩包语义）、打包
 
 **归档扫描（ArchiveScanner）**:
