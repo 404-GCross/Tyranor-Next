@@ -9,6 +9,14 @@ import android.os.Environment
 import android.provider.Settings
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -63,6 +71,8 @@ import com.tyranor.next.R
 import com.tyranor.next.core.game.model.GamePathUtils
 import com.tyranor.next.core.unpack.ScannedArchive
 import com.tyranor.next.theme.NavWhite
+import com.tyranor.next.theme.glassBorder
+import com.tyranor.next.theme.glassShadow
 import com.tyranor.next.ui.common.AppScreenActivity
 import com.tyranor.next.ui.common.AppAlertDialog
 import com.tyranor.next.ui.common.AppTopBar
@@ -87,6 +97,9 @@ class ArchiveUnpackActivity : AppScreenActivity() {
 }
 
 private const val TAG = "ArchiveUnpack"
+
+/// 拆包页统一圆角：卡片/容器/玻璃描边共用同一轮廓。
+private val ArchCardShape = RoundedCornerShape(8.dp)
 private const val MAX_LISTED_ENTRIES = 2000
 
 /** 目录展示名：优先映射真实路径（从 /storage/emulated/0 起），映射失败退回解码的文档 id 路径。 */
@@ -196,19 +209,30 @@ private fun ArchiveScreen(vm: ArchiveViewModel = viewModel()) {
 
         ModeTabs(mode = vm.mode, onSelect = { vm.switchMode(it) })
 
-        // 面板占剩余空间：给关闭弹窗后的结果消息（StatusBar）留出可见区域
+        // 面板占剩余空间：给关闭弹窗后的结果消息（StatusBar）留出可见区域。
+        // 模式切换保留滑动 + 淡入淡出特效（与主界面水平移动切换同向语义）。
         Box(Modifier.fillMaxWidth().weight(1f)) {
-            when (vm.mode) {
-                ArchiveMode.UNPACK -> UnpackPane(
-                    vm = vm,
-                    appContext = appContext,
-                    onPickDir = { pickSourceDir.launch(null) },
-                )
-                ArchiveMode.PACK -> PackPane(
-                    vm = vm,
-                    appContext = appContext,
-                    onPickDir = { pickPackDir.launch(null) },
-                )
+            AnimatedContent(
+                targetState = vm.mode,
+                transitionSpec = {
+                    val forward = targetState == ArchiveMode.PACK
+                    (slideInHorizontally { if (forward) it else -it } + fadeIn(tween(220))) togetherWith
+                        (slideOutHorizontally { if (forward) -it else it } + fadeOut(tween(220)))
+                },
+                label = "archivePane",
+            ) { paneMode ->
+                when (paneMode) {
+                    ArchiveMode.UNPACK -> UnpackPane(
+                        vm = vm,
+                        appContext = appContext,
+                        onPickDir = { pickSourceDir.launch(null) },
+                    )
+                    ArchiveMode.PACK -> PackPane(
+                        vm = vm,
+                        appContext = appContext,
+                        onPickDir = { pickPackDir.launch(null) },
+                    )
+                }
             }
         }
 
@@ -221,12 +245,13 @@ private fun ArchiveScreen(vm: ArchiveViewModel = viewModel()) {
 
 @Composable
 private fun ModeTabs(mode: ArchiveMode, onSelect: (ArchiveMode) -> Unit) {
+    // 横排独立小按钮（形态对齐主界面左侧纵栏的小胶囊）：玻璃面 + 描边，选中态主色浅底
     Row(
         modifier = Modifier
-            .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 6.dp)
-            .clip(RoundedCornerShape(8.dp))
+            .clip(ArchCardShape)
             .background(NavWhite)
+            .glassBorder(ArchCardShape)
             .padding(4.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
@@ -244,21 +269,28 @@ private fun ModeTabs(mode: ArchiveMode, onSelect: (ArchiveMode) -> Unit) {
 }
 
 @Composable
-private fun RowScope.ModeTab(label: String, selected: Boolean, onClick: () -> Unit) {
+private fun ModeTab(label: String, selected: Boolean, onClick: () -> Unit) {
+    val bg by animateColorAsState(
+        if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f) else Color.Transparent,
+        label = "modeTabBg",
+    )
+    val fg by animateColorAsState(
+        if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+        label = "modeTabFg",
+    )
     Box(
         modifier = Modifier
-            .weight(1f)
             .clip(RoundedCornerShape(8.dp))
-            .background(if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f) else Color.Transparent)
+            .background(bg)
             .clickable(onClick = onClick)
-            .padding(vertical = 8.dp),
+            .padding(horizontal = 18.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             label,
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            color = fg,
         )
     }
 }
@@ -452,8 +484,9 @@ private fun DirStrip(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 4.dp)
-            .clip(RoundedCornerShape(8.dp))
+            .clip(ArchCardShape)
             .background(NavWhite)
+            .glassBorder(ArchCardShape)
             .padding(start = 12.dp, end = 2.dp, top = 2.dp, bottom = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -659,10 +692,10 @@ private fun BigAction(label: String, onClick: () -> Unit, enabled: Boolean) {
 @Composable
 private fun ArchiveCard(title: String, content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().glassShadow(ArchCardShape).glassBorder(ArchCardShape),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         colors = CardDefaults.cardColors(containerColor = NavWhite),
-        shape = RoundedCornerShape(8.dp),
+        shape = ArchCardShape,
     ) {
         Column(Modifier.fillMaxWidth().padding(14.dp)) {
             Text(
