@@ -77,6 +77,7 @@ import com.tyranor.next.theme.glassShadow
 import com.tyranor.next.ui.common.AppScreenActivity
 import com.tyranor.next.ui.common.AppAlertDialog
 import com.tyranor.next.ui.common.AppTopBar
+import com.tyranor.next.ui.common.DialogTextButton
 import top.yukonga.miuix.kmp.basic.Slider
 import top.yukonga.miuix.kmp.basic.SliderDefaults
 import java.util.Locale
@@ -667,13 +668,9 @@ private fun ArchiveProgressDialog(vm: ArchiveViewModel, onDismissRequest: () -> 
         },
         confirmButton = {
             if (vm.working) {
-                TextButton(onClick = { vm.cancel() }) {
-                    Text(stringResource(R.string.archive_cancel), style = MaterialTheme.typography.bodyMedium)
-                }
+                DialogTextButton(stringResource(R.string.archive_cancel), onClick = { vm.cancel() })
             } else {
-                TextButton(onClick = { vm.dismissDialog() }) {
-                    Text(stringResource(R.string.common_done), style = MaterialTheme.typography.bodyMedium)
-                }
+                DialogTextButton(stringResource(R.string.common_done), onClick = { vm.dismissDialog() })
             }
         },
     )
