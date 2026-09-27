@@ -366,8 +366,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                         Column(Modifier.padding(vertical = 4.dp)) {
                             ArrowPreference(
                                 title = stringResource(R.string.archive_title),
-                                summary = stringResource(R.string.archive_summary),
-                                startAction = { SettingsItemIcon(R.drawable.ic_sheet_folder) },
+                                startAction = { SettingsItemIcon(R.drawable.ic_sheet_archive) },
                                 onClick = { startActivityWithPageTransition(ctx, ArchiveUnpackActivity.createIntent(ctx)) },
                             )
                         }
