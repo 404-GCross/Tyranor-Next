@@ -124,14 +124,26 @@ mod tests {
     #[test]
     fn mode2_probe_rejects_non_text_magic_collision() {
         // 任何 ≤16MiB 条目都能过 XP3 探测的 5 字节魔数；二进制（TGA 型碰撞）
-        // 不得被"解码"成垃圾。非法 UTF-16（孤立高位代理）→ None → 原样透传。
-        let mut inner = vec![0x41u8, 0x00]; // 'A'
-        inner.extend_from_slice(&[0x00, 0xD8]); // 孤立高位代理 U+D800
-        inner.extend_from_slice(&[0x42u8, 0x00]); // 'B'，无低位代理跟随
-        assert_eq!(ksd_mode2_decode(&wrap(&inner, inner.len() as i64)), None);
+        // 不得被"解码"成垃圾。载荷必须先 zlib 压缩——否则 deflate 截断会先于
+        // UTF-16 校验失败，测试就失去意义。非法 UTF-16（孤立高位代理）→ None。
+        let inner = {
+            let mut b = vec![0x41u8, 0x00]; // 'A'
+            b.extend_from_slice(&[0x00, 0xD8]); // 孤立高位代理 U+D800
+            b.extend_from_slice(&[0x42u8, 0x00]); // 'B'，无低位代理跟随
+            b
+        };
+        assert_eq!(ksd_mode2_decode(&wrap_zlib(&inner)), None);
 
         // UTF-16 合法但含非空白控制字符（U+0001）→ 同样拒绝。
         let inner2 = vec![0x41u8, 0x00, 0x01, 0x00, 0x42u8, 0x00];
-        assert_eq!(ksd_mode2_decode(&wrap(&inner2, inner2.len() as i64)), None);
+        assert_eq!(ksd_mode2_decode(&wrap_zlib(&inner2)), None);
+    }
+
+    /// 按真实 KSD 布局构造条目：zlib(inner) + 声明未压缩长度。
+    fn wrap_zlib(inner: &[u8]) -> Vec<u8> {
+        let mut enc = ZlibEncoder::new(Vec::new(), flate2::Compression::new(6));
+        enc.write_all(inner).unwrap();
+        let compressed = enc.finish().unwrap();
+        wrap(&compressed, inner.len() as i64)
     }
 }

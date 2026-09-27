@@ -50,7 +50,11 @@ impl XP3Entries {
         let mut buf = vec![];
         while read < original_size {
             let (key, index_size) = read_index(&mut stream).await?;
-            if index_size > MAX_INDEX_BYTES || read + index_size > original_size {
+            // index_size 来自归档数据（攻击者可控）：加法必须 checked，溢出回绕
+            // 会把 cap 检查整个绕过（CodeRabbit CWE-190）。
+            if index_size > MAX_INDEX_BYTES
+                || read.checked_add(index_size).map_or(true, |end| end > original_size)
+            {
                 return Err(XP3OpenError::Io(ErrorKind::UnexpectedEof.into()));
             }
             let n = (&mut stream).take(index_size).read_to_end(&mut buf).await? as u64;
@@ -91,7 +95,10 @@ impl XP3Entries {
         let mut prev_segment_index: Option<usize> = None;
         while cursor.position() < total_size {
             let (key, index_size) = read_index(&mut cursor).await?;
-            if cursor.position() + index_size > total_size {
+            let end = cursor.position().checked_add(index_size).ok_or_else(|| {
+                io::Error::new(ErrorKind::InvalidData, "xp3 index: chunk size overflow")
+            })?;
+            if end > total_size {
                 return Err(XP3OpenError::Io(ErrorKind::UnexpectedEof.into()));
             }
 
@@ -106,7 +113,7 @@ impl XP3Entries {
 
                     let name_len = ReadBytesExt::read_u16::<LittleEndian>(&mut sub_data)? as usize;
                     let name_start = sub_data.position() as usize;
-                    if name_start + name_len * 2 > sub_data.get_ref().len() {
+                    if name_start.checked_add(name_len * 2).map_or(true, |end| end > sub_data.get_ref().len()) {
                         return Err(XP3OpenError::Io(ErrorKind::UnexpectedEof.into()));
                     }
                     entry.name = char::decode_utf16(
@@ -158,7 +165,7 @@ impl XP3Entries {
                 }
             }
 
-            cursor.set_position(cursor.position() + index_size);
+            cursor.set_position(end);
         }
 
         let Some(start_segment_index) = start_segment_index else {

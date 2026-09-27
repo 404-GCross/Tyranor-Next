@@ -618,7 +618,7 @@
     <string name="archive_conflict_dir">同名フォルダ「%1$s」が既に存在します。バックアップまたは名前変更後に再試行してください</string>
     <string name="archive_conflict_file">同名ファイル「%1$s」が既に存在します。事前にバックアップまたは名前を変更してください</string>
     <string name="archive_conflict_inside">アーカイブ内に重複エントリ「%1$s」があるため、上書き防止のため解凍を拒否しました</string>
-    <string name="archive_conflict_rollback">出力フォルダ「%1$s」のロールバックが完了しませんでした。不完全なファイルが残っている可能性があります。手動で確認・削除してください</string>
+    <string name="archive_conflict_rollback">生成物「%1$s」のロールバックが完了しませんでした。不完全なファイルが残っている可能性があります。手動で確認・削除してください</string>
     <string name="archive_no_dir">先にフォルダを選択してください</string>
     <string name="archive_empty_list">空または読み取れません</string>
     <string name="archive_entries_summary">%1$d 件、合計 %2$s</string>

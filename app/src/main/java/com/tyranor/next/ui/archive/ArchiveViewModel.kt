@@ -150,8 +150,17 @@ class ArchiveViewModel : ViewModel() {
         }
     }
 
-    private fun launchOp(appContext: Context, label: String, determinate: Boolean, block: suspend () -> Unit) {
-        if (working) return
+    private fun launchOp(appContext: Context, label: String, determinate: Boolean, block: suspend () -> Unit): Boolean {
+        if (working) return false
+        val busyMessage = appContext.getString(R.string.archive_busy)
+        // 门闸在派发前取：拒绝时调用方能就地善后自己的产物（如 finishSave 的
+        // 暂存包与 CreateDocument 预建的目标文档）。
+        if (!ArchiveOpGate.tryLock()) {
+            message = busyMessage
+            dialogVisible = false
+            Toast.makeText(appContext, busyMessage, Toast.LENGTH_LONG).show()
+            return false
+        }
         working = true
         workingLabel = label
         progress = 0f
@@ -166,18 +175,7 @@ class ArchiveViewModel : ViewModel() {
         val failedMessage = appContext.getString(R.string.archive_failed_generic)
         val cancelledMessage = appContext.getString(R.string.archive_cancelled)
         val nativeMissingMessage = appContext.getString(R.string.archive_native_missing)
-        val busyMessage = appContext.getString(R.string.archive_busy)
         val job = viewModelScope.launch {
-            if (!ArchiveOpGate.tryLock()) {
-                // 分屏/平行窗口可能出现两个页面实例：Rust 全局进度/取消槽与暂存区
-                // 是进程级资源，与其互踩（莫名取消/进度互串/暂存互删）不如就地拒绝。
-                message = busyMessage
-                dialogVisible = false
-                working = false
-                currentJob = null
-                Toast.makeText(appContext, busyMessage, Toast.LENGTH_LONG).show()
-                return@launch
-            }
             try {
                 try {
                     block()
@@ -215,6 +213,7 @@ class ArchiveViewModel : ViewModel() {
             }
         }
         currentJob = job
+        return true
     }
 
     fun dismissDialog() {
@@ -551,17 +550,18 @@ class ArchiveViewModel : ViewModel() {
         saveDialogActive = false
         val packed = pendingSaveFile
         val suggestedName = pendingSaveName
-        pendingSaveFile = null
-        pendingSaveName = ""
         if (packed == null) return
         if (targetUri == null) {
+            pendingSaveFile = null
+            pendingSaveName = ""
             runCatching { packed.delete() }
             return
         }
         val doneFormat = appContext.getString(R.string.archive_pack_done)
-        launchOp(appContext, suggestedName.ifBlank { packed.name }, determinate = false) {
-            // 回写成功前记录状态：失败/取消时用户目录里已经建出的目标文档必须清理，
-            // 否则会残留一个名字正确但内容截断的 .xp3，看起来像有效封包。
+        val accepted = launchOp(appContext, suggestedName.ifBlank { packed.name }, determinate = false) {
+            // 门闸已受理才清待保存状态：拒绝路径要靠它们善后。
+            pendingSaveFile = null
+            pendingSaveName = ""
             var written = false
             try {
                 val savedName = withContext(Dispatchers.IO) {
@@ -583,16 +583,36 @@ class ArchiveViewModel : ViewModel() {
                 }
                 written = true
                 message = doneFormat.format(savedName)
+            } catch (error: Throwable) {
+                // 目标文档由 CreateDocument 预先创建：失败/取消时删除半成品并复核——
+                // provider 返回 false 时用户目录残留截断的 .xp3，必须按类型化错误如实上报。
+                val removed = withContext(NonCancellable + Dispatchers.IO) {
+                    runCatching { DocumentsContract.deleteDocument(appContext.contentResolver, targetUri) }
+                        .getOrDefault(false)
+                }
+                if (!removed) {
+                    Log.w(TAG, "save rollback incomplete: $targetUri", error)
+                    throw ArchiveConflictException(
+                        ArchiveConflictKind.ROLLBACK_INCOMPLETE,
+                        suggestedName.ifBlank { packed.name },
+                    )
+                }
+                throw error
             } finally {
                 // 清理是跨进程/磁盘操作，挪 IO 线程；NonCancellable 保证取消路径上仍执行。
                 withContext(NonCancellable + Dispatchers.IO) {
-                    if (!written) {
-                        // 目标文档由 CreateDocument 预先创建：失败/取消时尽力删除半成品。
-                        runCatching { DocumentsContract.deleteDocument(appContext.contentResolver, targetUri) }
-                    }
                     runCatching { packed.delete() }
                 }
             }
+        }
+        if (!accepted) {
+            // 门闸拒绝（另一实例在运行）：暂存包与预建的空目标文档都明确清理。
+            viewModelScope.launch(Dispatchers.IO) {
+                runCatching { packed.delete() }
+                runCatching { DocumentsContract.deleteDocument(appContext.contentResolver, targetUri) }
+            }
+            pendingSaveFile = null
+            pendingSaveName = ""
         }
     }
 

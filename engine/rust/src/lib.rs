@@ -291,6 +291,8 @@ fn collect_files_xp3(base: &Path) -> Result<Vec<(PathBuf, String)>, String> {
         let entries: Vec<_> = fs::read_dir(&dir).map_err(|e| format!("read_dir {}: {e}", dir.display()))?
             .collect::<Result<_, _>>().map_err(|e| format!("read_dir {}: {e}", dir.display()))?;
         for entry in entries {
+            // 逐条目取消检查：单个巨大平铺目录的 collect + 排序此前要等整层读完才响应。
+            if compress_progress::cancelled() { return Err("cancelled".to_string()); }
             let path = entry.path();
             let name = entry.file_name().to_string_lossy().to_string();
             let child_rel = if rel.is_empty() { name.clone() } else { format!("{rel}/{name}") };
@@ -302,6 +304,7 @@ fn collect_files_xp3(base: &Path) -> Result<Vec<(PathBuf, String)>, String> {
             }
         }
     }
+    if compress_progress::cancelled() { return Err("cancelled".to_string()); }
     out.sort_by(|a, b| a.1.cmp(&b.1));
     Ok(out)
 }
