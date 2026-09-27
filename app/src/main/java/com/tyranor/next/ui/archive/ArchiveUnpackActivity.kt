@@ -70,6 +70,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tyranor.next.R
 import com.tyranor.next.core.game.model.GamePathUtils
 import com.tyranor.next.core.unpack.ScannedArchive
+import com.tyranor.next.theme.MiuixSettingsTheme
 import com.tyranor.next.theme.NavWhite
 import com.tyranor.next.theme.glassBorder
 import com.tyranor.next.theme.glassShadow
@@ -448,16 +449,20 @@ private fun PackPane(vm: ArchiveViewModel, appContext: Context, onPickDir: () ->
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                Slider(
-                    value = vm.packLevel.toFloat(),
-                    onValueChange = { vm.choosePackLevel(it.roundToInt()) },
-                    valueRange = 0f..9f,
-                    showKeyPoints = true,
-                    keyPoints = (0..9).map { it.toFloat() },
-                    magnetThreshold = 0.25f,
-                    hapticEffect = SliderDefaults.SliderHapticEffect.Step,
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                )
+                // Slider 是 Miuix 组件，默认色读库默认 MiuixTheme（固定蓝），不随主题色；
+                // 本页只有 Material 主题包裹，必须显式套 Miuix 子主题才能跟随色调轮盘。
+                MiuixSettingsTheme {
+                    Slider(
+                        value = vm.packLevel.toFloat(),
+                        onValueChange = { vm.choosePackLevel(it.roundToInt()) },
+                        valueRange = 0f..9f,
+                        showKeyPoints = true,
+                        keyPoints = (0..9).map { it.toFloat() },
+                        magnetThreshold = 0.25f,
+                        hapticEffect = SliderDefaults.SliderHapticEffect.Step,
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                    )
+                }
                 Button(
                     onClick = { vm.pack(appContext) },
                     enabled = !vm.working && vm.packTreeUri != null,
