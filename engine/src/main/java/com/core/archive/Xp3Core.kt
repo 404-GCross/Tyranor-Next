@@ -1,7 +1,7 @@
 package com.core.archive
 
 /**
- * Kirikiri XP3 打包/解包 native 桥（engine/rust/crates/xp3-core，产物 libarchive_xp3_core.so）。
+ * Kirikiri XP3 打包/解包 native 桥（源码 engine/rust，产物 libarchive_xp3_core.so）。
  *
  * 库加载失败不抛在 init（避免 ExceptionInInitializerError），由 [ensureLoaded]
  * 在每次操作入口显式检查并转为 [IOException]。
@@ -23,7 +23,7 @@ object Xp3Core {
         }
     }
 
-    external fun xp3Extract(tool: String, input: String, output: String): String?
+    external fun xp3Extract(input: String, output: String): String?
     external fun xp3ListEntries(input: String): String?
     external fun xp3ExtractProgressCount(): Long
     external fun xp3ExtractProgressTotal(): Long
@@ -31,7 +31,7 @@ object Xp3Core {
     external fun xp3ExtractProgressFileTotal(): Long
     external fun xp3ExtractProgressName(): String?
     external fun xp3ExtractCancel()
-    external fun xp3CreateArchive(tool: String, input: String, output: String, level: String): String?
+    external fun xp3CreateArchive(input: String, output: String, level: String): String?
     external fun xp3CompressProgressCount(): Long
     external fun xp3CompressProgressTotal(): Long
     external fun xp3CompressProgressFileCount(): Long

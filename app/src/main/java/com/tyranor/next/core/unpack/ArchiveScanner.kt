@@ -5,6 +5,7 @@ import android.net.Uri
 import android.provider.DocumentsContract
 import com.tyranor.next.core.game.model.GamePathUtils
 import java.io.File
+import java.nio.file.Files
 import java.util.Locale
 
 /**
@@ -15,13 +16,18 @@ import java.util.Locale
  */
 data class ScannedArchive(
     val id: String,
-    /** 列表展示名（相对扫描根的路径，便于区分同名）。 */
+    /** 相对扫描根的路径，仅作排序键；列表展示用 [fileName]。 */
     val displayName: String,
     /** 归档文件自身的名字（含扩展名），用于派生输出文件夹名。 */
     val fileName: String,
     val size: Long,
     val realFile: File?,
     val docUri: Uri?,
+    /**
+     * 归档所在父目录的 document URI（扫描期记录，SAF 条目必非空）——解包输出目录
+     * 的落点依据。document ID 是 provider 不透明标识，运行期不得再按其推导层级。
+     */
+    val parentDocUri: Uri? = null,
 )
 
 /**
@@ -64,8 +70,12 @@ object ArchiveScanner {
             // 若只 continue 跳过，已找到的条目会让回退被跳过，漏掉子树里的封包。
             val children = runCatching { dir.listFiles() }.getOrNull() ?: return emptyList()
             for (child in children) {
+                // 单目录内也守住总量上限（外层 while 的检查在深目录时会漏）。
+                if (out.size >= MAX_ARCHIVES) break
                 val childRel = if (rel.isEmpty()) child.name else "$rel/${child.name}"
                 if (child.isDirectory) {
+                    // 不跟随目录符号链接：环形链接会让遍历不终止（SAF 链路无此问题）。
+                    if (Files.isSymbolicLink(child.toPath())) continue
                     stack.add(child to childRel)
                 } else if (child.isFile) {
                     if (!isArchiveFileName(child.name)) continue
@@ -126,6 +136,9 @@ object ArchiveScanner {
                                 size = size,
                                 realFile = null,
                                 docUri = docUri,
+                                // 父目录就是当前正被枚举的这一层：扫描期记下 URI，
+                                // 运行期不解析不透明的 document ID。
+                                parentDocUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, docId),
                             ),
                         )
                     }

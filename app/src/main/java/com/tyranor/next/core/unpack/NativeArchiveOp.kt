@@ -9,7 +9,7 @@ import kotlin.concurrent.thread
  *
  * Rust 侧每格式只有一份全局进度槽，进度只能轮询取得；取消经 [cancel] 点火
  * Rust 侧 flag，native 调用随后以 `cancelled` 错误返回，此处转译为哨兵异常。
- * 同一格式禁止并发（Rust 全局槽会被互踩）；调用方用单 flight 互斥保证。
+ * 同一格式禁止并发（Rust 全局槽会被互踩）；调用方必须经 [ArchiveOpGate] 取进程级单飞。
  */
 internal object NativeArchiveOp {
     private const val POLL_INTERVAL_MS = 100L

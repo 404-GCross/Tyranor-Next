@@ -412,8 +412,6 @@ checksum = "9aec5da331524158c6d1a4ac0ab1541149c0b9505fde06423b02f5ef0106b9f0"
 [[package]]
 name = "xp3"
 version = "0.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f9e127ab7195446286d697afd61d6af9886cb96cc54f45e72e7c996bbd5e8c5"
 dependencies = [
  "adler32",
  "async-compression",

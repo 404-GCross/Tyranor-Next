@@ -2,9 +2,9 @@ package com.tyranor.next.core.unpack
 
 import java.io.IOException
 
-/** 同名产物冲突的类型（解压输出文件夹 / 封包输出文件 / 包内重名条目）。 */
+/** 操作产物异常的类型（同名冲突 / 回滚残留）。 */
 enum class ArchiveConflictKind {
-    /** 解压输出的同名文件夹已存在。 */
+    /** 解包输出的同名文件夹已存在。 */
     OUTPUT_DIR_EXISTS,
 
     /** 封包输出的同名文件已存在。 */
@@ -12,6 +12,9 @@ enum class ArchiveConflictKind {
 
     /** 归档内存在重名条目（大小写折叠后）。 */
     DUPLICATE_ENTRY,
+
+    /** 取消/失败后的输出回滚未完成（provider 拒绝递归删除等），可能残留半成品。 */
+    ROLLBACK_INCOMPLETE,
 }
 
 /**
