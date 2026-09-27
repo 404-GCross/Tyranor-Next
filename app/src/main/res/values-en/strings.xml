@@ -1,6 +1,7 @@
 <resources>
     <string name="app_name">Tyranor Next</string>
     <string name="common_confirm">OK</string>
+    <string name="common_done">Done</string>
     <string name="common_cancel">Cancel</string>
     <string name="common_delete">Delete</string>
     <string name="common_save">Save</string>
@@ -592,6 +593,38 @@
     <string name="launch_krkr_save_path_not_dir">KRKR save path exists but is not a directory: %1$s</string>
     <string name="launch_create_krkr_scoped_save_failed">Unable to create the KRKR app-specific save directory: %1$s</string>
     <string name="launch_create_krkr_save_failed">Unable to create the KRKR save directory: %1$s</string>
+
+    <string name="archive_title">Unpack / Pack</string>
+    <string name="archive_permission_rationale">“All files access” is required to read archives from storage directly; without it some folders cannot be scanned or fall back to slow transfers</string>
+    <string name="archive_permission_grant">Grant</string>
+    <string name="archive_summary">Pick a folder to scan &amp; extract XP3, or pack a folder to XP3</string>
+    <string name="archive_mode_unpack">Unpack</string>
+    <string name="archive_mode_pack">Pack</string>
+    <string name="archive_pick_source_dir">Select game folder</string>
+    <string name="archive_rescan">Rescan</string>
+    <string name="archive_change_dir">Change</string>
+    <string name="archive_scanning">Scanning…</string>
+    <string name="archive_no_archives">No XP3 found in this folder</string>
+    <string name="archive_select_hint">Select an archive on the left to preview</string>
+    <string name="archive_archives_count">%1$d archives</string>
+    <string name="archive_extract_to">Extract to %1$s folder</string>
+    <string name="archive_extract_created">Extracted to %1$s</string>
+    <string name="archive_pack_pick_dir">Select folder to pack</string>
+    <string name="archive_pack_action">Pack</string>
+    <string name="archive_pack_done">Packed: %1$s</string>
+    <string name="archive_pick_dir">Select folder</string>
+    <string name="archive_done_extract_skipped">Extracted %1$d files, skipped %2$d</string>
+    <string name="archive_native_missing">Unpack component missing, please reinstall the full app and retry</string>
+    <string name="archive_level">Level (0=store)</string>
+    <string name="archive_cancel">Cancel</string>
+    <string name="archive_conflict_dir">Folder “%1$s” already exists — back it up or rename it first</string>
+    <string name="archive_conflict_file">Output “%1$s” already exists — back it up or rename it first</string>
+    <string name="archive_conflict_inside">Duplicate entry “%1$s” inside the archive — extraction refused to avoid overwriting</string>
+    <string name="archive_no_dir">Select a folder first</string>
+    <string name="archive_empty_list">Empty or unreadable</string>
+    <string name="archive_entries_summary">%1$d entries, %2$s total</string>
+    <string name="archive_failed">Failed: %1$s</string>
+    <string name="archive_cancelled">Cancelled</string>
 
     <string name="patch_error_only_kirikiri">Online patches are only supported for Kirikiri games</string>
     <string name="patch_error_select_patch">Select a patch to download</string>

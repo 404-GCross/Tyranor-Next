@@ -1,6 +1,7 @@
 <resources>
     <string name="app_name">Tyranor Next</string>
     <string name="common_confirm">OK</string>
+    <string name="common_done">完了</string>
     <string name="common_cancel">キャンセル</string>
     <string name="common_delete">削除</string>
     <string name="common_save">保存</string>
@@ -592,6 +593,38 @@
     <string name="launch_krkr_save_path_not_dir">KRKR セーブパスは存在しますがフォルダではありません：%1$s</string>
     <string name="launch_create_krkr_scoped_save_failed">KRKR アプリ個別セーブフォルダを作成できません：%1$s</string>
     <string name="launch_create_krkr_save_failed">KRKR セーブフォルダを作成できません：%1$s</string>
+
+    <string name="archive_title">解凍 / 圧縮</string>
+    <string name="archive_permission_rationale">アーカイブを直接読み取るには「すべてのファイルアクセス」権限が必要です。未許可の場合、一部のフォルダはスキャンできないか低速な転送になります</string>
+    <string name="archive_permission_grant">許可する</string>
+    <string name="archive_summary">フォルダを選んで XP3 をスキャン・解凍、またはフォルダを XP3 に圧縮</string>
+    <string name="archive_mode_unpack">解凍</string>
+    <string name="archive_mode_pack">圧縮</string>
+    <string name="archive_pick_source_dir">ゲームフォルダを選択</string>
+    <string name="archive_rescan">再スキャン</string>
+    <string name="archive_change_dir">フォルダ変更</string>
+    <string name="archive_scanning">スキャン中…</string>
+    <string name="archive_no_archives">このフォルダに XP3 が見つかりません</string>
+    <string name="archive_select_hint">左のアーカイブを選択して内容を表示</string>
+    <string name="archive_archives_count">アーカイブ %1$d 件</string>
+    <string name="archive_extract_to">%1$s フォルダに解凍</string>
+    <string name="archive_extract_created">%1$s に解凍しました</string>
+    <string name="archive_pack_pick_dir">圧縮するフォルダを選択</string>
+    <string name="archive_pack_action">圧縮</string>
+    <string name="archive_pack_done">圧縮完了：%1$s</string>
+    <string name="archive_pick_dir">フォルダを選択</string>
+    <string name="archive_done_extract_skipped">解凍完了：%1$d ファイル、スキップ %2$d 件</string>
+    <string name="archive_native_missing">解凍コンポーネントが見つかりません。アプリを再インストールしてください</string>
+    <string name="archive_level">圧縮レベル（0=無圧縮）</string>
+    <string name="archive_cancel">キャンセル</string>
+    <string name="archive_conflict_dir">同名フォルダ「%1$s」が既に存在します。バックアップまたは名前変更後に再試行してください</string>
+    <string name="archive_conflict_file">同名ファイル「%1$s」が既に存在します。事前にバックアップまたは名前を変更してください</string>
+    <string name="archive_conflict_inside">アーカイブ内に重複エントリ「%1$s」があるため、上書き防止のため解凍を拒否しました</string>
+    <string name="archive_no_dir">先にフォルダを選択してください</string>
+    <string name="archive_empty_list">空または読み取れません</string>
+    <string name="archive_entries_summary">%1$d 件、合計 %2$s</string>
+    <string name="archive_failed">失敗：%1$s</string>
+    <string name="archive_cancelled">キャンセルしました</string>
 
     <string name="patch_error_only_kirikiri">オンラインパッチは Kirikiri ゲームのみ対応しています</string>
     <string name="patch_error_select_patch">ダウンロードするパッチを選択してください</string>

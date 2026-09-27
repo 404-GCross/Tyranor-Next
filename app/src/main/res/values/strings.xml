@@ -1,6 +1,7 @@
 <resources>
     <string name="app_name">Tyranor Next</string>
     <string name="common_confirm">确定</string>
+    <string name="common_done">完成</string>
     <string name="common_cancel">取消</string>
     <string name="common_delete">删除</string>
     <string name="common_save">保存</string>
@@ -592,6 +593,38 @@
     <string name="launch_krkr_save_path_not_dir">KRKR 存档路径已存在但不是目录：%1$s</string>
     <string name="launch_create_krkr_scoped_save_failed">无法创建 KRKR 应用独立存档目录：%1$s</string>
     <string name="launch_create_krkr_save_failed">无法创建 KRKR 存档目录：%1$s</string>
+
+    <string name="archive_title">解包 / 封包</string>
+    <string name="archive_permission_rationale">需要「所有文件访问」权限以直接读取存储中的封包；未授权时部分目录可能扫描不到或需慢速中转</string>
+    <string name="archive_permission_grant">去授权</string>
+    <string name="archive_summary">选择目录扫描 XP3 并解包，或将目录封包为 XP3</string>
+    <string name="archive_mode_unpack">解包</string>
+    <string name="archive_mode_pack">封包</string>
+    <string name="archive_pick_source_dir">选择游戏目录</string>
+    <string name="archive_rescan">重新扫描</string>
+    <string name="archive_change_dir">换目录</string>
+    <string name="archive_scanning">正在扫描…</string>
+    <string name="archive_no_archives">该目录下未找到 XP3 封包</string>
+    <string name="archive_select_hint">从左侧选择一个封包查看内容</string>
+    <string name="archive_archives_count">封包 %1$d 个</string>
+    <string name="archive_extract_to">解压到 %1$s 文件夹</string>
+    <string name="archive_extract_created">已解压到 %1$s</string>
+    <string name="archive_pack_pick_dir">选择要封包的目录</string>
+    <string name="archive_pack_action">封包</string>
+    <string name="archive_pack_done">已封包：%1$s</string>
+    <string name="archive_pick_dir">选择目录</string>
+    <string name="archive_done_extract_skipped">解包完成：%1$d 个文件，跳过 %2$d 个</string>
+    <string name="archive_native_missing">解包组件缺失，请重装完整应用后重试</string>
+    <string name="archive_level">压缩等级（0=明文存放）</string>
+    <string name="archive_cancel">取消</string>
+    <string name="archive_conflict_dir">已存在同名文件夹「%1$s」，请先备份或改名后重试</string>
+    <string name="archive_conflict_file">已存在同名产物「%1$s」，请提前备份或改名后重试</string>
+    <string name="archive_conflict_inside">包内存在重名条目「%1$s」，已拒绝解压以避免覆盖</string>
+    <string name="archive_no_dir">请先选择目录</string>
+    <string name="archive_empty_list">空包或无法读取</string>
+    <string name="archive_entries_summary">%1$d 项，共 %2$s</string>
+    <string name="archive_failed">失败：%1$s</string>
+    <string name="archive_cancelled">已取消</string>
 
     <string name="patch_error_only_kirikiri">仅 Kirikiri 游戏支持在线补丁</string>
     <string name="patch_error_select_patch">请选择要下载的补丁</string>
