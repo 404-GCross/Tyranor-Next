@@ -81,7 +81,7 @@ object Xp3Archive {
                 )
             },
             cancel = { Xp3Core.xp3ExtractCancel() },
-            call = { Xp3Core.xp3Extract("", archive.absolutePath, outputDir.absolutePath) },
+            call = { Xp3Core.xp3Extract(archive.absolutePath, outputDir.absolutePath) },
         )
         // 尾检：取消恰好落在末条目时 Rust 可能已正常返回，必须复检。
         if (isCancelled()) throw ArchiveCancelledException(archive.path)
@@ -130,7 +130,6 @@ object Xp3Archive {
                 cancel = { Xp3Core.xp3CompressCancel() },
                 call = {
                     Xp3Core.xp3CreateArchive(
-                        "",
                         source.absolutePath,
                         output.absolutePath,
                         level.coerceIn(0, 9).toString(),

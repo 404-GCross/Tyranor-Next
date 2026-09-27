@@ -23,7 +23,7 @@ object Xp3Core {
         }
     }
 
-    external fun xp3Extract(tool: String, input: String, output: String): String?
+    external fun xp3Extract(input: String, output: String): String?
     external fun xp3ListEntries(input: String): String?
     external fun xp3ExtractProgressCount(): Long
     external fun xp3ExtractProgressTotal(): Long
@@ -31,7 +31,7 @@ object Xp3Core {
     external fun xp3ExtractProgressFileTotal(): Long
     external fun xp3ExtractProgressName(): String?
     external fun xp3ExtractCancel()
-    external fun xp3CreateArchive(tool: String, input: String, output: String, level: String): String?
+    external fun xp3CreateArchive(input: String, output: String, level: String): String?
     external fun xp3CompressProgressCount(): Long
     external fun xp3CompressProgressTotal(): Long
     external fun xp3CompressProgressFileCount(): Long

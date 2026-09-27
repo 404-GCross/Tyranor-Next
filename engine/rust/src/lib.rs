@@ -155,7 +155,7 @@ fn guarded<T: Send + 'static>(f: impl FnOnce() -> Result<T, String> + Send + 'st
 #[no_mangle]
 pub extern "system" fn Java_com_core_archive_Xp3Core_xp3Extract(
     mut env: JNIEnv, _class: JClass,
-    _tool: JString, input: JString, output: JString,
+    input: JString, output: JString,
 ) -> jstring {
     extract_progress::clear_cancel();
     let inp = s(&mut env, &input); let out = s(&mut env, &output);
@@ -166,6 +166,9 @@ pub extern "system" fn Java_com_core_archive_Xp3Core_xp3Extract(
 }
 
 fn extract_xp3(input: &str, output: &str) -> Result<(u32, u32), String> {
+    // 取消检查点：open/索引解析阶段（大包可达秒级）此前不可取消，先查一次；
+    // xp3 crate 内部无法注入取消，open 返回后由循环首行与 post-loop recheck 兜底。
+    if extract_progress::cancelled() { return Err("cancelled".to_string()); }
     let file = File::open(input).map_err(|e| format!("{e}"))?;
     let mut archive = oneshot_async(XP3Archive::open(SyncIo(BufReader::new(file))))
         .map_err(|e| format!("XP3: {e}"))?;
@@ -218,6 +221,10 @@ fn list_xp3(input: &str) -> Result<String, String> {
     let file = File::open(input).map_err(|e| format!("{e}"))?;
     let archive = oneshot_async(XP3Archive::open(SyncIo(BufReader::new(file))))
         .map_err(|e| format!("XP3: {e}"))?;
+    // 敌意索引条目数上限（与 Kotlin 侧解析上限同值）：防跨 JNI 巨串撑爆内存。
+    if archive.entries().len() > 200_000 {
+        return Err(format!("XP3: index too large: {} entries", archive.entries().len()));
+    }
     let raw_names: Vec<&str> = archive.entries().iter().map(|e| e.name.as_str()).collect();
     let normalized: Vec<String> = raw_names.iter().map(|n| n.replace('\\', "/")).collect();
     let norm_refs: Vec<&str> = normalized.iter().map(|s| s.as_str()).collect();
@@ -279,9 +286,10 @@ fn collect_files_xp3(base: &Path) -> Result<Vec<(PathBuf, String)>, String> {
     }
     let mut stack = vec![(base.to_path_buf(), String::new())];
     while let Some((dir, rel)) = stack.pop() {
+        // 取消检查点：GB 级目录树的 collect 阶段此前完全不响应取消。
+        if compress_progress::cancelled() { return Err("cancelled".to_string()); }
         let mut entries: Vec<_> = fs::read_dir(&dir).map_err(|e| format!("read_dir {}: {e}", dir.display()))?
             .collect::<Result<_, _>>().map_err(|e| format!("read_dir {}: {e}", dir.display()))?;
-        entries.sort_by_key(|e| e.file_name());
         for entry in entries {
             let path = entry.path();
             let name = entry.file_name().to_string_lossy().to_string();
@@ -301,7 +309,8 @@ fn collect_files_xp3(base: &Path) -> Result<Vec<(PathBuf, String)>, String> {
 fn create_xp3(input: &str, output: &str, level: i32) -> Result<u32, String> {
     let files = collect_files_xp3(Path::new(input))?;
     if files.is_empty() { return Err("XP3: no files to archive".to_string()); }
-    let total: u64 = files.iter().map(|(p, _)| p.metadata().map(|m| m.len()).unwrap_or(0)).sum();
+    // 饱和加法与解包侧口径一致：敌意输入下普通 sum 会溢出污染进度。
+    let total: u64 = files.iter().map(|(p, _)| p.metadata().map(|m| m.len()).unwrap_or(0)).fold(0u64, |a, b| a.saturating_add(b));
     compress_progress::reset(total);
 
     let out_file = File::create(output).map_err(|e| format!("XP3 create {output}: {e}"))?;
@@ -345,7 +354,7 @@ fn create_xp3(input: &str, output: &str, level: i32) -> Result<u32, String> {
 
 #[no_mangle]
 pub extern "system" fn Java_com_core_archive_Xp3Core_xp3CreateArchive(
-    mut env: JNIEnv, _: JClass, _t: JString, input: JString, output: JString, level: JString,
+    mut env: JNIEnv, _: JClass, input: JString, output: JString, level: JString,
 ) -> jstring {
     compress_progress::clear_cancel();
     let inp = s(&mut env, &input); let out = s(&mut env, &output);
