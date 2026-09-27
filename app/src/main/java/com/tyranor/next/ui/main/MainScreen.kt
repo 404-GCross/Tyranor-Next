@@ -127,6 +127,7 @@ fun MainScreen(modifier: Modifier = Modifier) {
     withContext(Dispatchers.IO) { AppSettingsStore.initEngineTabs(context) }
     withContext(Dispatchers.IO) { AppSettingsStore.initSideRail(context) }
     withContext(Dispatchers.IO) { AppSettingsStore.initGameCardHideTitleTag(context) }
+    withContext(Dispatchers.IO) { AppSettingsStore.initGameCardStyle(context) }
   }
   LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
     libraryViewModel.refreshFromStorage()

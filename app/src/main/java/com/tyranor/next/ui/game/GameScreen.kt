@@ -559,12 +559,22 @@ private fun GameLibraryContent(
                             modifier = Modifier.align(Alignment.Center),
                         )
                     } else {
-                        GameGrid(
-                            games = filteredGames,
-                            gridState = gridState,
-                            onGameClick = onGameClick,
-                            onGameLongClick = onGameLongClick,
-                        )
+                        val cardStyle by AppSettingsStore.gameCardStyleState.collectAsState()
+                        if (cardStyle == AppSettingsStore.GAME_CARD_STYLE_COVER_FLOW) {
+                            // 「列表」风格：封面流横向轮播（列表/搜索/排序数据源相同）
+                            GameCoverFlow(
+                                games = filteredGames,
+                                onGameClick = onGameClick,
+                                onGameLongClick = onGameLongClick,
+                            )
+                        } else {
+                            GameGrid(
+                                games = filteredGames,
+                                gridState = gridState,
+                                onGameClick = onGameClick,
+                                onGameLongClick = onGameLongClick,
+                            )
+                        }
                     }
                 }
             }
