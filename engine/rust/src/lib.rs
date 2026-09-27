@@ -48,7 +48,9 @@ fn copy_xp3_entry<R: tokio::io::AsyncRead + Unpin>(
         let mut hit_limit = false;
         let copied: Result<Vec<u8>, std::io::Error> = oneshot_async(async {
             let x = &mut xf; // borrow, not consume — we may stream the rest below
-            let mut buf2 = Vec::with_capacity(size as usize);
+            // 初始分配封顶 1 MiB（与 ksd.rs 一致）：declared size 攻击者可控，
+            // 预分配不设防会被敌意索引用于瞬时堆放大。
+            let mut buf2 = Vec::with_capacity((size as usize).min(1024 * 1024));
             let limit = (KSD_PROBE_MAX + 1) as usize;
             let mut tmp = [0u8; 8192];
             loop {
@@ -91,11 +93,15 @@ fn copy_xp3_entry<R: tokio::io::AsyncRead + Unpin>(
         }
         // 续流（宽容提取约定）：已缓冲的 buf 先写出，剩余解码内容用与流式路径
         // 相同的 cap（声明 size + 1 GiB）继续复制，绝不按窗口截断。
+        // 读/写/取消错误与流式路径同款如实上抛，由调用方删半成品并计失败。
         if oneshot_async(async { out_stream.write_all(&buf).await }).is_err() {
             return Err(());
         }
         let cap = size.saturating_add(1024 * 1024 * 1024).saturating_sub(buf.len() as u64);
-        let copied = oneshot_async(tokio::io::copy(&mut xf.take(cap), out_stream)).unwrap_or(0);
+        let copied = match oneshot_async(tokio::io::copy(&mut xf.take(cap), out_stream)) {
+            Ok(c) => c,
+            Err(_) => return Err(()),
+        };
         if oneshot_async(async { out_stream.flush().await }).is_err() {
             return Err(());
         }
