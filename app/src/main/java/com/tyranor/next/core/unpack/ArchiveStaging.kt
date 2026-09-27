@@ -260,6 +260,9 @@ object ArchiveStaging {
         runCatching { stagingDir(context).deleteRecursively() }
     }
 
+    /** 文档显示名（OpenableColumns 查询；provider 不报或失败回 null，由调用方兜底）。 */
+    fun queryDisplayName(context: Context, uri: Uri): String? = displayName(context, uri)
+
     /** 目录树子项单查询（name → 文档）；查询失败抛 [IOException]，绝不静默缺项。 */
     private fun listChildren(context: Context, parentDocUri: Uri): Map<String, ChildDoc> {
         val docId = DocumentsContract.getDocumentId(parentDocUri)

@@ -5,6 +5,7 @@ import android.net.Uri
 import android.provider.DocumentsContract
 import com.tyranor.next.core.game.model.GamePathUtils
 import java.io.File
+import java.nio.file.Files
 import java.util.Locale
 
 /**
@@ -64,8 +65,12 @@ object ArchiveScanner {
             // 若只 continue 跳过，已找到的条目会让回退被跳过，漏掉子树里的封包。
             val children = runCatching { dir.listFiles() }.getOrNull() ?: return emptyList()
             for (child in children) {
+                // 单目录内也守住总量上限（外层 while 的检查在深目录时会漏）。
+                if (out.size >= MAX_ARCHIVES) break
                 val childRel = if (rel.isEmpty()) child.name else "$rel/${child.name}"
                 if (child.isDirectory) {
+                    // 不跟随目录符号链接：环形链接会让遍历不终止（SAF 链路无此问题）。
+                    if (Files.isSymbolicLink(child.toPath())) continue
                     stack.add(child to childRel)
                 } else if (child.isFile) {
                     if (!isArchiveFileName(child.name)) continue

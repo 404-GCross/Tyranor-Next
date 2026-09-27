@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
+import android.provider.DocumentsContract
 import android.util.Log
 import android.widget.Toast
 import androidx.compose.runtime.getValue
@@ -27,6 +28,7 @@ import com.tyranor.next.core.unpack.Xp3Archive
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -274,7 +276,11 @@ class ArchiveViewModel : ViewModel() {
             // 扫描后自动选中第一个并预览。
             if (found.isNotEmpty()) {
                 selectedId = found.first().id
-                listSelectedInternal(appContext)
+                // “正在扫描”弹窗里会隐式暂存首个 SAF 归档（GB 级拷贝）：把档名透出成
+                // 进度名，用户能看见实际在搬哪个包。
+                listSelectedInternal(appContext) { copied, total ->
+                    reportProgress(copied, total, 0, 0, found.first().fileName)
+                }
             }
         }
     }
@@ -291,9 +297,12 @@ class ArchiveViewModel : ViewModel() {
         }
     }
 
-    private suspend fun listSelectedInternal(appContext: Context) {
+    private suspend fun listSelectedInternal(
+        appContext: Context,
+        onStagingProgress: ((copied: Long, total: Long) -> Unit)? = null,
+    ) {
         val archive = selectedArchive ?: return
-        val file = requireArchiveFile(appContext, archive)
+        val file = requireArchiveFile(appContext, archive, onStagingProgress)
         val listed = withContext(Dispatchers.IO) {
             Xp3Archive.listEntries(file).map {
                 EntryRow(it.name, it.size, it.isDirectory)
@@ -331,16 +340,14 @@ class ArchiveViewModel : ViewModel() {
         val doneFormat = appContext.getString(R.string.archive_extract_created)
         val doneSkippedFormat = appContext.getString(R.string.archive_done_extract_skipped)
         val baseName = baseNameWithoutExt(archive.fileName)
-        // 包内重名预检：大小写折叠后同名（含仅大小写不同）即拒绝解压——
-        // /sdcard 等大小写不敏感文件系统上后写会覆盖先写，静默丢数据。
-        val duplicate = findDuplicateEntryName()
-        if (duplicate != null) {
-            val text = appContext.getString(R.string.archive_conflict_inside).format(duplicate)
-            message = text
-            Toast.makeText(appContext, text, Toast.LENGTH_LONG).show()
-            return
-        }
         launchOp(appContext, archive.fileName, determinate = true) {
+            // 包内重名预检放 IO：敌意大索引的全量小写化不卡主线程。大小写折叠后同名
+            // （含仅大小写不同）即拒绝——/sdcard 等大小写不敏感文件系统上后写会覆盖
+            // 先写，静默丢数据。
+            val duplicate = withContext(Dispatchers.IO) { findDuplicateEntryName() }
+            if (duplicate != null) {
+                throw ArchiveConflictException(ArchiveConflictKind.DUPLICATE_ENTRY, duplicate)
+            }
             val file = requireArchiveFile(appContext, archive) { copied, total ->
                 reportProgress(copied, total, 0, 0, archive.fileName)
             }
@@ -388,7 +395,8 @@ class ArchiveViewModel : ViewModel() {
                         // 回写阶段进度：解包字节此时已计满，把 SAF 发布字节接到同一根条上
                         // 续跑（总数 = 解包 + 回写，单调递增）。否则 GB 级回写期间条会
                         // 长时间停格在 ~100%，看起来像卡死——用户反馈的“解包没多久就卡住”。
-                        val base = progressBytes.second
+                        // 基准直读 Rust 终态 TOTAL（含末条目自校正），不用滞后的轮询快照。
+                        val base = Xp3Archive.extractProgressTotalSnapshot()
                         val publishTotal = tmp.walkBottomUp().filter { it.isFile }.sumOf { it.length() }
                         ArchiveStaging.publishDir(appContext, tmp, outDocUri, isCancelled) { copied, total, name ->
                             reportProgress(base + copied, base + publishTotal, copied, total, name)
@@ -464,41 +472,53 @@ class ArchiveViewModel : ViewModel() {
         }
         val ext = ".xp3"
         val level = packLevel
+        val dirName = packDirName
         val doneFormat = appContext.getString(R.string.archive_pack_done)
-        launchOp(appContext, packDirName, determinate = true) {
+        launchOp(appContext, dirName, determinate = true) {
             // SAF 专有 provider 下 stageInputDir 的整棵输入拷贝必须随操作回收
             var stagedDir: File? = null
             try {
-                val mappedPath = GamePathUtils.safUriToPath(uri.toString())
-                // canRead + 所有文件访问双重门禁：未授权时 File 直读会得到残缺结果
-                //（read_dir 失败 → 封包失败），必须回退 SAF 暂存路径。
-                val mappedDir = mappedPath
-                    ?.let { File(it) }
-                    ?.takeIf {
-                        it.isDirectory && it.canRead() &&
-                            (Build.VERSION.SDK_INT < Build.VERSION_CODES.R || Environment.isExternalStorageManager())
+                val outcome = withContext(Dispatchers.IO) {
+                    // canRead + 所有文件访问双重门禁：未授权时 File 直读会得到残缺结果
+                    //（read_dir 失败 → 封包失败），必须回退 SAF 暂存路径。
+                    // 门禁 stat 全在 IO：主线程不做磁盘访问。
+                    val mappedPath = GamePathUtils.safUriToPath(uri.toString())
+                    val mappedDir = mappedPath
+                        ?.let { File(it) }
+                        ?.takeIf {
+                            it.isDirectory && it.canRead() &&
+                                (Build.VERSION.SDK_INT < Build.VERSION_CODES.R || Environment.isExternalStorageManager())
+                        }
+                    if (mappedDir != null) {
+                        // 真实路径：输出为同级同名文件，同名拒绝（提示提前备份/改名）。
+                        val parent = mappedDir.parentFile ?: mappedDir
+                        val outFile = File(parent, "${mappedDir.name}$ext")
+                        if (outFile.exists()) {
+                            throw ArchiveConflictException(ArchiveConflictKind.OUTPUT_FILE_EXISTS, outFile.absolutePath)
+                        }
+                        ensurePackInputNonEmpty(mappedDir)
+                        runPack(mappedDir, outFile, level)
+                        PackOutcome.Saved(outFile.absolutePath)
+                    } else {
+                        // SAF 专有 provider：封到 cache，交给系统保存框。
+                        awaitStaleCleanup()
+                        val srcDir = ArchiveStaging.stageInputDir(appContext, uri, isCancelled)
+                        stagedDir = srcDir
+                        val outFile = File(ArchiveStaging.stagingDir(appContext), "packed/resolved$ext")
+                        outFile.parentFile?.mkdirs()
+                        if (outFile.exists()) outFile.delete()
+                        ensurePackInputNonEmpty(srcDir)
+                        runPack(srcDir, outFile, level)
+                        // 保存框建议名取末级目录名（dirName 是完整展示路径，含分隔符）。
+                        PackOutcome.PendingSave(outFile, "${dirName.substringAfterLast('/').ifBlank { "archive" }}$ext")
                     }
-                if (mappedDir != null) {
-                    // 真实路径：输出为同级同名文件，同名拒绝（提示提前备份/改名）。
-                    val parent = mappedDir.parentFile ?: mappedDir
-                    val outFile = File(parent, "${mappedDir.name}$ext")
-                    if (outFile.exists()) {
-                        throw ArchiveConflictException(ArchiveConflictKind.OUTPUT_FILE_EXISTS, outFile.absolutePath)
+                }
+                when (outcome) {
+                    is PackOutcome.Saved -> message = doneFormat.format(outcome.path)
+                    is PackOutcome.PendingSave -> {
+                        pendingSaveFile = outcome.file
+                        pendingSaveName = outcome.suggestedName
                     }
-                    withContext(Dispatchers.IO) { runPack(mappedDir, outFile, level) }
-                    message = doneFormat.format(outFile.absolutePath)
-                } else {
-                    // SAF 专有 provider：封到 cache，交给系统保存框。
-                    awaitStaleCleanup()
-                    val srcDir = withContext(Dispatchers.IO) { ArchiveStaging.stageInputDir(appContext, uri, isCancelled) }
-                    stagedDir = srcDir
-                    val outFile = File(ArchiveStaging.stagingDir(appContext), "packed/resolved$ext")
-                    outFile.parentFile?.mkdirs()
-                    if (outFile.exists()) outFile.delete()
-                    withContext(Dispatchers.IO) { runPack(srcDir, outFile, level) }
-                    pendingSaveFile = outFile
-                    // 保存框建议名取末级目录名（packDirName 是完整展示路径，含分隔符）。
-                    pendingSaveName = "${packDirName.substringAfterLast('/').ifBlank { "archive" }}$ext"
                 }
             } finally {
                 // stageInputDir 理论上也可能零拷贝返回用户原目录（与 stageInputFile 同款
@@ -507,6 +527,17 @@ class ArchiveViewModel : ViewModel() {
                     ?.let { runCatching { it.deleteRecursively() } }
             }
         }
+    }
+
+    /** 封包输入预检：目录里没有任何普通文件时按类型化错误拒绝（不进 native 报技术串）。 */
+    private fun ensurePackInputNonEmpty(srcDir: File) {
+        if (srcDir.walkBottomUp().none { it.isFile }) throw ArchiveEmptyInputException(srcDir.path)
+    }
+
+    /** 封包结果：落盘到同级同名 .xp3，或暂存等待系统保存框。 */
+    private sealed interface PackOutcome {
+        data class Saved(val path: String) : PackOutcome
+        data class PendingSave(val file: File, val suggestedName: String) : PackOutcome
     }
 
     private suspend fun runPack(srcDir: File, outFile: File, level: Int) {
@@ -521,6 +552,7 @@ class ArchiveViewModel : ViewModel() {
     fun finishSave(appContext: Context, targetUri: Uri?) {
         saveDialogActive = false
         val packed = pendingSaveFile
+        val suggestedName = pendingSaveName
         pendingSaveFile = null
         pendingSaveName = ""
         if (packed == null) return
@@ -529,12 +561,12 @@ class ArchiveViewModel : ViewModel() {
             return
         }
         val doneFormat = appContext.getString(R.string.archive_pack_done)
-        launchOp(appContext, packed.name, determinate = false) {
+        launchOp(appContext, suggestedName.ifBlank { packed.name }, determinate = false) {
             // 回写成功前记录状态：失败/取消时用户目录里已经建出的目标文档必须清理，
             // 否则会残留一个名字正确但内容截断的 .xp3，看起来像有效封包。
             var written = false
             try {
-                withContext(Dispatchers.IO) {
+                val savedName = withContext(Dispatchers.IO) {
                     appContext.contentResolver.openOutputStream(targetUri)?.use { output ->
                         packed.inputStream().use { input ->
                             // 分块拷贝并响应取消：整包 copyTo 会让取消按钮在拷完前像失效一样。
@@ -547,17 +579,21 @@ class ArchiveViewModel : ViewModel() {
                             }
                         }
                     } ?: throw java.io.IOException("Cannot open output: $targetUri")
+                    // 成功文案显示用户在保存框里实际选择的文件名，而非内部暂存名 resolved.xp3。
+                    ArchiveStaging.queryDisplayName(appContext, targetUri)
+                        ?: suggestedName.ifBlank { packed.name }
                 }
                 written = true
-                message = doneFormat.format(packed.name)
+                message = doneFormat.format(savedName)
             } finally {
-                if (!written) {
-                    // 目标文档由 CreateDocument 预先创建：失败/取消时尽力删除半成品。
-                    runCatching {
-                        android.provider.DocumentsContract.deleteDocument(appContext.contentResolver, targetUri)
+                // 清理是跨进程/磁盘操作，挪 IO 线程；NonCancellable 保证取消路径上仍执行。
+                withContext(NonCancellable + Dispatchers.IO) {
+                    if (!written) {
+                        // 目标文档由 CreateDocument 预先创建：失败/取消时尽力删除半成品。
+                        runCatching { DocumentsContract.deleteDocument(appContext.contentResolver, targetUri) }
                     }
+                    runCatching { packed.delete() }
                 }
-                runCatching { packed.delete() }
             }
         }
     }

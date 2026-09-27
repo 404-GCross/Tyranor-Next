@@ -1,5 +1,6 @@
 package com.tyranor.next.core.unpack
 
+import android.util.Log
 import com.core.archive.Xp3Core
 import com.core.archive.NativeMissingException
 import java.io.File
@@ -12,13 +13,17 @@ import java.io.IOException
  * 进度经独立轮询线程回调，取消经 [ArchiveCancelledException] 报告。
  */
 object Xp3Archive {
+    private const val TAG = "Xp3Archive"
+
+    /** 敌意索引条目数上限：真实游戏索引远低于此；超限拒绝，防跨 JNI 巨串与主线程大遍历。 */
+    private const val MAX_LIST_ENTRIES = 200_000
+
     data class EntryInfo(val name: String, val size: Long, val isDirectory: Boolean)
 
     data class ExtractStats(val extracted: Int, val skipped: Int)
 
     data class PackStats(val entryCount: Int)
 
-    /** 列出条目（含派生目录），名称为 `/` 分隔。 */
     private fun ensureLoaded() {
         try {
             Xp3Core.ensureLoaded()
@@ -27,6 +32,13 @@ object Xp3Archive {
         }
     }
 
+    /** 解包 TOTAL 的即时快照（终态含劣质包自校正）；SAF 发布续跑以它为进度基准。 */
+    fun extractProgressTotalSnapshot(): Long {
+        ensureLoaded()
+        return Xp3Core.xp3ExtractProgressTotal()
+    }
+
+    /** 列出条目（含派生目录），名称为 `/` 分隔。 */
     fun listEntries(archive: File): List<EntryInfo> {
         if (!archive.isFile) throw IOException("XP3 archive missing: ${archive.path}")
         ensureLoaded()
@@ -129,7 +141,9 @@ object Xp3Archive {
             return PackStats(counts.total)
         } catch (error: Throwable) {
             runCatching { output.delete() }
-            if (output.exists()) runCatching { output.deleteOnExit() }
+            // deleteOnExit 注册表随失败次数累积且 Android 进程常驻基本不退出，改日志留痕；
+            // SAF 暂存产物由 clearStaging 兜底，真实路径残留如实可见。
+            if (output.exists()) Log.w(TAG, "XP3 pack output residual: ${output.path}")
             throw error
         }
     }
@@ -138,7 +152,10 @@ object Xp3Archive {
     fun parseListEntries(json: String): List<EntryInfo> {
         return try {
             val array = org.json.JSONArray(json)
-            List(array.length()) { i ->
+            val count = array.length()
+            // 敌意索引条目数上限：真实游戏索引远低于此；超限拒绝，防跨 JNI 巨串与主线程大遍历。
+            if (count > MAX_LIST_ENTRIES) throw IOException("XP3 index too large: $count entries")
+            List(count) { i ->
                 val obj = array.getJSONObject(i)
                 EntryInfo(
                     name = obj.getString("n"),

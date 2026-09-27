@@ -344,8 +344,18 @@ private fun UnpackPane(vm: ArchiveViewModel, appContext: Context, onPickDir: () 
                 if (selected == null) {
                     PaneHeader(stringResource(R.string.archive_select_hint))
                 } else {
-                    val fileCount = vm.entries.count { !it.isDirectory }
-                    val totalSize = vm.entries.filter { !it.isDirectory }.sumOf { it.size }
+                    // 汇总只在 entries 变化时算一次：敌意大档的逐条统计不能跟随重组反复跑。
+                    val (fileCount, totalSize) = remember(vm.entries) {
+                        var count = 0
+                        var size = 0L
+                        for (entry in vm.entries) {
+                            if (!entry.isDirectory) {
+                                count++
+                                size += entry.size
+                            }
+                        }
+                        count to size
+                    }
                     PaneHeader(
                         if (fileCount > 0) {
                             stringResource(R.string.archive_entries_summary).format(fileCount, formatBytes(totalSize))
