@@ -264,7 +264,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
     MiuixSettingsTheme {
         MiuixScaffold(
             modifier = modifier,
-            containerColor = MiuixTheme.colorScheme.background,
+            containerColor = Color.Transparent,
             contentWindowInsets = WindowInsets(0.dp),
             topBar = { SettingsTopBar(stringResource(R.string.nav_settings)) },
         ) { innerPadding ->
@@ -819,12 +819,12 @@ internal fun EngineSettingsDetailScreen(kind: EngineSettingsKind) {
     MiuixSettingsTheme {
         MiuixScaffold(
             modifier = Modifier.fillMaxSize(),
-            containerColor = MiuixTheme.colorScheme.background,
+            containerColor = Color.Transparent,
             contentWindowInsets = WindowInsets(0.dp),
             topBar = {
                 AppTopBar(
                     title = engineSettingsKindTitle(kind),
-                    background = MiuixTheme.colorScheme.background,
+                    background = Color.Transparent,
                     contentColor = MiuixTheme.colorScheme.onBackground,
                     trailing = {
                         TopBarIcon(painterResource(R.drawable.ic_save), stringResource(R.string.engine_settings_save_content_description), MiuixTheme.colorScheme.primary) {
@@ -925,7 +925,7 @@ private fun SettingsItemIcon(@DrawableRes iconRes: Int) {
 private fun SettingsTopBar(title: String) {
     AppTopBar(
         title = title,
-        background = MiuixTheme.colorScheme.background,
+        background = Color.Transparent,
         contentColor = MiuixTheme.colorScheme.onBackground,
     )
 }

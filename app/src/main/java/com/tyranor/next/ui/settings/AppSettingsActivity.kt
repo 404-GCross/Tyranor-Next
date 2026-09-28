@@ -83,6 +83,7 @@ internal fun AppSettingsScreen() {
     val hideCardTitleTag by AppSettingsStore.gameCardTitleTagState.collectAsState()
     val gameCardStyle by AppSettingsStore.gameCardStyleState.collectAsState()
     val gameCardBadge by AppSettingsStore.gameCardBadgeState.collectAsState()
+    val defaultThemeGradient by AppSettingsStore.defaultThemeGradientState.collectAsState()
     val glass = AppThemeColors.isGlass
     // 平板/大窗口 + 侧边栏开关开启：导航以侧栏显示（液态玻璃两档不参与侧栏适配）
     val railLayout = isSideRailLayout()
@@ -96,18 +97,19 @@ internal fun AppSettingsScreen() {
             AppSettingsStore.initGameCardHideTitleTag(ctx)
             AppSettingsStore.initGameCardStyle(ctx)
             AppSettingsStore.initGameCardBadge(ctx)
+            AppSettingsStore.initDefaultThemeGradient(ctx)
         }
     }
 
     MiuixSettingsTheme {
         MiuixScaffold(
             modifier = Modifier.fillMaxSize(),
-            containerColor = MiuixTheme.colorScheme.background,
+            containerColor = ComposeColor.Transparent,
             contentWindowInsets = WindowInsets(0.dp),
             topBar = {
                 AppTopBar(
                     title = stringResource(R.string.settings_app_title),
-                    background = MiuixTheme.colorScheme.background,
+                    background = ComposeColor.Transparent,
                     contentColor = MiuixTheme.colorScheme.onBackground,
                 )
             },
@@ -248,6 +250,16 @@ internal fun AppSettingsScreen() {
                                 onCheckedChange = { checked ->
                                     AppSettingsStore.setToneSwitchEnabled(ctx, checked)
                                     AppThemeColors.refresh(ctx)
+                                },
+                            )
+                            // 默认外观风格的页面背景：纯色 + 主题色/近似色渐变（关闭回退纯色）
+                            SwitchPreference(
+                                title = stringResource(R.string.settings_default_theme_gradient),
+                                summary = if (glass) stringResource(R.string.settings_disabled_in_glass_style) else null,
+                                checked = defaultThemeGradient,
+                                enabled = !glass,
+                                onCheckedChange = { checked ->
+                                    AppSettingsStore.setDefaultThemeGradientEnabled(ctx, checked)
                                 },
                             )
                         }

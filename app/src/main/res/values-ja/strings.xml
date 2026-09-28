@@ -34,6 +34,7 @@
     <string name="settings_theme_mode">外観モード</string>
     <string name="settings_theme_mode_light">ライト</string>
     <string name="settings_theme_mode_dark">ダーク</string>
+    <string name="settings_default_theme_gradient">デフォルトテーマのグラデーション</string>
     <string name="settings_tone_switch">色調切り替え</string>
     <string name="settings_engine_tabs">エンジンページを分類表示</string>
     <string name="settings_side_rail">タブレットサイドレール</string>

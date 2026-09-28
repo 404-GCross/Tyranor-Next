@@ -144,7 +144,8 @@
 
 ### 4. 背景色
 
-- 顶部栏**使用页面背景色** **`colorScheme.background`（不透明）**（`Modifier.background(colorScheme.background)`），标题与图标统一使用 `colorScheme.onBackground`。
+- 顶部栏背景**恒为透明**（`AppTopBar` 默认 `Color.Transparent`），露出页面根部背景层：默认外观风格为「纯色 + 主题色/近似色渐变（浅色含柔光+高斯模糊，深色为黑底对角渐变）」（`theme/DefaultPageBackground.kt`，可在应用设置「默认主题渐变」关闭，关闭后为纯色底），玻璃系风格为玻璃页面渐变。标题与图标统一使用 `colorScheme.onBackground`。
+- 页面根容器（`MiuixScaffold(containerColor = …)`、页面级 Box）同样**不得铺不透明背景色**（一律 `Color.Transparent`），背景由根部背景层负责；否则会把渐变背景整片盖掉。
 
 - **玻璃系外观风格（复古玻璃 / 高级玻璃）**：玻璃下页面背景透明，顶栏保持透明（露出渐变/色斑与环境光）。
   因此**页面内容必须整体垫在顶栏下方**（用持久 `Modifier.padding(top = 顶栏高度)`，而不是滚动区的
@@ -174,7 +175,7 @@ Column(fillMaxSize)                                // 页面根
 └── 正文内容
 ```
 
-> 设置类页面若使用 `MiuixScaffold`，顶部栏在 `topBar` 槽中按同样规则实现：
+> 设置类页面若使用 `MiuixScaffold`，`containerColor` 取 `Color.Transparent`（背景由根部背景层绘制）；顶部栏在 `topBar` 槽中按同样规则实现：
 > `Column(background(background)) { Column(statusBarsPadding) { Row(height 64dp, padding horizontal 16dp) { ... } } }`，
 > 并设 `contentWindowInsets = WindowInsets(0.dp)` 避免系统 inset 再次叠加间距。
 

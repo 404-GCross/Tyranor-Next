@@ -34,6 +34,7 @@
     <string name="settings_theme_mode">Appearance</string>
     <string name="settings_theme_mode_light">Light</string>
     <string name="settings_theme_mode_dark">Dark</string>
+    <string name="settings_default_theme_gradient">Default theme gradient</string>
     <string name="settings_tone_switch">Tone switch</string>
     <string name="settings_engine_tabs">Categorize engine page</string>
     <string name="settings_side_rail">Tablet side rail</string>

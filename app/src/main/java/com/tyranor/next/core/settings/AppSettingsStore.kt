@@ -29,6 +29,9 @@ object AppSettingsStore {
 
     /** 游戏页卡片左上角引擎类型角标；默认关。 */
     const val KEY_GAME_CARD_BADGE = "game_card_badge"
+
+    /** 默认外观风格的页面背景渐变（纯色+柔光/颜色渐变）；默认开。 */
+    const val KEY_DEFAULT_THEME_GRADIENT = "default_theme_gradient"
     const val KEY_ENGINE_TABS = "engine_tabs"
     const val KEY_SIDE_RAIL = "side_rail"
     const val KEY_COVER_SCRAPER_ONLY_MISSING = "cover_scraper_only_missing"
@@ -100,6 +103,9 @@ object AppSettingsStore {
     /** 卡片引擎角标默认值：关。 */
     const val DEFAULT_GAME_CARD_BADGE = false
 
+    /** 默认主题渐变默认值：开（应用设置可关闭，回退纯色页面背景）。 */
+    const val DEFAULT_DEFAULT_THEME_GRADIENT = true
+
     /** 底部导航栏样式：默认（Material3 导航栏）。 */
     const val NAV_STYLE_DEFAULT = "default"
 
@@ -139,6 +145,9 @@ object AppSettingsStore {
 
     /** 卡片引擎角标内存态：设置页切换后游戏页卡片即时重组。 */
     val gameCardBadgeState: MutableStateFlow<Boolean> = MutableStateFlow(DEFAULT_GAME_CARD_BADGE)
+
+    /** 默认主题渐变内存态：设置页切换后页面背景即时重组。 */
+    val defaultThemeGradientState: MutableStateFlow<Boolean> = MutableStateFlow(DEFAULT_DEFAULT_THEME_GRADIENT)
 
     /** 封面刮削设置内存态：设置页修改后游戏页可即时读取。 */
     val coverScraperSettingsVersion: MutableStateFlow<Int> = MutableStateFlow(0)
@@ -275,6 +284,19 @@ object AppSettingsStore {
     }
 
     /** 首次组合时从持久化加载「卡片风格」到内存态（幂等）。 */
+    /** 首次组合时从持久化加载「默认主题渐变」到内存态（幂等）。 */
+    fun initDefaultThemeGradient(c: Context) {
+        defaultThemeGradientState.value = isDefaultThemeGradientEnabled(c)
+    }
+
+    fun isDefaultThemeGradientEnabled(c: Context): Boolean =
+        prefs(c).getBoolean(KEY_DEFAULT_THEME_GRADIENT, DEFAULT_DEFAULT_THEME_GRADIENT)
+
+    fun setDefaultThemeGradientEnabled(c: Context, enabled: Boolean) {
+        prefs(c).edit().putBoolean(KEY_DEFAULT_THEME_GRADIENT, enabled).apply()
+        defaultThemeGradientState.value = enabled
+    }
+
     /** 首次组合时从持久化加载「卡片引擎角标」到内存态（幂等）。 */
     fun initGameCardBadge(c: Context) {
         gameCardBadgeState.value = isGameCardBadgeEnabled(c)
