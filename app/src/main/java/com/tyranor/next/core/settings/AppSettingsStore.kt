@@ -26,6 +26,9 @@ object AppSettingsStore {
 
     /** 游戏页卡片风格：网格 / 列表（封面流）；默认网格。 */
     const val KEY_GAME_CARD_STYLE = "game_card_style"
+
+    /** 游戏页卡片左上角引擎类型角标；默认关。 */
+    const val KEY_GAME_CARD_BADGE = "game_card_badge"
     const val KEY_ENGINE_TABS = "engine_tabs"
     const val KEY_SIDE_RAIL = "side_rail"
     const val KEY_COVER_SCRAPER_ONLY_MISSING = "cover_scraper_only_missing"
@@ -94,6 +97,9 @@ object AppSettingsStore {
     /** 卡片风格默认值：网格。 */
     const val DEFAULT_GAME_CARD_STYLE = GAME_CARD_STYLE_GRID
 
+    /** 卡片引擎角标默认值：关。 */
+    const val DEFAULT_GAME_CARD_BADGE = false
+
     /** 底部导航栏样式：默认（Material3 导航栏）。 */
     const val NAV_STYLE_DEFAULT = "default"
 
@@ -130,6 +136,9 @@ object AppSettingsStore {
 
     /** 卡片风格内存态：设置页切换后游戏页即时切换布局。 */
     val gameCardStyleState: MutableStateFlow<String> = MutableStateFlow(DEFAULT_GAME_CARD_STYLE)
+
+    /** 卡片引擎角标内存态：设置页切换后游戏页卡片即时重组。 */
+    val gameCardBadgeState: MutableStateFlow<Boolean> = MutableStateFlow(DEFAULT_GAME_CARD_BADGE)
 
     /** 封面刮削设置内存态：设置页修改后游戏页可即时读取。 */
     val coverScraperSettingsVersion: MutableStateFlow<Int> = MutableStateFlow(0)
@@ -266,6 +275,19 @@ object AppSettingsStore {
     }
 
     /** 首次组合时从持久化加载「卡片风格」到内存态（幂等）。 */
+    /** 首次组合时从持久化加载「卡片引擎角标」到内存态（幂等）。 */
+    fun initGameCardBadge(c: Context) {
+        gameCardBadgeState.value = isGameCardBadgeEnabled(c)
+    }
+
+    fun isGameCardBadgeEnabled(c: Context): Boolean =
+        prefs(c).getBoolean(KEY_GAME_CARD_BADGE, DEFAULT_GAME_CARD_BADGE)
+
+    fun setGameCardBadgeEnabled(c: Context, enabled: Boolean) {
+        prefs(c).edit().putBoolean(KEY_GAME_CARD_BADGE, enabled).apply()
+        gameCardBadgeState.value = enabled
+    }
+
     fun initGameCardStyle(c: Context) {
         gameCardStyleState.value = getGameCardStyle(c)
     }

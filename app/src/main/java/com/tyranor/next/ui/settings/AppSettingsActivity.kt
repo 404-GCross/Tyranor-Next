@@ -82,6 +82,7 @@ internal fun AppSettingsScreen() {
     val sideRailEnabled by AppSettingsStore.sideRailState.collectAsState()
     val hideCardTitleTag by AppSettingsStore.gameCardTitleTagState.collectAsState()
     val gameCardStyle by AppSettingsStore.gameCardStyleState.collectAsState()
+    val gameCardBadge by AppSettingsStore.gameCardBadgeState.collectAsState()
     val glass = AppThemeColors.isGlass
     // 平板/大窗口 + 侧边栏开关开启：导航以侧栏显示（液态玻璃两档不参与侧栏适配）
     val railLayout = isSideRailLayout()
@@ -94,6 +95,7 @@ internal fun AppSettingsScreen() {
             AppSettingsStore.initSideRail(ctx)
             AppSettingsStore.initGameCardHideTitleTag(ctx)
             AppSettingsStore.initGameCardStyle(ctx)
+            AppSettingsStore.initGameCardBadge(ctx)
         }
     }
 
@@ -353,6 +355,14 @@ internal fun AppSettingsScreen() {
                                 checked = hideCardTitleTag,
                                 onCheckedChange = { checked ->
                                     AppSettingsStore.setGameCardHideTitleTag(ctx, checked)
+                                },
+                            )
+                            // 游戏页卡片左上角引擎类型角标（默认关，切换即时生效并持久化）
+                            SwitchPreference(
+                                title = stringResource(R.string.settings_game_card_badge),
+                                checked = gameCardBadge,
+                                onCheckedChange = { checked ->
+                                    AppSettingsStore.setGameCardBadgeEnabled(ctx, checked)
                                 },
                             )
                         }

@@ -58,6 +58,7 @@
     <string name="settings_game_card_style">ゲームカードのスタイル</string>
     <string name="settings_game_card_style_grid">グリッド</string>
     <string name="settings_game_card_style_cover_flow">リスト</string>
+    <string name="settings_game_card_badge">カードのエンジンバッジ</string>
     <string name="settings_game_card_hide_title_tag">カードの名前タグを非表示</string>
     <string name="settings_game_sort">ゲームの並び替え</string>
     <string name="settings_engine_settings">エンジン設定</string>

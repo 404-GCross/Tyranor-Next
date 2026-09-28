@@ -132,6 +132,8 @@ import com.tyranor.next.theme.TextColor
 import com.tyranor.next.theme.glassBorder
 import com.tyranor.next.theme.rememberAdvancedGlassPanelSurface
 import com.tyranor.next.theme.AppComponentShape
+import com.tyranor.next.theme.CoverBadgeText
+import com.tyranor.next.theme.CoverBadgeBackground
 import com.tyranor.next.theme.AppSheetTopShape
 import com.tyranor.next.ui.common.AppAlertDialog
 import com.tyranor.next.ui.common.AppNavItem
@@ -1712,6 +1714,8 @@ private fun GameGrid(
     val glassBottomInset = glassNavBottomInset()
     // 应用设置「卡片隐藏名称标签」：游戏页卡片名称去掉【】/[] 标签（默认开）
     val hideTitleTag by AppSettingsStore.gameCardTitleTagState.collectAsState()
+    // 应用设置「卡片引擎角标」：左上角引擎类型角标（默认关）
+    val showEngineBadge by AppSettingsStore.gameCardBadgeState.collectAsState()
     // 大屏（横屏/平板）一行六个卡片，避免卡片被撑得过大；窄屏保持一行三个
     val columns = if (isWideScreen()) 6 else 3
     LazyVerticalGrid(
@@ -1736,6 +1740,7 @@ private fun GameGrid(
                 // 滚动/惯性中暂缓封面解码，滚动停止后回填，避免首滑解码风暴挤占滑动帧
                 scrolling = gridState.isScrollInProgress,
                 hideTitleTag = hideTitleTag,
+                showEngineBadge = showEngineBadge,
             )
         }
     }
@@ -1754,6 +1759,8 @@ internal fun GameCard(
     scrolling: Boolean = false,
     /** 卡片名称隐藏【】/[] 标签（应用设置「卡片隐藏名称标签」）。 */
     hideTitleTag: Boolean = false,
+    /** 左上角引擎类型角标（应用设置「卡片引擎角标」，默认关）。 */
+    showEngineBadge: Boolean = false,
 ) {
     Column(modifier) {
         val engineName = when (game.engine) {
@@ -1806,6 +1813,23 @@ internal fun GameCard(
                     contentDescription = game.title,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize().graphicsLayer { alpha = coverAlpha },
+                )
+                // 左上角引擎类型角标：开关开启且实际渲染封面的卡片才显示（无封面占位卡不显示）；
+                // 尺寸为标注规格（labelSmall 11sp + 边距减半，AGENT.md 明文豁免）
+                if (showEngineBadge) Text(
+                    game.engine.abbr,
+                    style = MaterialTheme.typography.labelSmall,
+                    // 角标样式固定（半透明黑底 + 白字，见 theme/Color.kt），不随主题色/色调切换变化
+                    color = CoverBadgeText,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(3.dp)
+                        .graphicsLayer { alpha = coverAlpha }
+                        .clip(AppComponentShape)
+                        .background(CoverBadgeBackground)
+                        .padding(horizontal = 4.dp, vertical = 1.dp),
                 )
             }
         }

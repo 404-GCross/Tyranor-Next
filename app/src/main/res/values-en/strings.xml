@@ -58,6 +58,7 @@
     <string name="settings_game_card_style">Game card style</string>
     <string name="settings_game_card_style_grid">Grid</string>
     <string name="settings_game_card_style_cover_flow">List</string>
+    <string name="settings_game_card_badge">Card engine badge</string>
     <string name="settings_game_card_hide_title_tag">Hide name tags on cards</string>
     <string name="settings_game_sort">Game sorting</string>
     <string name="settings_engine_settings">Engine settings</string>
