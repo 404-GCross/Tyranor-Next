@@ -454,6 +454,12 @@ Column(fillMaxSize)                                // 页面根
 
 - **底部抽屉/面板（`ModalBottomSheet`）→ 按「页面灰底」处理**：`ModalBottomSheet` 的 `containerColor` 通常取 `colorScheme.background`（浅/深随色调切换，等同页面背景），因此抽屉内条目（`AppNavItem` 等）必须传 `NavWhite`（灰底白卡），**不要**套用「弹窗白底灰卡」用 `PageGrey`——否则 item 与抽屉背景同色融为一体（如游戏操作抽屉 GameActionsSheet）。
 
+- **游戏操作抽屉（`GameActionsSheet`）关闭拖拽手势**：统一传 `sheetGesturesEnabled = false`，只允许遮罩/返回键关闭。
+  原因：M3 `ModalBottomSheet` 的关闭判定是「位移 > 56dp 或速度 > 125dp/s」任一命中即关闭（`BottomSheetDefaults`
+  的 `PositionalThreshold` / `VelocityThreshold`，1.4.0 起 `rememberModalBottomSheetState` 不暴露这两个阈值），
+  且列表到顶后的剩余手势/惯性会转交抽屉，导致用户"滑动稍微快一点"就误关抽屉。新增抽屉照此对齐；
+  内容滚动与条目点击不受影响。
+
 - 页面背景 → `PageGrey`
 
 - 文字 → `TextColor`

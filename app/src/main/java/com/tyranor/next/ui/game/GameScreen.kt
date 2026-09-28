@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -590,6 +591,17 @@ private fun GameLibraryContent(
 
 }
 
+/** 抽屉内「一行两个」动作条目描述；[key] 供 LazyColumn item key 使用。 */
+private data class DrawerAction(
+    val key: String,
+    val title: String,
+    val icon: Int,
+    val showArrow: Boolean = false,
+    val iconTint: Color? = null,
+    val titleColor: Color? = null,
+    val onClick: () -> Unit,
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun GameActionsSheet(
@@ -626,6 +638,19 @@ internal fun GameActionsSheet(
     val shortcutRequestedMessage = stringResource(R.string.game_desktop_shortcut_requested)
     val shortcutUpdatedMessage = stringResource(R.string.game_desktop_shortcut_updated)
     val shortcutUnsupportedMessage = stringResource(R.string.game_desktop_shortcut_unsupported)
+    // 抽屉「一行两个」动作条目的文案/颜色：buildList 的 lambda 内不允许 @Composable 调用，先在组合体取值
+    val drawerQuickLaunchTitle = if (quickLaunched) stringResource(R.string.game_remove_quick_launch)
+    else stringResource(R.string.game_add_quick_launch)
+    val drawerDesktopShortcutTitle = stringResource(R.string.game_add_desktop_shortcut)
+    val drawerSearchCoverTitle = stringResource(R.string.game_search_cover)
+    val drawerEditCoverTitle = stringResource(R.string.game_edit_cover)
+    val drawerRenameTitle = stringResource(R.string.game_rename)
+    val drawerSaveManagementTitle = stringResource(R.string.game_save_management)
+    val drawerOnlinePatchTitle = stringResource(R.string.game_online_patch)
+    val drawerEngineSettingsTitle = stringResource(R.string.settings_engine_settings)
+    val drawerDeleteTitle = stringResource(R.string.game_delete_title)
+    val drawerPrimaryColor = MaterialTheme.colorScheme.primary
+    val drawerDangerColor = MaterialTheme.colorScheme.error
     val shortcutFailedMessage = stringResource(R.string.game_desktop_shortcut_failed)
     val saveFormatConvertedFormat = stringResource(R.string.save_format_converted_count)
     val saveFormatConvertedWithFailuresFormat = stringResource(R.string.save_format_converted_with_failures)
@@ -804,6 +829,10 @@ internal fun GameActionsSheet(
             onDismiss()
         },
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        // 关闭抽屉拖拽手势：M3 默认「位移 > 56dp 或速度 > 125dp/s」即关闭，用户快速滑动内容时
+        // 极易误关（列表到顶后的剩余手势/惯性会转交抽屉）。关闭后仅能通过遮罩/返回键关闭，
+        // 内容滚动与点击不受影响。参见 AGENT.md「游戏操作抽屉」约定。
+        sheetGesturesEnabled = false,
         // 高级玻璃面板底色透明，取色渐变画在内容层（不能挂 Surface 外层 modifier：
         // 抽屉位置由内部 anchors 布局偏移决定，外层绘制会落在未偏移位置，与玻璃描边踩过同一个坑）；
         // 复古玻璃用不透明面板色（GlassPanel 带 10% 透明度会透出底层内容）
@@ -908,118 +937,134 @@ internal fun GameActionsSheet(
                     )
                 }
             }
-            item {
-                AppNavItem(
-                    title = if (quickLaunched) stringResource(R.string.game_remove_quick_launch) else stringResource(R.string.game_add_quick_launch),
-                    leadingIcon = R.drawable.ic_home,
-                    containerColor = drawerItemSurface,
-                        verticalPadding = 17.dp,
-                    showArrow = false,
-                    leadingIconTint = MaterialTheme.colorScheme.primary,
-                    onClick = {
-                        if (onQuickLaunchToggle()) {
-                            onDismiss()
-                        } else {
-                            android.widget.Toast.makeText(context, quickLaunchFullMessage, android.widget.Toast.LENGTH_SHORT).show()
+            // 「启动游戏 / 启动文件」保持整行；其余动作条目一行两个（末行单个保持半宽）。
+            val drawerActions = buildList {
+                add(
+                    DrawerAction(
+                        key = "quick_launch",
+                        title = drawerQuickLaunchTitle,
+                        icon = R.drawable.ic_home,
+                        iconTint = drawerPrimaryColor,
+                        onClick = {
+                            if (onQuickLaunchToggle()) {
+                                onDismiss()
+                            } else {
+                                android.widget.Toast.makeText(context, quickLaunchFullMessage, android.widget.Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                    ),
+                )
+                add(
+                    DrawerAction(
+                        key = "desktop_shortcut",
+                        title = drawerDesktopShortcutTitle,
+                        icon = R.drawable.ic_sheet_desktop_shortcut,
+                        iconTint = drawerPrimaryColor,
+                        onClick = { if (!shortcutRequestInFlight) openShortcutCrop() },
+                    ),
+                )
+                add(
+                    DrawerAction(
+                        key = "search_cover",
+                        title = drawerSearchCoverTitle,
+                        icon = R.drawable.ic_sheet_search_cover,
+                        iconTint = drawerPrimaryColor,
+                        onClick = { if (!isBatchScrapingActive()) showCoverSourcePicker = true },
+                    ),
+                )
+                add(
+                    DrawerAction(
+                        key = "edit_cover",
+                        title = drawerEditCoverTitle,
+                        icon = R.drawable.ic_sheet_edit_cover,
+                        iconTint = drawerPrimaryColor,
+                        onClick = { if (!isBatchScrapingActive()) imagePicker.launch("image/*") },
+                    ),
+                )
+                add(
+                    DrawerAction(
+                        key = "rename",
+                        title = drawerRenameTitle,
+                        icon = R.drawable.ic_sheet_rename,
+                        iconTint = drawerPrimaryColor,
+                        onClick = { showRenameDialog = true },
+                    ),
+                )
+                if (shouldShowSaveManagement(game.engine)) {
+                    add(
+                        DrawerAction(
+                            key = "save_management",
+                            title = drawerSaveManagementTitle,
+                            icon = R.drawable.ic_sheet_saves,
+                            showArrow = true,
+                            iconTint = drawerPrimaryColor,
+                            onClick = {
+                                startActivityWithPageTransition(context, SaveManagementActivity.createIntent(context, game))
+                                onDismiss()
+                            },
+                        ),
+                    )
+                }
+                if (game.engine == EngineType.KIRIKIRI) {
+                    add(
+                        DrawerAction(
+                            key = "online_patch",
+                            title = drawerOnlinePatchTitle,
+                            icon = R.drawable.ic_sheet_patch,
+                            showArrow = true,
+                            iconTint = drawerPrimaryColor,
+                            onClick = {
+                                startActivityWithPageTransition(context, KrkrOnlinePatchActivity.createIntent(context, game))
+                                onDismiss()
+                            },
+                        ),
+                    )
+                }
+                add(
+                    DrawerAction(
+                        key = "engine_settings",
+                        title = drawerEngineSettingsTitle,
+                        icon = R.drawable.ic_sheet_settings,
+                        showArrow = true,
+                        iconTint = drawerPrimaryColor,
+                        onClick = onEngineSettings,
+                    ),
+                )
+                add(
+                    DrawerAction(
+                        key = "delete",
+                        title = drawerDeleteTitle,
+                        icon = R.drawable.ic_sheet_delete,
+                        iconTint = drawerDangerColor,
+                        titleColor = drawerDangerColor,
+                        onClick = { showDeleteConfirm = true },
+                    ),
+                )
+            }
+            drawerActions.chunked(2).forEach { rowActions ->
+                item(key = "drawer_row:" + rowActions.first().key) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        rowActions.forEach { action ->
+                            AppNavItem(
+                                title = action.title,
+                                modifier = Modifier.weight(1f),
+                                leadingIcon = action.icon,
+                                containerColor = drawerItemSurface,
+                                verticalPadding = 17.dp,
+                                showArrow = action.showArrow,
+                                leadingIconTint = action.iconTint,
+                                titleColor = action.titleColor,
+                                onClick = action.onClick,
+                            )
                         }
-                    },
-                )
-            }
-            item {
-                AppNavItem(
-                    title = stringResource(R.string.game_add_desktop_shortcut),
-                    leadingIcon = R.drawable.ic_sheet_desktop_shortcut,
-                    containerColor = drawerItemSurface,
-                        verticalPadding = 17.dp,
-                    showArrow = false,
-                    leadingIconTint = MaterialTheme.colorScheme.primary,
-                    onClick = { if (!shortcutRequestInFlight) openShortcutCrop() },
-                )
-            }
-            item {
-                AppNavItem(
-                    title = stringResource(R.string.game_search_cover),
-                    leadingIcon = R.drawable.ic_sheet_search_cover,
-                    containerColor = drawerItemSurface,
-                        verticalPadding = 17.dp,
-                    showArrow = false,
-                    leadingIconTint = MaterialTheme.colorScheme.primary,
-                    onClick = { if (!isBatchScrapingActive()) showCoverSourcePicker = true },
-                )
-            }
-            item {
-                AppNavItem(
-                    title = stringResource(R.string.game_edit_cover),
-                    leadingIcon = R.drawable.ic_sheet_edit_cover,
-                    containerColor = drawerItemSurface,
-                        verticalPadding = 17.dp,
-                    showArrow = false,
-                    leadingIconTint = MaterialTheme.colorScheme.primary,
-                    onClick = { if (!isBatchScrapingActive()) imagePicker.launch("image/*") },
-                )
-            }
-            item {
-                AppNavItem(
-                    title = stringResource(R.string.game_rename),
-                    leadingIcon = R.drawable.ic_sheet_rename,
-                    containerColor = drawerItemSurface,
-                        verticalPadding = 17.dp,
-                    showArrow = false,
-                    leadingIconTint = MaterialTheme.colorScheme.primary,
-                    onClick = { showRenameDialog = true },
-                )
-            }
-            if (shouldShowSaveManagement(game.engine)) {
-                item {
-                    AppNavItem(
-                        title = stringResource(R.string.game_save_management),
-                        leadingIcon = R.drawable.ic_sheet_saves,
-                        containerColor = drawerItemSurface,
-                        verticalPadding = 17.dp,
-                        leadingIconTint = MaterialTheme.colorScheme.primary,
-                        onClick = {
-                            startActivityWithPageTransition(context, SaveManagementActivity.createIntent(context, game))
-                            onDismiss()
-                        },
-                    )
+                        if (rowActions.size == 1) {
+                            Spacer(Modifier.weight(1f))
+                        }
+                    }
                 }
-            }
-            if (game.engine == EngineType.KIRIKIRI) {
-                item {
-                    AppNavItem(
-                        title = stringResource(R.string.game_online_patch),
-                        leadingIcon = R.drawable.ic_sheet_patch,
-                        containerColor = drawerItemSurface,
-                        verticalPadding = 17.dp,
-                        leadingIconTint = MaterialTheme.colorScheme.primary,
-                        onClick = {
-                            startActivityWithPageTransition(context, KrkrOnlinePatchActivity.createIntent(context, game))
-                            onDismiss()
-                        },
-                    )
-                }
-            }
-            item {
-                AppNavItem(
-                    title = stringResource(R.string.settings_engine_settings),
-                    leadingIcon = R.drawable.ic_sheet_settings,
-                    containerColor = drawerItemSurface,
-                        verticalPadding = 17.dp,
-                    leadingIconTint = MaterialTheme.colorScheme.primary,
-                    onClick = onEngineSettings,
-                )
-            }
-            item {
-                AppNavItem(
-                    title = stringResource(R.string.game_delete_title),
-                    leadingIcon = R.drawable.ic_sheet_delete,
-                    containerColor = drawerItemSurface,
-                        verticalPadding = 17.dp,
-                    showArrow = false,
-                    leadingIconTint = MaterialTheme.colorScheme.error,
-                    titleColor = MaterialTheme.colorScheme.error,
-                    onClick = { showDeleteConfirm = true },
-                )
             }
 
             // 底部安全区留白
