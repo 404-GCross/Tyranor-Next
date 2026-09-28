@@ -45,7 +45,7 @@ _Avoid_: 渲染器、后端
 _Avoid_: 补丁、Hook
 
 **autopatch 策略**:
-Artemis 启动前对必要文件（system.ini、list_windows、movie 等）进行幂等修补的决策策略：「启动时询问 / 自动 / 关闭」，由共享确认弹窗承载。
+Artemis 启动前对必要文件（system.ini、list_windows、movie 等）进行幂等修补的决策策略：「启动时询问 / 自动 / 关闭」，由共享确认弹窗承载；**默认关闭**（`ART_PATCH_DEFAULT`，避免无弹窗路径下等价于自动补丁）。
 _Avoid_: 自动补丁、提问开关
 
 **Siglus 标题回写（Title Feedback）**:
