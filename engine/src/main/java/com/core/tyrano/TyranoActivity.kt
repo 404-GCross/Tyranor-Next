@@ -1,6 +1,7 @@
 package com.core.tyrano
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
@@ -29,7 +30,6 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
-import androidx.appcompat.app.AlertDialog
 import com.core.engine.DoubleBackExit
 import com.core.engine.EnginePrefs
 import com.core.engine.EngineSessionRegistry
@@ -562,6 +562,23 @@ class TyranoActivity : Activity() {
         }
     }
 
+    /**
+     * 快捷菜单「结束」确认：与其它内核（Framebuffer 等）一致的退出确认，
+     * 确认后 finish()，由 finish/onDestroy 链路统一延时结束引擎进程。
+     *
+     * 修复点：此前 closeGame 直接走 onBackPressed 的「双击返回退出」逻辑——
+     * 单击无任何反馈、快速双击直接杀进程退出，观感等同闪退。
+     */
+    private fun confirmExitGame() {
+        showEngineConfirm(
+            getString(R.string.engine_exit_game),
+            getString(R.string.engine_exit_game_message),
+            getString(R.string.engine_confirm),
+        ) {
+            finish()
+        }
+    }
+
     override fun finish() {
         super.finish()
         if (processExitScheduled.compareAndSet(false, true)) {
@@ -694,6 +711,13 @@ class TyranoActivity : Activity() {
         confirmText: String,
         onConfirm: () -> Unit,
     ) {
+        // 守卫：JS 回调与执行之间 Activity 可能已销毁（Home 键/系统回收），
+        // 避免 dialog.show() 抛 WindowManager$BadTokenException（与 KRKRCall/Siglus 同款防御）
+        if (isFinishing || isDestroyed) return
+        // 用框架 AlertDialog：TyranoActivity 未声明独立主题，继承的是应用框架主题
+        // （android:Theme.Material.*，非 AppCompat 主题），AppCompat AlertDialog 会在
+        // setContentView 抛 "You need to use a Theme.AppCompat theme..."；
+        // 与 SDLActivity 的同风格弹窗实现保持一致。
         val dialog = AlertDialog.Builder(this).create()
         dialog.setCancelable(true)
         dialog.setCanceledOnTouchOutside(true)
@@ -845,7 +869,7 @@ class TyranoActivity : Activity() {
 
     inner class TyranoJsBridge(private val saveDirectory: File?) {
         @JavascriptInterface
-        fun closeGame() = runOnUiThread(::onBackPressed)
+        fun closeGame() = runOnUiThread(::confirmExitGame)
 
         @JavascriptInterface
         fun finishGame() = runOnUiThread(::confirmReturnToTitle)
