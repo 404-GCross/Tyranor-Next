@@ -197,7 +197,7 @@ private fun toastBindingFailed(context: android.content.Context) {
 private fun StickRow(
     title: String,
     entries: List<InputRemapRepository.StickEntry>,
-    summaryOf: (List<Int>) -> String,
+    summaryOf: @Composable (List<Int>) -> String,
     onEdit: (String) -> Unit,
 ) {
     Column(Modifier.fillMaxWidth()) {
@@ -254,7 +254,11 @@ private fun bindingSummary(context: Context, keys: List<Int>, autoKeep: Boolean)
     val label = if (keys.isEmpty()) {
         context.getString(R.string.input_settings_binding_empty)
     } else {
-        keys.joinToString(" + ") { keyDisplayLabel(it) }
+        // keyDisplayLabel 是 @Composable，不能塞进 joinToString{}/map{} 这类
+        // 非 Composable 形参的 lambda（编译器拒绝）：逐个解析再拼接
+        val parts = ArrayList<String>(keys.size)
+        for (code in keys) parts.add(keyDisplayLabel(code))
+        parts.joinToString(" + ")
     }
     return if (autoKeep) {
         label + " · " + context.getString(R.string.input_settings_auto_keep)
