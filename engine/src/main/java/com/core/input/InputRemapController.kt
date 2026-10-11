@@ -73,6 +73,24 @@ class InputRemapController private constructor(
 
     private var editPanel: VirtualPadEditPanel? = null
 
+    /**
+     * 宿主已销毁标记（[Bridge] 延迟投递的门控，见 [hostAlive]）。
+     *
+     * `runOnUiThread` 投递的 runnable 可能在 [onDestroy] 之后才执行：此时再
+     * `enterEditMode` 会把新 panel 挂到已销毁的容器上（BadToken/泄漏），
+     * 必须先拦掉。
+     */
+    private var destroyed = false
+
+    /**
+     * 宿主是否仍可承载 UI 操作（编辑面板的新建/弹窗）。
+     *
+     * JS 桥回调在 WebView 线程，`enterEdit` 等经 `runOnUiThread` 延迟执行，
+     * 与宿主退出的竞态窗口必须用本判定收敛（不能只判 `padView != null`）。
+     */
+    private fun hostAlive(): Boolean =
+        !destroyed && !activity.isFinishing && !activity.isDestroyed
+
     private val padListener = object : VirtualPadView.Listener {
         override fun onEditStarted() {
             val pad = padView ?: return
@@ -249,6 +267,7 @@ class InputRemapController private constructor(
     }
 
     fun onDestroy() {
+        destroyed = true
         unregisterDeviceListener()
         editPanel?.dismiss()
         editPanel = null
@@ -269,17 +288,27 @@ class InputRemapController private constructor(
 
         @android.webkit.JavascriptInterface
         fun enterEdit() {
-            activity.runOnUiThread { padView?.enterEditMode() }
+            activity.runOnUiThread {
+                // 退出竞态：onDestroy 后排队的投递不得再建 panel（死容器 + BadToken）
+                if (!hostAlive()) return@runOnUiThread
+                padView?.enterEditMode()
+            }
         }
 
         @android.webkit.JavascriptInterface
         fun exitEdit() {
-            activity.runOnUiThread { padView?.cancelEdit() }
+            activity.runOnUiThread {
+                if (!hostAlive()) return@runOnUiThread
+                padView?.cancelEdit()
+            }
         }
 
         @android.webkit.JavascriptInterface
         fun resetToDefaults() {
-            activity.runOnUiThread { padView?.resetToDefaults() }
+            activity.runOnUiThread {
+                if (!hostAlive()) return@runOnUiThread
+                padView?.resetToDefaults()
+            }
         }
     }
 

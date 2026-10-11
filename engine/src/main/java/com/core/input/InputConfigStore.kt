@@ -43,6 +43,26 @@ object InputConfigStore {
 
     private val ID_PATTERN = Regex("[A-Za-z0-9_-]{1,32}")
 
+    /**
+     * 方案/映射文件的读取上限（1MB）。
+     *
+     * 正常文件只有几 KB；无上限时超大/恶意文件在进 [InputJsonLimits] 之前就
+     * 一次性读进内存（OOM），解析约束被绕过。超限按「损坏文件」处理，
+     * 调用方回退出厂默认/跳过（与解析失败同一路径）。
+     */
+    internal const val MAX_CONFIG_FILE_BYTES = 1_048_576L
+
+    /**
+     * 带大小上限的文件读取；缺失/超限/读失败一律返回 null（调用方按损坏处理）。
+     *
+     * 先判长度再读内容：`File.readText()` 会一次分配整个文件，超大文件
+     * 不得走到这一步。
+     */
+    internal fun readTextCapped(file: File): String? {
+        if (!file.isFile || file.length() > MAX_CONFIG_FILE_BYTES) return null
+        return runCatching { file.readText() }.getOrNull()
+    }
+
     /** 原子写的临时文件名序号：仅带 pid 时，同进程内两次并发写会共用同一个临时文件。 */
     private val tmpCounter = java.util.concurrent.atomic.AtomicInteger(0)
 
@@ -72,12 +92,12 @@ object InputConfigStore {
             // 内置默认方案允许被用户编辑：优先读同名文件，缺失回退出厂布局
             val file = profileFile(context, safeId)
             if (!file.isFile) return PadProfile.defaultProfile()
-            return PadProfile.parse(runCatching { file.readText() }.getOrNull())
+            return PadProfile.parse(readTextCapped(file))
                 ?: PadProfile.defaultProfile()
         }
         val file = profileFile(context, safeId)
         if (!file.isFile) return null
-        return PadProfile.parse(runCatching { file.readText() }.getOrNull())
+        return PadProfile.parse(readTextCapped(file))
     }
 
     /** 读取方案；缺失/损坏时回退出厂默认（id 归一到内置默认）。 */
@@ -107,7 +127,7 @@ object InputConfigStore {
                 ?.mapNotNull { file ->
                     val id = file.name.removeSuffix(".json")
                     if (id == DEFAULT_PROFILE_ID) null
-                    else PadProfile.parse(runCatching { file.readText() }.getOrNull())
+                    else PadProfile.parse(readTextCapped(file))
                 }
                 ?.sortedBy { it.name.lowercase() }
                 ?.let { result.addAll(it) }
@@ -120,7 +140,7 @@ object InputConfigStore {
     fun readGamepadMap(context: Context): GamepadMap {
         val file = gamepadMapFile(context)
         if (!file.isFile) return GamepadMap.default()
-        return GamepadMap.parse(runCatching { file.readText() }.getOrNull()) ?: GamepadMap.default()
+        return GamepadMap.parse(readTextCapped(file)) ?: GamepadMap.default()
     }
 
     fun writeGamepadMap(context: Context, map: GamepadMap): Boolean {

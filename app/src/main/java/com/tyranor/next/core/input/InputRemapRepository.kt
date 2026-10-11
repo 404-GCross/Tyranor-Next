@@ -316,28 +316,41 @@ object InputRemapRepository {
 
     // ---------- 键位目录（UI 键位选择器用；engine 侧类型不向 ui 泄漏） ----------
 
-    /** 单个可选键位：canonical 码 + 已本地化的展示名。 */
-    data class KeyOption(val code: Int, val label: String)
+    /**
+     * 单个可选键位：canonical 码 + 展示名。
+     *
+     * [label] 为语言中立的 ASCII 名（字母/数字/方向/功能键）；需要本地化的条目
+     * （鼠标键/动作）只带 [labelRes] 资源 id，展示文案由 UI 层用 stringResource
+     * 组装——AGENT.md 错误协议：文案组装一律上移 UI，core 不返回本地化文案。
+     * [labelRes] 为 0 表示无资源。
+     */
+    data class KeyOption(val code: Int, val label: String?, val labelRes: Int)
 
-    /** 键位分组（字母 / 数字 / 方向 / 功能键 / 鼠标）。 */
-    data class KeyGroup(val title: String, val keys: List<KeyOption>)
+    /** 键位分组（字母 / 数字 / 方向 / 功能键 / 鼠标 / 动作）；标题同样由 UI 本地化。 */
+    data class KeyGroup(val titleRes: Int, val keys: List<KeyOption>)
 
-    fun keyGroups(context: Context): List<KeyGroup> =
+    /**
+     * 键位目录（不依赖 Context：只透传 code 与资源 id）。
+     *
+     * engine 的 `InputKeyCatalog.Entry` 不向外泄漏，UI 按 code 与资源 id 组装展示。
+     */
+    fun keyGroups(): List<KeyGroup> =
         InputKeyCatalog.groups().map { group ->
             KeyGroup(
-                title = context.getString(group.titleRes),
-                keys = group.keys.map { entry ->
-                    KeyOption(
-                        code = entry.code,
-                        label = entry.label ?: context.getString(entry.labelRes),
-                    )
-                },
+                titleRes = group.titleRes,
+                keys = group.keys.map { entry -> KeyOption(entry.code, entry.label, entry.labelRes) },
             )
         }
 
-    /** 键位展示名（未知键位回退为数字，避免出现空白项）。 */
-    fun keyLabel(context: Context, code: Int): String =
-        InputKeyCatalog.label(context, code).ifBlank { code.toString() }
+    /**
+     * 按 code 查目录条目（UI 组装展示名用）；未知返回 null。
+     *
+     * UI 侧展示规则：`label ?: labelRes（非 0 时 stringResource）?: code.toString()`。
+     */
+    fun keyOption(code: Int): KeyOption? =
+        InputKeyCatalog.groups().firstNotNullOfOrNull { group ->
+            group.keys.firstOrNull { it.code == code }
+        }?.let { KeyOption(it.code, it.label, it.labelRes) }
 
     // ---------- 手柄映射（UI 读写门面） ----------
 

@@ -360,8 +360,15 @@ object EngineLauncher {
         }
         // 输入重映射：旧 __touch_pad.js 布局/预设 → 新方案文件（幂等；仅 Web 系引擎有旧数据）
         if (game.engine in WEB_INPUT_ENGINES) {
-            runCatching { InputRemapRepository.migrateLegacyIfNeeded(context.applicationContext, game.uri) }
-                .onFailure { Log.w(TAG, "input legacy migration failed uri=${game.uri}", it) }
+            // 取消必须原样传播（AGENT.md 错误协议）：不用 runCatching 一把吞，
+            // 否则取消会被当成迁移失败只记日志、启动继续走下去
+            try {
+                InputRemapRepository.migrateLegacyIfNeeded(context.applicationContext, game.uri)
+            } catch (ce: CancellationException) {
+                throw ce
+            } catch (t: Throwable) {
+                Log.w(TAG, "input legacy migration failed uri=${game.uri}", t)
+            }
         }
         // 阻塞准备（镜像/overlay/PFS）完成后统一检查取消：已取消则不执行任何启动副作用
         currentCoroutineContext().ensureActive()

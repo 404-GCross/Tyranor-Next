@@ -249,17 +249,32 @@ private fun gamepadKeyLabel(id: String): String = stringResource(
 )
 
 /** 绑定的可读摘要：键位名连接 + 「保持」标记；空绑定显示「未绑定」。 */
+@Composable
 private fun bindingSummary(context: Context, keys: List<Int>, autoKeep: Boolean): String {
     val label = if (keys.isEmpty()) {
         context.getString(R.string.input_settings_binding_empty)
     } else {
-        keys.joinToString(" + ") { InputRemapRepository.keyLabel(context, it) }
+        keys.joinToString(" + ") { keyDisplayLabel(it) }
     }
     return if (autoKeep) {
         label + " · " + context.getString(R.string.input_settings_auto_keep)
     } else {
         label
     }
+}
+
+/**
+ * 键位展示名（UI 层组装：ASCII 名优先，其次本地化资源，未知回退数字避免空白项）。
+ *
+ * core 只给 code 与资源 id（见 `InputRemapRepository.keyOption`），文案组装不上移之外的
+ * 地方做——AGENT.md 错误协议：core 不返回本地化文案。
+ */
+@Composable
+private fun keyDisplayLabel(code: Int): String {
+    val option = InputRemapRepository.keyOption(code)
+    return option?.label
+        ?: option?.labelRes?.takeIf { it != 0 }?.let { stringResource(it) }
+        ?: code.toString()
 }
 
 /** 键位多选对话框：分组键位网格 + 可选「按下保持」。 */
@@ -274,7 +289,7 @@ private fun KeyBindingDialog(
 ) {
     var selected by remember { mutableStateOf(selectedKeys.toSet()) }
     var keep by remember { mutableStateOf(autoKeep) }
-    val groups = remember { InputRemapRepository.keyGroups(context) }
+    val groups = remember { InputRemapRepository.keyGroups() }
 
     AppAlertDialog(
         onDismissRequest = onDismiss,
@@ -308,7 +323,7 @@ private fun KeyBindingDialog(
                     groups.forEach { group ->
                         item {
                             Text(
-                                text = group.title,
+                                text = stringResource(group.titleRes),
                                 style = MaterialTheme.typography.titleMedium,
                                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
                             )
@@ -321,7 +336,7 @@ private fun KeyBindingDialog(
                                         // 选中态用主题色实底 + 白字，与游戏内编辑面板的键位高亮一致；
                                         // 未选中为静默文本，一眼可辨「选了哪些」而不是只看计数
                                         NoRippleButton(
-                                            text = option.label,
+                                            text = keyDisplayLabel(option.code),
                                             tonal = !on,
                                             modifier = Modifier.weight(1f),
                                             onClick = {

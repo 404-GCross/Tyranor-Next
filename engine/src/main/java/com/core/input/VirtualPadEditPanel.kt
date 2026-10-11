@@ -1,5 +1,6 @@
 package com.core.input
 
+import android.app.Activity
 import android.app.AlertDialog
 import android.content.Context
 import android.graphics.Color
@@ -581,6 +582,9 @@ class VirtualPadEditPanel(
      */
     private fun showDarkDialog(contentView: View) {
         dismissDialog()
+        // 宿主已退出时不再建窗：延迟回调在 finish 后触发 show() 会抛 BadTokenException。
+        // 非 Activity 语境（如预览）不拦截；Activity 语境只看存活态
+        if ((context as? Activity)?.let { it.isFinishing || it.isDestroyed } == true) return
         val cardPaddingH = dp(16f)
         val cardPaddingV = dp(14f) + dp(12f)
         val card = LinearLayout(context).apply {
