@@ -41,7 +41,9 @@ fun DialogTextButton(
 ) {
     Text(
         text = text,
-        style = MaterialTheme.typography.labelLarge,
+        // 两档排版：按钮文字属 bodyMedium（AGENTS.md「页面内容文字尺寸规范」），
+        // 不用 Material 默认的 labelLarge
+        style = MaterialTheme.typography.bodyMedium,
         color = if (enabled) {
             contentColor
         } else {

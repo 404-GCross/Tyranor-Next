@@ -42,6 +42,15 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      # 硬编码界面文案门禁（三语言键齐平 + Kotlin CJK 字面量 + 豁免文件数量基线）：
+      # 脚本此前只在本地手动跑，扩展 engine 扫描范围后必须有自动保障
+      - name: Check hardcoded UI strings
+        run: python3 tools/check-hardcoded-ui-strings.py
+
+      # 单元测试：输入内核（键位/配置/迁移/RTP 语义）等回归全靠它，此前 CI 只构建不测试
+      - name: Run unit tests
+        run: ./gradlew testDebugUnitTest --no-daemon
+
       - name: Assemble debug APK
         run: ./gradlew assembleDebug --no-daemon
 

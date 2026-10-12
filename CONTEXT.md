@@ -179,23 +179,23 @@ _Avoid_: 云同步、备份（与存档镜像不同）
 ## 输入重映射
 
 **输入重映射（Input Remap）**:
-engine 模块 `com.core.input` 下的统一输入组件：把「虚拟按键 / 物理手柄 /（后续）物理键盘」等输入源归一到 canonical 键位空间（键盘段=Android keycode、1000 段=鼠标键、2000 段=功能动作），再经每宿主一份的 `InputSink` 注入目标引擎。Web 系宿主（Tyrano / MV / MZ / VN / WebOther）经 `InputRemapController.installWeb` 一键装配，其余内置引擎按同一接口后续接入。取代原 `__touch_pad.js` 注入式实现（该资产已删除）。
+engine 模块 `com.core.input` 下的统一输入组件：把虚拟按键 / 物理手柄 /（后续）物理键盘等输入源归一为 canonical 键位空间（键盘段=Android keycode、1000 段=鼠标键、2000 段=功能动作），再经每宿主一份的 `InputSink` 注入目标引擎。Web 系宿主经 `InputRemapController.installWeb` 装配，取代原 `__touch_pad.js` 注入实现（该资产已删除）。
 _Avoid_: 触屏手柄（旧称，指已下线的 JS 实现）、虚拟键盘（指按键层外观时用「虚拟按键」）
 
 **虚拟按键（Virtual Pad）**:
-叠加在游戏画面上的原生按键层（`VirtualPadView` 自绘 View）：显示当前**按键方案**的按钮与方向控件，负责命中、按下态与编辑模式（拖拽 / 缩放 / 增删 / 改键 / 显隐）。悬浮球（FAB）可拖动并持久化位置；点按切换按键层显隐，长按进入编辑。编辑面板 `VirtualPadEditPanel` 与键位选择对话框均为原生实现。
+叠加在游戏画面上的原生按键层（`VirtualPadView` 自绘 View）：按当前**按键方案**渲染按钮与方向控件，负责命中、按下态与编辑模式（拖拽 / 缩放 / 增删 / 改键 / 显隐），编辑 UI 亦为原生实现（`VirtualPadEditPanel`）。悬浮球点按切换显隐、长按进入编辑。
 _Avoid_: 软键盘、IME、游戏自带按键
 
 **按键方案（PadProfile）**:
-一套虚拟按键布局（按钮列表 + 方向控件配置），文件存于 `<filesDir>/input/profiles/<id>.json`，游戏内编辑与设置页共用。方案目录全 App 共享，因此旧触屏手柄的迁移产物用 `migrated-<游戏作用域>-*` 独立命名（不占用内置 `default`），并按游戏写单游戏覆盖指向它。坐标归一化到全视口（0..1，允许 -0.1..1.1 出界摆放），横竖屏切换按比例重映射；`size` 为屏幕短边比例。`default` 为内置方案 id（可编辑、不可删除）；旧 `__touch_pad.js` 的 `touch_pad_config` / `touch_pad_presets` 在首次启动对应游戏时一次性迁移为方案文件。
+一套虚拟按键布局（按钮列表 + 方向控件配置），文件存于 `<filesDir>/input/profiles/<id>.json`，游戏内编辑与设置页共用；坐标按全视口归一化（0..1，允许 -0.1..1.1 出界摆放），`size` 取屏幕短边比例。方案目录全 App 共享，因此旧触屏手柄的迁移产物用 `migrated-<游戏作用域>-*` 独立命名并按游戏写单游戏覆盖指向它；`default` 为内置方案（可编辑、不可删除）。
 _Avoid_: 布局文件、preset（预设为旧实现术语）
 
 **手柄映射（GamepadMap）**:
-物理手柄 16 个逻辑按键（A/B/X/Y、START/SELECT、L1/R1、L2/R2、L3/R3、D-Pad 四向）+ 左右摇杆四方向仿真 → 多键位输出（可含鼠标键）的映射表，文件存于 `<filesDir>/input/gamepad_map.json`。摇杆仿真带死区与滞回；`autoKeep` 表示「按下保持」（再按一次释放）。手柄事件由宿主 `dispatchKeyEvent` / `dispatchGenericMotionEvent` 交给 `InputRouter`，命中映射即消费（外接键盘不受影响，BACK 不拦截）。
+物理手柄 16 个逻辑按键（A/B/X/Y、START/SELECT、L1/R1、L2/R2、L3/R3、D-Pad 四向）与双摇杆四方向仿真 → 多键位输出（可含鼠标键）的映射表，文件存于 `<filesDir>/input/gamepad_map.json`；摇杆仿真带死区与滞回，`autoKeep` 为「按下保持」（再按一次释放）。宿主把事件交给 `InputRouter`，命中映射即消费。
 _Avoid_: 控制器、JoyKey
 
 **输入开关（input_pad_enabled / input_gamepad_enabled / input_profile_id）**:
-虚拟按键、手柄映射与方案选择的全局/单游戏设置键：全局存 `tyranor_prefs`，单游戏覆盖存 `game_overrides` blob 同名字段（缺失=跟随全局）。「三处字面量锚定」只适用于这三**个**键：engine `InputConfigStore`（输入开关只有这 3 个 `KEY_*` 常量）、`EngineSettingsStore` / `PerGameSettingsStore`、`GameOverridePartitions`；旧触屏手柄的一次性迁移标记 `input_legacy_migrated` **engine 侧没有该常量**，仅 app 侧读写，由 `PerGameSettingsStore.F_LEGACY_MIGRATED` / `GameOverridePartitions.KEY_INPUT_LEGACY_MIGRATED` 与 `GameOverridePartitionsTest` 锚定。虚拟按键的全局默认**按引擎分档**：未显式设置时 MV/MZ 默认开、Tyrano/VN/WebOther 默认关（`engineDefaultsEnabled`），显式设置（全局或单游戏）优先；手柄映射**默认对所有 Web 宿主开启**（`InputConfigStore.resolve` 用 `getBoolean(KEY_GAMEPAD_ENABLED, true)`），即 Tyrano/VN/WebOther 升级后也开始消费手柄按键。
+虚拟按键、手柄映射与方案选择的全局/单游戏设置键：全局存 `tyranor_prefs`，单游戏覆盖存 `game_overrides` blob 同名字段（缺失=跟随全局）。「三处字面量锚定」只适用于这三**个**键（engine `InputConfigStore` 的 3 个 `KEY_*`、`EngineSettingsStore` / `PerGameSettingsStore`、`GameOverridePartitions`）；迁移标记 `input_legacy_migrated` 只在 app 侧定义。虚拟按键的全局默认按引擎分档（未显式设置时 MV/MZ 开、Tyrano/VN/WebOther 关），手柄映射默认对所有 Web 宿主开启。详见 `docs/输入重映射与手柄映射方案.md`。
 _Avoid_: 触屏设置、按键开关
 
 ## 拆封包
