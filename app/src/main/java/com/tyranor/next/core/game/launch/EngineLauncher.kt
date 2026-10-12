@@ -322,7 +322,7 @@ object EngineLauncher {
             } catch (t: Throwable) {
                 Log.e(TAG, "prepare KRKR SAF mirror failed uri=${game.uri}", t)
                 // 只把类型化阶段交给 UI：底层异常 message 是给日志的排查线索，
-                // 不该当作界面文案（AGENT.md 错误协议）。
+                // 不该当作界面文案（AGENTS.md 错误协议）。
                 // 非 PrepareException 的未知异常一律按「创建失败」上报（名称留空，
                 // UI 回落到「未知路径」），因为此时连失败发生在哪一步都无法断言
                 val failure = t as? KrSafMirror.PrepareException
@@ -360,7 +360,7 @@ object EngineLauncher {
         }
         // 输入重映射：旧 __touch_pad.js 布局/预设 → 新方案文件（幂等；仅 Web 系引擎有旧数据）
         if (game.engine in WEB_INPUT_ENGINES) {
-            // 取消必须原样传播（AGENT.md 错误协议）：不用 runCatching 一把吞，
+            // 取消必须原样传播（AGENTS.md 错误协议）：不用 runCatching 一把吞，
             // 否则取消会被当成迁移失败只记日志、启动继续走下去
             try {
                 InputRemapRepository.migrateLegacyIfNeeded(context.applicationContext, game.uri)

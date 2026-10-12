@@ -14,7 +14,7 @@ import kotlin.coroutines.cancellation.CancellationException
 /**
  * RTP 导入被拒的原因（类型化错误码，不带文案）。
  *
- * core 层禁止把本地化文案当返回值（AGENT.md 错误处理协议）：此处只给类型与数值，
+ * core 层禁止把本地化文案当返回值（AGENTS.md 错误处理协议）：此处只给类型与数值，
  * 可展示文案由 UI 层组装（见 `ui/settings/RpgMakerRtpMessages.kt`）。
  *
  * 导入入口直接返回本类型（null = 成功），不再维护「最近一次失败原因」这类全局状态：

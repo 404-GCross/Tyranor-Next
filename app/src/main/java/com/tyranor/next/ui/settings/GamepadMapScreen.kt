@@ -102,7 +102,7 @@ internal fun GamepadMapScreen() {
             ) {
                 item {
                     EngineCard(stringResource(R.string.input_settings_gamepad_buttons_label)) {
-                        // 说明并入卡片内：AGENT.md 禁止在顶部栏下方放整页描述文案
+                        // 说明并入卡片内：AGENTS.md 禁止在顶部栏下方放整页描述文案
                         Text(
                             text = stringResource(R.string.input_settings_gamepad_summary),
                             style = MaterialTheme.typography.bodyMedium,
@@ -274,7 +274,7 @@ private fun bindingSummary(context: Context, keys: List<Int>, autoKeep: Boolean)
  * 键位展示名（UI 层组装：ASCII 名优先，其次本地化资源，未知回退数字避免空白项）。
  *
  * core 只给 code 与资源 id（见 `InputRemapRepository.keyOption`），文案组装不上移之外的
- * 地方做——AGENT.md 错误协议：core 不返回本地化文案。
+ * 地方做——AGENTS.md 错误协议：core 不返回本地化文案。
  */
 @Composable
 private fun keyDisplayLabel(code: Int): String {

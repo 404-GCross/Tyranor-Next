@@ -517,7 +517,7 @@ private fun ProfileRow(
                 Box(Modifier.weight(1f)) {
                     NoRippleTextButton(
                         text = stringResource(R.string.input_settings_profile_delete),
-                        // 删除是破坏性动作：语义色取 colorScheme.error（AGENT.md 3.3）
+                        // 删除是破坏性动作：语义色取 colorScheme.error（AGENTS.md 3.3）
                         contentColor = MaterialTheme.colorScheme.error,
                         onClick = onDelete,
                     )

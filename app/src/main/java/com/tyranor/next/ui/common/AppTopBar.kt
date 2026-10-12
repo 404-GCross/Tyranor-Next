@@ -18,7 +18,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
 /**
- * 页面顶部栏统一组件（AGENT.md「页面顶部栏统一规范」的唯一入口）。
+ * 页面顶部栏统一组件（AGENTS.md「页面顶部栏统一规范」的唯一入口）。
  *
  * 结构固定为：不透明背景容器 → statusBarsPadding → 64dp 标题行（标题居左 titleLarge Bold）：
  *
@@ -35,8 +35,8 @@ import androidx.compose.ui.unit.dp
  * @param title 标题文案
  * @param background 背景色；**默认透明**（露出页面根部背景层：纯色 + 主题柔光渐变 + 模糊），
  *   Miuix 风格页面同样传 `Color.Transparent`（**不要**传 `MiuixTheme.colorScheme.background`
- *   ——它是 `PageGrey`，会盖住玻璃/渐变根背景，与 AGENT.md「顶部栏背景恒为透明」冲突），
- *   需要「色调切换」参与取色的页面传 `PageGrey`（见 AGENT.md 容器色约定）。玻璃外观风格下
+ *   ——它是 `PageGrey`，会盖住玻璃/渐变根背景，与 AGENTS.md「顶部栏背景恒为透明」冲突），
+ *   需要「色调切换」参与取色的页面传 `PageGrey`（见 AGENTS.md 容器色约定）。玻璃外观风格下
  *   页面背景为透明，顶栏随之透明（露出渐变/环境光）；此时页面内容必须整体垫在顶栏下方（用持久
  *   padding，而非滚动 contentPadding），否则滚动内容会从顶栏下方穿过与标题重叠。
  * @param contentColor 标题前景色；默认 `colorScheme.onBackground`，与 [background] 配套传入

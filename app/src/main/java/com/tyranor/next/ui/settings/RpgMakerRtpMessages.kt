@@ -7,7 +7,7 @@ import com.tyranor.next.core.i18n.AppLocaleController
 import com.tyranor.next.ui.common.ByteFormats
 
 /**
- * RTP 导入拒绝原因 → 本地化文案（core → ui 错误协议，见 AGENT.md）。
+ * RTP 导入拒绝原因 → 本地化文案（core → ui 错误协议，见 AGENTS.md）。
  *
  * core 侧 [RtpImportRejection] 只带类型与数值，文案在这里组装；带数值的分支给出实际值与
  * 上限，用户据此判断是包损坏、格式不对，还是被安全上限拦下。

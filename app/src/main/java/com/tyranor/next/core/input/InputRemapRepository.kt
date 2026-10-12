@@ -338,7 +338,7 @@ object InputRemapRepository {
      *
      * [label] 为语言中立的 ASCII 名（字母/数字/方向/功能键）；需要本地化的条目
      * （鼠标键/动作）只带 [labelRes] 资源 id，展示文案由 UI 层用 stringResource
-     * 组装——AGENT.md 错误协议：文案组装一律上移 UI，core 不返回本地化文案。
+     * 组装——AGENTS.md 错误协议：文案组装一律上移 UI，core 不返回本地化文案。
      * [labelRes] 为 0 表示无资源。
      */
     data class KeyOption(val code: Int, val label: String?, val labelRes: Int)

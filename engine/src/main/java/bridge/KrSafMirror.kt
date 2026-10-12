@@ -24,7 +24,7 @@ object KrSafMirror {
     private const val INDEX_VERSION = "krkr-saf-index-v1"
 
     /**
-     * 镜像准备失败（**类型化原因，不带文案**：文案由 app 层按 [stage] 映射，见 AGENT.md 错误协议）。
+     * 镜像准备失败（**类型化原因，不带文案**：文案由 app 层按 [stage] 映射，见 AGENTS.md 错误协议）。
      *
      * [name] 为相关目录/文件名，供调用方给出可定位的提示（如「无法创建镜像目录：data」）。
      */

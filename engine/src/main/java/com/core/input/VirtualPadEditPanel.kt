@@ -660,7 +660,7 @@ class VirtualPadEditPanel(
                 if (primary) {
                     theme.primary
                 } else {
-                    // 次级按钮底色从主题色派生（AGENT.md：强调色不得硬编码）
+                    // 次级按钮底色从主题色派生（AGENTS.md：强调色不得硬编码）
                     Color.argb(60, Color.red(theme.primary), Color.green(theme.primary), Color.blue(theme.primary))
                 },
             )

@@ -223,11 +223,17 @@ Column(fillMaxSize)                                // 页面根
   主按钮与弧上导航项使用 `CircleShape`（圆形是本样式既定形态），为有意设计；该豁免仅限该组件，其余组件不得援引。
   **材质固定为液态玻璃的浅 / 深两档**（浅色 = 白玻璃、深色 = 深色玻璃），**只按 `AppThemeColors.isDark` 取档，
   不随外观风格（默认 / 复古玻璃 / 高级玻璃）分档**（本样式自带固定观感，是 3.5 节「组件必须走动态常量」的豁免；
-  固定色取自 `theme/Color.kt` 的 `FloatingNavGlassSurface` / `FloatingNavGlassSurfaceDark` / `GlassUnselected`，
-  仅选中态图标用主题色），组件内不得引入 `AppThemeColors` 的**风格**判断（深浅取档是允许且必须的）。
+  固定色取自 `theme/Color.kt` 的 `FloatingNavGlassSurface` / `FloatingNavGlassSurfaceDark` /
+  `GlassUnselected` / `FloatingNavGlassUnselectedDark`，
+  沿用原版图标，图标强调色与接近光效跟随主题色，触边使用半透明主题色玻璃覆盖），组件内不得引入 `AppThemeColors` 的**风格**判断（深浅取档是允许且必须的）。
   **长按拖动位置**：位置以归一化坐标存 `AppSettingsStore`（安全区内换算，见 `floatingNavPositionPx` /
   `clampFloatingNavPosition`），展开方向按象限自适应（`floatingNavArcStartAngle`），设置页有「重置悬浮按钮位置」；
-  展开态禁用拖动。
+  收起时长按展开并连续滑选；展开后长按主按钮收起并进入自由移动，同一手指可持续拖动。
+  展开后单点子控件切页保持展开，连续滑选松手确认后收起；主控件维持 64dp，主子图标统一为 28dp。
+  展开位置固定，触碰子控件不得带动其它子控件移动；圆球靠近时只缩放并按固定间距限制相交。
+  页面点击由共同父层观察，事件不得消费：同一次点击同时收起导航并执行页面选项，不铺全屏拦截层。
+  触觉反馈保留展开/收起、确认选中、长按进入移动与实际落位；接近、移入或切换子控件候选时不得震动。
+  悬浮按钮在平板也保持圆球导航，弧形半径与选项尺寸按安全区自适应；其它样式的平板侧栏规则不变。
 
 - 所有弹窗背景必须为白色，且圆角必须使用统一圆角数值 **8dp**。
 
@@ -509,8 +515,7 @@ Column(fillMaxSize)                                // 页面根
   与「色调切换」不可用（置灰），色调轮盘保持可用（兜底色斑随主题色变化）。
   高级玻璃的绘制是独立实现（`theme/AdvancedGlassStyle.kt`），复古玻璃的 `GlassStyle.kt` 不参与其材质；
   新增组件必须走动态常量与 `glassBorder`，不得硬编码玻璃色值。真 backdrop 采样仅限白名单
-  （液态玻璃底栏、透镜底栏、高级玻璃悬浮默认导航条、悬浮按钮导航的主按钮**与弧上导航项**
-  ——两者共用同一份采样 Modifier，见 `FloatingGlassNavButton.kt`）；弹窗/抽屉是独立窗口，**无法**采样主窗口内容，
+  （液态玻璃底栏、透镜底栏、高级玻璃悬浮默认导航条、悬浮按钮导航的主子按钮）；弹窗/抽屉是独立窗口，**无法**采样主窗口内容，
   只能用背景取色渐变 + 遮罩 + 光学描边，不要为它们接 backdrop。
 
 - **底部抽屉/面板（`ModalBottomSheet`）→ 按「页面灰底」处理**：`ModalBottomSheet` 的 `containerColor` 通常取 `colorScheme.background`（浅/深随色调切换，等同页面背景），因此抽屉内条目（`AppNavItem` 等）必须传 `NavWhite`（灰底白卡），**不要**套用「弹窗白底灰卡」用 `PageGrey`——否则 item 与抽屉背景同色融为一体（如游戏操作抽屉 GameActionsSheet）。
@@ -549,7 +554,7 @@ Column(fillMaxSize)                                // 页面根
 架构审核：检查模块职责、依赖关系、代码耦合以及是否破坏现有架构。
 代码健壮性审核：检查异常处理、空值、资源释放、线程安全、生命周期以及极端输入。
 回归风险审核：分析修改是否可能影响现有功能、其他引擎或既有调用链。
-代码规范审核：检查代码风格、命名、重复代码、无效代码以及是否符合 AGENT.md 和项目现有规范。
+代码规范审核：检查代码风格、命名、重复代码、无效代码以及是否符合 AGENTS.md 和项目现有规范。
 
 ***
 

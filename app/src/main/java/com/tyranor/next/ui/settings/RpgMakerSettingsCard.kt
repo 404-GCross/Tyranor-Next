@@ -110,7 +110,7 @@ internal fun RpgMakerRgssSettingsCard(
             refreshRtp(type)
             // 失败时带上原因（如「条目数超过上限」「源里没有可导入内容」）：只报「导入失败」
             // 会让用户无从判断是包损坏、格式不对，还是被安全上限拦下。
-            // core 返回类型化原因，文案与括号样式由 UI 层资源组装（AGENT.md 错误处理协议）
+            // core 返回类型化原因，文案与括号样式由 UI 层资源组装（AGENTS.md 错误处理协议）
             val message = rejection?.let {
                 ctx.getString(R.string.engine_settings_rpgm_rtp_import_failed, it.userMessage(ctx))
             } ?: ctx.getString(R.string.engine_settings_rpgm_rtp_imported)
@@ -477,8 +477,8 @@ private fun RpgmRtpRow(
             onClick = onImport,
         )
         if (imported == true) {
-            // 清除是破坏性动作；无点击反馈实现（AGENT.md 弹窗/页内按钮规范），
-            // 语义色取 colorScheme.error（AGENT.md 3.3：error 用于错误/删除）
+            // 清除是破坏性动作；无点击反馈实现（AGENTS.md 弹窗/页内按钮规范），
+            // 语义色取 colorScheme.error（AGENTS.md 3.3：error 用于错误/删除）
             NoRippleTextButton(
                 text = stringResource(R.string.engine_settings_rpgm_rtp_clear),
                 enabled = !importing,
