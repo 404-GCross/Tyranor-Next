@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -169,6 +170,19 @@ fun PerGameSettingsScreen(game: ScanGame) {
         )
     }
     val inputGlobalGamepad = remember { EngineSettingsStore.isInputGamepadEnabled(ctx) }
+    // 按键方案的单游戏覆盖：旧布局迁移会把结果写成**按游戏的方案**并写入该覆盖，若这里没有
+    // 入口，用户既改不回「跟随全局」，也改不了这个游戏的方案——设置页的全局选择对它无效，
+    // 页面显示会与实际生效的方案相反。
+    var inputProfileOverride by remember(gid) {
+        mutableStateOf(InputRemapRepository.gameProfileIdOverride(ctx, gid))
+    }
+    var inputProfiles by remember(gid) {
+        mutableStateOf(emptyList<InputRemapRepository.ProfileSummary>())
+    }
+    val inputGlobalProfile = remember(gid) { InputRemapRepository.globalProfileId(ctx) }
+    LaunchedEffect(gid) {
+        inputProfiles = withContext(Dispatchers.IO) { InputRemapRepository.listProfileSummaries(ctx) }
+    }
     var rpgmOverride by remember(gid) {
         mutableStateOf(PerGameSettingsStore.toRpgMakerOverride(PerGameSettingsStore.load(ctx, gid)))
     }
@@ -831,6 +845,15 @@ fun PerGameSettingsScreen(game: ScanGame) {
                                 inputGlobalGamepad,
                                 inputGamepadEnabled,
                             ) { inputGamepadEnabled = it }
+                            InputProfileOverrideRow(
+                                profiles = inputProfiles,
+                                globalId = inputGlobalProfile,
+                                overrideId = inputProfileOverride,
+                                onSet = { id ->
+                                    inputProfileOverride = id
+                                    InputRemapRepository.setGameProfileIdOverride(ctx, gid, id)
+                                },
+                            )
                         }
                     }
                     EngineType.TYRANO,
@@ -859,6 +882,15 @@ fun PerGameSettingsScreen(game: ScanGame) {
                                 inputGlobalGamepad,
                                 inputGamepadEnabled,
                             ) { inputGamepadEnabled = it }
+                            InputProfileOverrideRow(
+                                profiles = inputProfiles,
+                                globalId = inputGlobalProfile,
+                                overrideId = inputProfileOverride,
+                                onSet = { id ->
+                                    inputProfileOverride = id
+                                    InputRemapRepository.setGameProfileIdOverride(ctx, gid, id)
+                                },
+                            )
                             if (game.engine in setOf(EngineType.TYRANO, EngineType.VN, EngineType.WEB_OTHER)) {
                                 OverrideText(
                                     label = stringResource(R.string.engine_settings_web_shell_port_title),
@@ -1045,6 +1077,29 @@ private fun SectionCard(title: String, content: @Composable () -> Unit) {
             content()
         }
     }
+}
+
+/**
+ * 按键方案的单游戏覆盖行（首位「跟随全局」）。
+ *
+ * 单独包一层是因为选项值/展示名要过 [profileDisplayName]：内置默认与迁移主布局存的是
+ * 语言中立占位名（Default），直接显示会把占位名暴露给用户。
+ */
+@Composable
+private fun InputProfileOverrideRow(
+    profiles: List<InputRemapRepository.ProfileSummary>,
+    globalId: String,
+    overrideId: String?,
+    onSet: (String?) -> Unit,
+) {
+    OverrideChoice(
+        label = stringResource(R.string.engine_settings_input_profile_title),
+        options = profiles.associate { it.id to profileDisplayName(it) },
+        global = globalId,
+        override = overrideId,
+        emptyLabel = stringResource(R.string.input_settings_profile_default),
+        onSet = onSet,
+    )
 }
 
 /** 覆盖版下拉行：Miuix OverlayDropdownPreference，选项首位为“跟随全局”。 */

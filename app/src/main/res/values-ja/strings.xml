@@ -301,6 +301,7 @@
     <string name="engine_settings_input_summary">バーチャルパッド・キー配置・ゲームパッド割り当ての切り替えと管理</string>
     <string name="engine_settings_input_pad_title">バーチャルパッド</string>
     <string name="engine_settings_input_pad_summary">ゲーム画面に編集可能な仮想キーを重ねて表示します。既定では RPG Maker MV/MZ のみ有効で、オンにするとすべての Web エンジンに適用されます</string>
+    <string name="engine_settings_input_profile_title">ボタン配置</string>
     <string name="engine_settings_input_gamepad_title">ゲームパッド割り当て</string>
     <string name="engine_settings_input_gamepad_summary">外付けゲームパッドのボタンをキーボード/マウス操作に割り当てます</string>
     <string name="engine_settings_input_gamepad_entry">ゲームパッド割り当て</string>
@@ -670,6 +671,7 @@
     <string name="engine_settings_rpgm_rtp_clear_confirm">このバージョンの RTP を削除しますか？</string>
     <string name="engine_settings_rpgm_rtp_cleared">RTP を削除しました</string>
     <string name="engine_settings_rpgm_rtp_clear_failed">RTP の削除に失敗しました</string>
+    <string name="engine_settings_rpgm_rtp_clear_importing">RTP をインポート中です。完了後に削除してください</string>
     <string name="engine_settings_rpgm_rtp_hint">RPG Maker 公式サイトから対応する RTP を取得してください。zip またはフォルダのインポートに対応</string>
     <string name="engine_settings_rpgm_rtp_from_zip">zip を選択</string>
     <string name="engine_settings_rpgm_rtp_from_dir">フォルダを選択</string>

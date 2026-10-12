@@ -298,7 +298,11 @@ private fun KeyBindingDialog(
     var keep by remember { mutableStateOf(autoKeep) }
     val groups = remember { InputRemapRepository.keyGroups() }
 
-    AppAlertDialog(
+    // 弹窗在独立窗口里组合，拿不到调用点的 MiuixSettingsTheme 作用域：
+    // 不显式包一层的话 SwitchPreference 与 onSurfaceVariantSummary 会落到库默认浅色板
+    // （默认蓝、深色模式下黑字），与页面观感不一致。仓库既有弹窗同此处理。
+    MiuixSettingsTheme {
+        AppAlertDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
@@ -373,5 +377,6 @@ private fun KeyBindingDialog(
                 onClick = { onSave(emptyList(), false) },
             )
         },
-    )
+        )
+    }
 }

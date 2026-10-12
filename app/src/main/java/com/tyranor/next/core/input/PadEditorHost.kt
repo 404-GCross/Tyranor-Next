@@ -85,8 +85,12 @@ class PadEditorHost private constructor(
         /**
          * 构建编辑器宿主；方案文件缺失/不可读时返回 null（调用方提示并退出，
          * 不在组合期抛异常）。
+         *
+         * **读盘在 [Dispatchers.IO]**：方案 JSON 解析（最大 1MB）此前发生在调用方
+         * （Compose 组合期）的主线程上，属 ANR 风险；视图构建本身仍在调用线程执行，
+         * 因此调用方必须在主线程的协程里 await（`LaunchedEffect` 即满足）。
          */
-        fun create(
+        suspend fun create(
             context: Context,
             profileId: String,
             primaryColor: Int,
@@ -95,7 +99,9 @@ class PadEditorHost private constructor(
             onEditEnded: () -> Unit,
             onSaveFailed: () -> Unit = {},
         ): PadEditorHost? {
-            val profile = InputRemapRepository.readProfile(context, profileId) ?: return null
+            val profile = withContext(Dispatchers.IO) {
+                InputRemapRepository.readProfile(context, profileId)
+            } ?: return null
             val palette = EngineThemeColors.Palette(
                 primary = primaryColor,
                 onPrimary = onPrimaryColor,

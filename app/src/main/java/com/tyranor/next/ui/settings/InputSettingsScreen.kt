@@ -375,13 +375,17 @@ internal fun InputSettingsScreen() {
     }
 
     renameTarget?.let { target ->
-        val current = profiles.firstOrNull { it.id == target }?.name.orEmpty()
+        val profile = profiles.firstOrNull { it.id == target }
+        // 预填**展示名**：迁移主布局/内置默认存的是语言中立占位名（Default），
+        // 直接把它填进输入框，用户点「确定」就把英文占位名固化成了正式名称。
+        // 展示名未改动时不落盘（保留占位名语义，避免「改名成占位名」这类无意义写入）。
+        val current = profile?.let { profileDisplayName(it) }.orEmpty()
         ProfileNameDialog(
             title = stringResource(R.string.input_settings_profile_rename),
             initial = current,
             onConfirm = { newName ->
                 renameTarget = null
-                if (newName.isNotBlank()) {
+                if (newName.isNotBlank() && newName.trim() != current) {
                     scope.launch {
                         val ok = withContext(Dispatchers.IO) {
                             InputRemapRepository.renameProfile(ctx, target, newName)
@@ -530,9 +534,11 @@ private fun ProfileRow(
 /**
  * 方案展示名：内置默认与迁移主布局存的是语言中立占位名，按 id 本地化展示；
  * 用户改过名的方案原样显示（见 isLegacyMain 的判定）。
+ *
+ * `internal`：单游戏设置页的「按键方案」行复用同一套展示名（同包）。
  */
 @Composable
-private fun profileDisplayName(profile: InputRemapRepository.ProfileSummary): String = when {
+internal fun profileDisplayName(profile: InputRemapRepository.ProfileSummary): String = when {
     profile.isDefault -> stringResource(R.string.input_settings_profile_default)
     profile.isLegacyMain -> stringResource(R.string.input_settings_profile_default_migrated)
     else -> profile.name
@@ -547,7 +553,10 @@ private fun ProfileNameDialog(
     onDismiss: () -> Unit,
 ) {
     var value by rememberSaveable(initial) { mutableStateOf(initial) }
-    AppAlertDialog(
+    // 弹窗在独立窗口里组合，拿不到调用点的 MiuixSettingsTheme 作用域：不包一层的话
+    // AppSearchField/SwitchPreference 这类 Miuix 组件会落到库默认浅色板
+    MiuixSettingsTheme {
+        AppAlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(text = title, style = MaterialTheme.typography.titleMedium) },
         text = {
@@ -577,7 +586,8 @@ private fun ProfileNameDialog(
         dismissButton = {
             DialogTextButton(text = stringResource(R.string.common_cancel), onClick = onDismiss)
         },
-    )
+        )
+    }
 }
 
 /** 方案 JSON 导入上限（字符）：正常方案只有几 KB，仅用于挡住异常大文件。 */

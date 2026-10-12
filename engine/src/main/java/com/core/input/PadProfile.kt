@@ -121,6 +121,9 @@ data class PadProfile(
         /** 按钮文字长度上限（与编辑面板的输入限制一致）。 */
         const val MAX_BUTTON_TEXT = 12
 
+        /** 方案展示名长度上限（与 app 侧 `InputRemapRepository.PROFILE_NAME_MAX_LENGTH` 锚定）。 */
+        const val MAX_NAME_LENGTH = 24
+
         /** 迁移产物 id 前缀。 */
         const val MIGRATED_PREFIX = "migrated-"
 
@@ -140,10 +143,14 @@ data class PadProfile(
         fun parse(raw: String?): PadProfile? {
             if (raw.isNullOrBlank()) return null
             return runCatching {
-                val root = JSONObject(raw)
+                // 导入的文件可能带 UTF-8 BOM（Windows 记事本/部分导出工具）：org.json 会直接
+                // 抛异常，用户只看到通用「导入失败」，这里统一剥掉
+                val root = JSONObject(raw.removePrefix("\uFEFF"))
                 if (!InputJsonLimits.isSupportedSchema(root.opt("schema"), SCHEMA)) return null
-                val id = root.optString("id").takeIf { it.isNotBlank() } ?: return null
-                val name = root.optString("name").takeIf { it.isNotBlank() } ?: id
+                // 内容 id 必须过与写盘同一个白名单：否则解析出一个永远写不回去的 id
+                // （游戏内保存永远失败），而列表里它又显示为可用方案
+                val id = InputConfigStore.sanitizeProfileId(root.optString("id")) ?: return null
+                val name = root.optString("name").takeIf { it.isNotBlank() }?.take(MAX_NAME_LENGTH) ?: id
                 val buttons = ArrayList<PadButton>()
                 root.optJSONArray("buttons")?.let { array ->
                     // 上限防御：方案文件可能被外部改坏或构造（导入路径直接吃用户文件），
@@ -242,22 +249,30 @@ data class PadProfile(
          * 旧 `__touch_pad.js` 布局（`touch_pad_config`）与其预设（`touch_pad_presets`）
          * → 新方案列表。返回空列表表示无旧数据。
          *
-         * 位置（旧编辑态已存归一化中心坐标）与显隐原样保留；旧 `scale` 与新 `size`
-         * 语义不同（旧相对 padSize、新相对 min(视口边)），不强行换算，尺寸回落新默认。
+         * 位置（旧编辑态已存归一化中心坐标）与显隐原样保留；但 beta ≤ 1.20 的旧版本存过
+         * **视口像素**坐标（`x > 1`），旧 JS 自带一次性迁移（`x/vw`、`y/vh`），因此这里
+         * 用 [viewportWidth] / [viewportHeight] 补回换算——直接 clamp 会把这类按钮全部
+         * 钉到右下角。旧 `scale` 与新 `size` 语义不同（旧相对 padSize、新相对 min(视口边)），
+         * 不强行换算，尺寸回落新默认。
          * 旧开关类按钮（btn.hide / btn.stick / btn.dir8）由原生 FAB 取代，不迁移。
          *
          * @param gameScope 迁移产物 id 的按游戏作用域。方案目录全 App 共享，主布局若沿用
          *   内置 [BUILTIN_DEFAULT_ID] 会让第一个迁移的游戏污染全局默认布局，因此迁移产物
          *   一律用独立 id，由调用方写单游戏覆盖指向它。
+         * @param viewportWidth 游戏视口宽（px，宿主固定横屏时即显示长边）；null = 不做像素换算
+         * @param viewportHeight 游戏视口高（px，宿主固定横屏时即显示短边）；null = 不做像素换算
          */
         fun migrateLegacy(
             configJson: String?,
             presetsJson: String?,
             gameScope: String,
+            viewportWidth: Float? = null,
+            viewportHeight: Float? = null,
         ): List<PadProfile> {
             val scope = sanitizeLegacyId(gameScope).take(MAX_SCOPE_SLUG_LENGTH)
+            val viewport = LegacyViewport(viewportWidth, viewportHeight)
             val result = ArrayList<PadProfile>()
-            parseLegacyConfig(configJson)?.let {
+            parseLegacyConfig(configJson, viewport)?.let {
                 // 主布局打上 legacyMain 标记：app 侧按它（而非仅按占位名）识别迁移主布局，
                 // 用户改名（含改回占位名 "Default"）后由 renameProfile 清掉该标记
                 result.add(
@@ -269,11 +284,11 @@ data class PadProfile(
                 val names = presets.names() ?: return@runCatching
                 for (i in 0 until names.length()) {
                     val name = names.optString(i).takeIf { it.isNotBlank() } ?: continue
-                    val legacy = parseLegacyConfig(presets.optJSONObject(name)?.toString()) ?: continue
+                    val legacy = parseLegacyConfig(presets.optJSONObject(name)?.toString(), viewport) ?: continue
                     result.add(
                         legacy.copy(
                             id = migratedId(scope, i + 1, sanitizeLegacyId(name)),
-                            name = name.take(24),
+                            name = name.take(MAX_NAME_LENGTH),
                         ),
                     )
                 }
@@ -342,7 +357,7 @@ data class PadProfile(
          * 覆盖位置与显隐——只拖过一个按钮的旧配置迁移后仍保有完整按键集。
          * 旧条目 `x/y` 为 JSON null（旧 JS 只改显隐时的写法）时保留默认锚点。
          */
-        private fun parseLegacyConfig(raw: String?): PadProfile? {
+        private fun parseLegacyConfig(raw: String?, viewport: LegacyViewport): PadProfile? {
             if (raw.isNullOrBlank()) return null
             return runCatching {
                 val buttonsObj = JSONObject(raw).optJSONObject("buttons") ?: return null
@@ -364,8 +379,8 @@ data class PadProfile(
                     touched = true
                     migrated.add(
                         base.copy(
-                            x = legacyCoord(legacy, "x", base.x),
-                            y = legacyCoord(legacy, "y", base.y),
+                            x = legacyCoord(legacy, "x", base.x, viewport.width),
+                            y = legacyCoord(legacy, "y", base.y, viewport.height),
                             visible = legacy.optBoolean("visible", true),
                         ),
                     )
@@ -375,8 +390,8 @@ data class PadProfile(
                 val qwzxDefaults = defaults.buttons.filter { it.id in setOf("q", "w", "z", "x") }
                 buttonsObj.optJSONObject("qwzx")?.let { legacy ->
                     touched = true
-                    val cx = legacyCoord(legacy, "x", 0.78f)
-                    val cy = legacyCoord(legacy, "y", 0.885f)
+                    val cx = legacyCoord(legacy, "x", 0.78f, viewport.width)
+                    val cy = legacyCoord(legacy, "y", 0.885f, viewport.height)
                     val visible = legacy.optBoolean("visible", true)
                     migrated.removeAll { it.id in setOf("q", "w", "z", "x") }
                     LEGACY_QWZX.forEach { (btnId, keyCode, offset) ->
@@ -400,8 +415,8 @@ data class PadProfile(
                 (buttonsObj.optJSONObject("joystick") ?: buttonsObj.optJSONObject("dpad"))?.let { legacy ->
                     touched = true
                     direction = direction.copy(
-                        x = legacyCoord(legacy, "x", direction.x),
-                        y = legacyCoord(legacy, "y", direction.y),
+                        x = legacyCoord(legacy, "x", direction.x, viewport.width),
+                        y = legacyCoord(legacy, "y", direction.y, viewport.height),
                         visible = legacy.optBoolean("visible", true),
                     )
                 }
@@ -413,14 +428,27 @@ data class PadProfile(
             }.getOrNull()
         }
 
-        /** 旧配置坐标：缺失或 JSON null 时回落默认锚点（旧 JS 只改显隐时写 null）。 */
-        private fun legacyCoord(obj: JSONObject, key: String, fallback: Float): Float {
+        /**
+         * 旧配置坐标：缺失或 JSON null 时回落默认锚点（旧 JS 只改显隐时写 null）。
+         *
+         * [viewport] 为该轴的游戏视口尺寸（px）：beta ≤ 1.20 的旧版本存的是视口像素
+         * （值 `> 1`），旧 JS 会做一次性归一化，这里补回同一语义；无有效视口时只做 clamp。
+         */
+        private fun legacyCoord(obj: JSONObject, key: String, fallback: Float, viewport: Float?): Float {
             if (!obj.has(key) || obj.isNull(key)) return fallback
-            return obj.optDouble(key, fallback.toDouble()).toFloat().coerceIn(-0.1f, 1.1f)
+            val raw = obj.optDouble(key, fallback.toDouble()).toFloat()
+            val normalized = if (raw > 1f && viewport != null && viewport > 1f) raw / viewport else raw
+            return normalized.coerceIn(-0.1f, 1.1f)
+        }
+
+        /** 迁移用的旧视口（px）；任一侧缺失/非法即整体不参与像素换算。 */
+        private class LegacyViewport(width: Float?, height: Float?) {
+            val width: Float? = width?.takeIf { it.isFinite() && it > 1f }
+            val height: Float? = height?.takeIf { it.isFinite() && it > 1f }
         }
 
         private fun sanitizeLegacyId(name: String): String =
-            name.trim().replace(Regex("[^A-Za-z0-9_-]+"), "-").trim('-').take(24)
+            name.trim().replace(Regex("[^A-Za-z0-9_-]+"), "-").trim('-').take(MAX_NAME_LENGTH)
                 .ifBlank { "preset" }
 
         private fun buttonToJson(button: PadButton): JSONObject = JSONObject().apply {

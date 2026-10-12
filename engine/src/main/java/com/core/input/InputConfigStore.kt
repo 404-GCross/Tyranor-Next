@@ -111,10 +111,26 @@ object InputConfigStore {
         return atomicWrite(profileFile(context, safeId), profile.copy(id = safeId).toJson())
     }
 
+    /**
+     * 删除方案文件；内置默认方案不可删。
+     *
+     * 文件不存在按**成功**处理（重复删除、并发删除、或列表里那条本就来自损坏文件）：
+     * 返回 false 会让 UI 报「删除失败」，而用户看到条目已消失，属自相矛盾的提示。
+     * 顺带清理该方案的替换残留（`.bak` 与 `.tmp`）：留着会占住固定备份名，且下次导入同 id
+     * 时旧 `.bak` 可能被当成「盘上唯一旧数据」归位，等于删掉的方案又回来。
+     */
     fun deleteProfile(context: Context, id: String): Boolean {
         val safeId = sanitizeProfileId(id) ?: return false
         if (safeId == DEFAULT_PROFILE_ID) return false
-        return profileFile(context, safeId).delete()
+        val file = profileFile(context, safeId)
+        val dir = file.parentFile
+        if (dir != null) {
+            File(dir, "${file.name}.bak").delete()
+            dir.listFiles { f -> f.name.startsWith(".${file.name}.") && f.name.endsWith(".tmp") }
+                ?.forEach { it.delete() }
+        }
+        if (!file.exists()) return true
+        return file.delete()
     }
 
     /** 全部用户方案（按名称排序）；内置默认排最前，不读盘。 */
@@ -252,10 +268,18 @@ object InputConfigStore {
 
     // ---------- 内部 ----------
 
+    /**
+     * 读该游戏的覆盖 blob（缺失/损坏都返回 null）。
+     *
+     * 解析失败必须留日志：这里静默吞掉的是「单游戏覆盖整体不可用」（虚拟按键/手柄开关与
+     * 方案选择一起回落到全局），只表现为「这个游戏的设置不生效」，没有日志无法归因。
+     */
     private fun gameOverrideBlob(context: Context, gameId: String): JSONObject? = runCatching {
         context.getSharedPreferences(EnginePrefs.GAME_OVERRIDES_PREFS, Context.MODE_PRIVATE)
             .getString(gameId, null)
             ?.let { JSONObject(it) }
+    }.onFailure { error ->
+        Log.w(TAG, "game override blob unreadable for $gameId, falling back to global", error)
     }.getOrNull()
 
     /**

@@ -301,6 +301,7 @@
     <string name="engine_settings_input_summary">Switches and management for the virtual pad, key profiles and gamepad mapping</string>
     <string name="engine_settings_input_pad_title">Virtual pad</string>
     <string name="engine_settings_input_pad_summary">Show an editable on-screen key overlay during games; on by default for RPG Maker MV/MZ only, enabling it applies to all Web engines</string>
+    <string name="engine_settings_input_profile_title">Button layout</string>
     <string name="engine_settings_input_gamepad_title">Gamepad mapping</string>
     <string name="engine_settings_input_gamepad_summary">Map physical gamepad buttons to game keyboard/mouse actions</string>
     <string name="engine_settings_input_gamepad_entry">Gamepad bindings</string>
@@ -670,6 +671,7 @@
     <string name="engine_settings_rpgm_rtp_clear_confirm">Delete the RTP files for this version?</string>
     <string name="engine_settings_rpgm_rtp_cleared">RTP cleared</string>
     <string name="engine_settings_rpgm_rtp_clear_failed">Failed to clear RTP</string>
+    <string name="engine_settings_rpgm_rtp_clear_importing">RTP import is in progress; clear it after the import finishes</string>
     <string name="engine_settings_rpgm_rtp_hint">Get the matching RTP from the RPG Maker website; zip or folder import is supported</string>
     <string name="engine_settings_rpgm_rtp_from_zip">Choose zip</string>
     <string name="engine_settings_rpgm_rtp_from_dir">Choose folder</string>

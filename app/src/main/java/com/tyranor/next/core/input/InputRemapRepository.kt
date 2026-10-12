@@ -246,7 +246,16 @@ object InputRemapRepository {
             return emptyList()
         }
         val legacy = InputConfigStore.readLegacyTouchPad(context, gameId) ?: return emptyList()
-        val profiles = PadProfile.migrateLegacy(legacy.first, legacy.second, gameScope(gameId))
+        // 旧版本（beta ≤ 1.20）存过视口像素坐标，迁移时按旧视口归一化（旧 JS 的一次性迁移）。
+        // 游戏宿主固定 sensorLandscape（见 engine AndroidManifest），故长边 = 宽、短边 = 高。
+        val metrics = context.resources.displayMetrics
+        val profiles = PadProfile.migrateLegacy(
+            configJson = legacy.first,
+            presetsJson = legacy.second,
+            gameScope = gameScope(gameId),
+            viewportWidth = maxOf(metrics.widthPixels, metrics.heightPixels).toFloat(),
+            viewportHeight = minOf(metrics.widthPixels, metrics.heightPixels).toFloat(),
+        )
         val outcome = writeMigratedProfiles(
             profiles = profiles,
             exists = { id -> InputConfigStore.profileFile(context, id).isFile },

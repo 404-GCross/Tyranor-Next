@@ -384,6 +384,59 @@ class PadProfileTest {
     }
 
     @Test
+    fun legacyPixelCoordinatesAreNormalizedAgainstViewport() {
+        // beta ≤ 1.20 的旧 JS 存过「视口像素」坐标（x>1），旧实现自带一次性迁移
+        // （x/vw、y/vh，见 base 200b0750 的 __touch_pad.js）。该迁移随旧 JS 删除而丢失，
+        // 直接 clamp(-0.1,1.1) 会把按钮全钉到右下角并固化。
+        // 游戏宿主固定 sensorLandscape，故按「长边 = 宽、短边 = 高」换算。
+        val legacy = JSONObject().apply {
+            put(
+                "buttons",
+                JSONObject().apply {
+                    put("enter", JSONObject().apply { put("x", 540); put("y", 1200) })
+                },
+            )
+        }.toString()
+
+        val profile = PadProfile.migrateLegacy(
+            legacy,
+            null,
+            TEST_SCOPE,
+            viewportWidth = 1080f,
+            viewportHeight = 2400f,
+        ).single()
+
+        val enter = profile.buttons.first { it.id == "enter" }
+        assertEquals("像素 x 必须按视口宽归一化", 0.5f, enter.x, 0.0001f)
+        assertEquals("像素 y 必须按视口高归一化", 0.5f, enter.y, 0.0001f)
+    }
+
+    @Test
+    fun legacyNormalizedCoordinatesAreNotRescaled() {
+        // 已是归一化的坐标（≤1）不得被视口换算影响
+        val legacy = JSONObject().apply {
+            put(
+                "buttons",
+                JSONObject().apply {
+                    put("enter", JSONObject().apply { put("x", 0.42); put("y", 0.7) })
+                },
+            )
+        }.toString()
+
+        val profile = PadProfile.migrateLegacy(
+            legacy,
+            null,
+            TEST_SCOPE,
+            viewportWidth = 1080f,
+            viewportHeight = 2400f,
+        ).single()
+
+        val enter = profile.buttons.first { it.id == "enter" }
+        assertEquals(0.42f, enter.x, 0.0001f)
+        assertEquals(0.7f, enter.y, 0.0001f)
+    }
+
+    @Test
     fun legacyConfigMigratesPositionsVisibilityAndKeys() {
         val legacy = JSONObject().apply {
             put(

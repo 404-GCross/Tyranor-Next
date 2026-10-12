@@ -301,6 +301,7 @@
     <string name="engine_settings_input_summary">虚拟按键、按键方案与手柄映射的开关和管理</string>
     <string name="engine_settings_input_pad_title">虚拟按键</string>
     <string name="engine_settings_input_pad_summary">在游戏画面上叠加可编辑的虚拟按键层；默认仅对 RPG Maker MV/MZ 开启，开启后对所有 Web 引擎生效</string>
+    <string name="engine_settings_input_profile_title">按键方案</string>
     <string name="engine_settings_input_gamepad_title">手柄映射</string>
     <string name="engine_settings_input_gamepad_summary">把外接手柄的按键映射为游戏键盘/鼠标操作</string>
     <string name="engine_settings_input_gamepad_entry">手柄按键映射</string>
@@ -670,6 +671,7 @@
     <string name="engine_settings_rpgm_rtp_clear_confirm">确定删除该版本的 RTP 资源？</string>
     <string name="engine_settings_rpgm_rtp_cleared">RTP 已清除</string>
     <string name="engine_settings_rpgm_rtp_clear_failed">RTP 清除失败</string>
+    <string name="engine_settings_rpgm_rtp_clear_importing">RTP 正在导入，请等导入结束后再清除</string>
     <string name="engine_settings_rpgm_rtp_hint">请从 RPG Maker 官网获取对应版本 RTP；支持 zip 压缩包或目录导入</string>
     <string name="engine_settings_rpgm_rtp_from_zip">选择压缩包</string>
     <string name="engine_settings_rpgm_rtp_from_dir">选择文件夹</string>

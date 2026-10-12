@@ -4,13 +4,16 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
-import android.widget.FrameLayout
 import android.widget.Toast
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
@@ -71,9 +74,11 @@ internal fun PadLayoutEditScreen(profileId: String) {
         Toast.makeText(ctx, hintMessage, Toast.LENGTH_LONG).show()
     }
 
-    // 宿主 View 只在首次组合构建；Activity 退出时随视图树回收
-    val host = remember(profileId) {
-        PadEditorHost.create(
+    // 宿主 View 构建含方案读盘：不在组合期同步读（ANR 风险），改由协程在 IO 读、主线程建视图。
+    // 方案缺失时也在这里提示并退出，而不是在 AndroidView.factory 里做 Toast 副作用。
+    var host by remember(profileId) { mutableStateOf<PadEditorHost?>(null) }
+    LaunchedEffect(profileId, primary) {
+        host = PadEditorHost.create(
             context = ctx,
             profileId = profileId,
             primaryColor = primary,
@@ -92,24 +97,24 @@ internal fun PadLayoutEditScreen(profileId: String) {
                 Toast.makeText(ctx, saveFailedMessage, Toast.LENGTH_LONG).show()
             },
         )
+        if (host == null) {
+            Toast.makeText(ctx, invalidMessage, Toast.LENGTH_SHORT).show()
+            activity?.finish()
+        }
     }
 
+    val readyHost = host
     MiuixSettingsTheme {
-        if (host == null) {
-            AndroidView(
-                modifier = Modifier.fillMaxSize(),
-                factory = { context ->
-                    FrameLayout(context).also {
-                        Toast.makeText(context, invalidMessage, Toast.LENGTH_SHORT).show()
-                    }
-                },
-            )
-        } else {
+        if (readyHost != null) {
             // 编辑区占满全屏（含系统栏区域），与游戏内的全屏按键层一致
             AndroidView(
                 modifier = Modifier.fillMaxSize(),
-                factory = { host.rootView },
+                factory = { readyHost.rootView },
             )
+        } else {
+            // 读盘中 / 方案缺失：留空占位。不放提示文案（AGENTS.md：正文区不做说明文案），
+            // 缺失路径已由上面的 Toast + finish 处理
+            Box(modifier = Modifier.fillMaxSize())
         }
     }
 }

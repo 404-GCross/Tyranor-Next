@@ -56,6 +56,10 @@ class InputRouter(
             }
             return false
         }
+        // 未绑定任何键位的手柄键**不消费**：用户清空绑定（或默认表未覆盖该键）时应把事件
+        // 放行给游戏原生处理，否则表现为「手柄某个键完全没反应」，会被误判成手柄故障。
+        // 仍被本路由按住的键不受影响（必须能正常收到 UP 释放）。
+        if (bindingFor(id).keys.isEmpty() && activeSources[id].isNullOrEmpty()) return false
         when (event.action) {
             KeyEvent.ACTION_DOWN -> if (event.repeatCount == 0) setPressed(id, SOURCE_KEY, true)
             KeyEvent.ACTION_UP -> setPressed(id, SOURCE_KEY, false)

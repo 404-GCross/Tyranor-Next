@@ -23,8 +23,11 @@ import kotlin.math.roundToInt
  * 增删/改键）全部在进程内完成，配置经 [InputConfigStore] 落盘；按键经 [InputSink]
  * 送到对应引擎（Web 见 [WebInputSink]）。
  *
- * 触摸策略：只有命中按键层元素的手势才被本 View 消费（其余 DOWN 返回 false 放行给
- * 下层 WebView / 虚拟鼠标层），编辑模式下则全量拦截。
+ * 触摸策略：本 View 铺满全屏且位于游戏画面之上，因此**逐指针**决定是否消费——
+ * 只有命中按键层元素（按钮 / 方向控件 / FAB）的指针才被接管，未命中的 ACTION_DOWN 与
+ * ACTION_POINTER_DOWN 一律返回 false 放行给下层 WebView / 虚拟鼠标层（这样「按住方向键
+ * 的同时另一指点屏幕交互」仍然可用）；按键层隐藏时只有 FAB 参与，其余全部放行。
+ * 编辑模式下则全量拦截（模态画布）。
  */
 class VirtualPadView(
     context: Context,
@@ -36,7 +39,13 @@ class VirtualPadView(
     /** 主题色（与 app 引擎主题一致，由宿主经 EngineThemeColors 注入）。 */
     data class PadTheme(val primary: Int, val onPrimary: Int) {
         companion object {
-            val DEFAULT = PadTheme(0xFF307DEF.toInt(), Color.WHITE)
+            /**
+             * 兜底主题：**不使用品牌蓝**（AGENTS.md 禁止硬编码品牌蓝）。
+             *
+             * 所有生产调用点都会注入 app 的主题色（`EngineThemeColors.fromIntent` /
+             * `PadEditorHost`），这里只服务未注入的边界（预览、单测），取中性白即可。
+             */
+            val DEFAULT = PadTheme(Color.WHITE, Color.BLACK)
         }
     }
 
@@ -379,8 +388,18 @@ class VirtualPadView(
                     handler.postDelayed(fabLongPress, FAB_LONG_PRESS_MS)
                     return true
                 }
-                if (!padVisible) return event.actionMasked == MotionEvent.ACTION_POINTER_DOWN
-                val element = hitTest(x, y) ?: return event.actionMasked == MotionEvent.ACTION_POINTER_DOWN
+                if (!padVisible) {
+                    // 隐藏时只有 FAB 参与（且仅由 ACTION_DOWN 起手）：其余指针一律放行。
+                    // 这里必须返回 false——本 View 铺满全屏且在上层，若把 POINTER_DOWN 也
+                    // 消费掉，游戏侧就再也收不到「按住按键层时第二根手指点画面」的那根手指。
+                    return false
+                }
+                // 未命中按键层元素：放行**该指针**给下层（WebView / 虚拟鼠标层）。
+                // 注意 Android 的分发语义：ACTION_DOWN 放行后本 View 不接管该手势；
+                // 已有其他手指被本 View 接管的场景下，POINTER_DOWN 是新指针的最后一次
+                // 「归谁」机会，返回 true 会把整根手指吃掉（旧实现在这里 return true，
+                // 导致「按住方向键 + 另一指点屏幕」失效）。
+                val element = hitTest(x, y) ?: return false
                 if (element.isDirection) {
                     if (dirPointerId != -1) return true
                     dirPointerId = pointerId
@@ -547,23 +566,27 @@ class VirtualPadView(
         val dy = y - element.rect.centerY()
         val deadzone = r * DIR_DEADZONE_RATIO
         val hysteresis = r * DIR_HYSTERESIS_RATIO
-        val threshold = if (dirActiveSet.isEmpty()) deadzone else max(0f, deadzone - hysteresis)
+        // 滞回**逐方向**生效：旧实现只要任一方向激活就把四个方向的阈值一起压低，
+        // 于是 8 向模式按住「右」时，横向漂移刚过 0.22r（而非 0.30r）就误触「上/下」，
+        // 表现为「明明在往右走却突然斜着走」。这里只对**已激活**的方向用低阈值。
+        val lowered = max(0f, deadzone - hysteresis)
+        fun thresholdFor(name: String): Float = if (name in dirActiveSet) lowered else deadzone
         val next = LinkedHashMap<String, Boolean>()
         if (direction.eightDir) {
-            next["up"] = -dy > threshold
-            next["down"] = dy > threshold
-            next["left"] = -dx > threshold
-            next["right"] = dx > threshold
+            next["up"] = -dy > thresholdFor("up")
+            next["down"] = dy > thresholdFor("down")
+            next["left"] = -dx > thresholdFor("left")
+            next["right"] = dx > thresholdFor("right")
         } else if (abs(dx) > abs(dy)) {
             next["up"] = false
             next["down"] = false
-            next["left"] = -dx > threshold
-            next["right"] = dx > threshold
+            next["left"] = -dx > thresholdFor("left")
+            next["right"] = dx > thresholdFor("right")
         } else {
             next["left"] = false
             next["right"] = false
-            next["up"] = -dy > threshold
-            next["down"] = dy > threshold
+            next["up"] = -dy > thresholdFor("up")
+            next["down"] = dy > thresholdFor("down")
         }
         val magnitude = hypot(dx.toDouble(), dy.toDouble()).toFloat()
         dirKnobDx = if (r > 0f) (dx / r).coerceIn(-1f, 1f) else 0f

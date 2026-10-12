@@ -3,6 +3,7 @@ package com.core.input
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.Context
+import android.content.ContextWrapper
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.ColorDrawable
@@ -583,8 +584,10 @@ class VirtualPadEditPanel(
     private fun showDarkDialog(contentView: View) {
         dismissDialog()
         // 宿主已退出时不再建窗：延迟回调在 finish 后触发 show() 会抛 BadTokenException。
-        // 非 Activity 语境（如预览）不拦截；Activity 语境只看存活态
-        if ((context as? Activity)?.let { it.isFinishing || it.isDestroyed } == true) return
+        // 非 Activity 语境（如预览）不拦截；Activity 语境只看存活态。
+        // 用 findActivity 而不是 `context as? Activity`：Compose 侧传入的 Context 可能是
+        // 包装过的（ContextWrapper），直接强转会在设置页里恒为 null 而漏掉这道守卫。
+        if (context.findActivity()?.let { it.isFinishing || it.isDestroyed } == true) return
         val cardPaddingH = dp(16f)
         val cardPaddingV = dp(14f) + dp(12f)
         val card = LinearLayout(context).apply {
@@ -805,4 +808,19 @@ class VirtualPadEditPanel(
             }
         }
     }
+}
+
+/**
+ * 从（可能被包装的）Context 里找出宿主 Activity；非 Activity 语境返回 null。
+ *
+ * 设置页把 engine 面板挂进 Compose 视图树，`Context` 可能被 `ContextWrapper` 包一层，
+ * 直接 `context as? Activity` 会漏判存活态。
+ */
+private fun Context.findActivity(): Activity? {
+    var current: Context? = this
+    while (current is ContextWrapper) {
+        if (current is Activity) return current
+        current = current.baseContext
+    }
+    return current as? Activity
 }
