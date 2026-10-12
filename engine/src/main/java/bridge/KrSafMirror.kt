@@ -127,9 +127,12 @@ object KrSafMirror {
         destination: File,
         entries: MutableList<Pair<String, String>>,
     ) {
+        val destRoot = runCatching { destination.canonicalPath }.getOrNull() ?: destination.absolutePath
         for (child in source.listFiles()) {
             val name = child.name?.takeIf { it.isNotBlank() } ?: continue
-            val local = File(destination, name.lowercase(Locale.ROOT))
+            // `DocumentFile.name` 完全由 DocumentsProvider 提供：`../x`、`a/b` 或绝对路径
+            // 会让镜像写到目标目录之外（与 zip 的 Zip Slip 同类）。不安全的名字跳过。
+            val local = safeMirrorChild(destination, destRoot, name.lowercase(Locale.ROOT)) ?: continue
             if (child.isDirectory) {
                 if (!local.isDirectory && !local.mkdirs()) {
                     throw PrepareException(Stage.CHILD_DIR, local.name)
@@ -142,6 +145,15 @@ object KrSafMirror {
                 entries += local.absolutePath.lowercase(Locale.ROOT) to child.uri.toString()
             }
         }
+    }
+
+    /** 把 provider 给的条目名安全落到 [destination] 之下；不安全返回 null（调用方跳过）。 */
+    private fun safeMirrorChild(destination: File, destRoot: String, name: String): File? {
+        if (name.isBlank() || name == "." || name == "..") return null
+        if (name.contains('/') || name.contains('\\')) return null
+        val file = File(destination, name)
+        val canonical = runCatching { file.canonicalPath }.getOrNull() ?: return null
+        return if (canonical.startsWith(destRoot + File.separator)) file else null
     }
 
     /**

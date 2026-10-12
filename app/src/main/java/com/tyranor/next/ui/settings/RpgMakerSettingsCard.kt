@@ -76,25 +76,37 @@ internal fun RpgMakerRgssSettingsCard(
     var rtpImported by remember { mutableStateOf(RPGM_RTP_TYPES.associateWith<String, Boolean?> { null }) }
     // 导入在途守卫：导入耗时可到分钟级，期间再次点「导入」会（在修复临时目录前）让两次
     // 导入互相破坏；现在临时目录已逐次唯一，但并发导入仍是无意义操作，入口直接置灰。
-    // 同时它也是「清除」与在途导入互斥的依据（见 RpgmRtpRow 的 enabled）。
+    // 这只是「顺手」的 UI 便利：真正的互斥由 core 的进程级在途登记承担（clearRtp 会拒绝），
+    // 因为本状态会随页面重建丢失，而导入在 IO 线程继续跑。
     var importingRtpType by remember { mutableStateOf<String?>(null) }
+
+    /**
+     * 重读全部子类型的状态 + 恢复 core 侧的在途导入登记（页面重建后在途导入仍在跑）。
+     *
+     * 局部函数必须在调用点之前声明（Kotlin 局部声明不提升）。
+     */
+    suspend fun refreshAllRtp() {
+        val states = withContext(Dispatchers.IO) {
+            RPGM_RTP_TYPES.associateWith { RpgMakerRuntimeEnvironment.isRtpImported(it) }
+        }
+        val inFlight = withContext(Dispatchers.IO) {
+            RPGM_RTP_TYPES.firstOrNull { RpgMakerRuntimeEnvironment.isRtpImportInFlight(it) }
+        }
+        rtpImported = states
+        // 只有本页没有正在跟踪的导入时才用 core 的登记覆盖：否则会把本页刚发起的导入状态冲掉
+        if (importingRtpType == null) importingRtpType = inFlight
+    }
 
     // RTP 状态读盘（含中断恢复的文件操作）放 IO 线程：组合期在主线程逐个 stat/rename
     // 目录有 ANR 风险（恢复路径会 deleteRecursively 半成品）
     LaunchedEffect(Unit) {
-        rtpImported = withContext(Dispatchers.IO) {
-            RPGM_RTP_TYPES.associateWith { RpgMakerRuntimeEnvironment.isRtpImported(it) }
-        }
+        refreshAllRtp()
     }
 
     // 从安装器返回后刷新模块/RTP 状态（与引擎页 ON_RESUME 刷新策略一致）
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
         moduleInstalled = ExternalEngineLauncher.isPackageInstalled(ctx, RpgMakerExternalEngineModule)
-        scope.launch {
-            rtpImported = withContext(Dispatchers.IO) {
-                RPGM_RTP_TYPES.associateWith { RpgMakerRuntimeEnvironment.isRtpImported(it) }
-            }
-        }
+        scope.launch { refreshAllRtp() }
     }
 
     suspend fun refreshRtp(type: String) {
@@ -393,10 +405,14 @@ internal fun RpgMakerRgssSettingsCard(
                         }
                         refreshRtp(type)
                         clearingRtpType = null
-                        val msg = if (cleared) {
-                            R.string.engine_settings_rpgm_rtp_cleared
-                        } else {
-                            R.string.engine_settings_rpgm_rtp_clear_failed
+                        val msg = when (cleared) {
+                            RpgMakerRuntimeEnvironment.RtpClearResult.CLEARED ->
+                                R.string.engine_settings_rpgm_rtp_cleared
+                            // 在途导入：core 拒绝清除（否则会把半成品装成 app），如实告知而不是报「失败」
+                            RpgMakerRuntimeEnvironment.RtpClearResult.IMPORT_IN_FLIGHT ->
+                                R.string.engine_settings_rpgm_rtp_clear_importing
+                            RpgMakerRuntimeEnvironment.RtpClearResult.FAILED ->
+                                R.string.engine_settings_rpgm_rtp_clear_failed
                         }
                         Toast.makeText(ctx, ctx.getString(msg), Toast.LENGTH_SHORT).show()
                     }

@@ -4,12 +4,16 @@ import android.content.Context
 import android.net.Uri
 import android.os.Environment
 import android.provider.OpenableColumns
+import android.util.Log
 import androidx.documentfile.provider.DocumentFile
 import java.io.File
 import java.io.InputStream
 import java.util.Locale
 import java.util.zip.ZipInputStream
 import kotlin.coroutines.cancellation.CancellationException
+
+/** 日志标签（导入/恢复这类文件操作的失败归因，见各 `Log.w` 调用点）。 */
+private const val TAG = "RpgmRtp"
 
 /**
  * RTP 导入被拒的原因（类型化错误码，不带文案）。
@@ -102,6 +106,15 @@ object RpgMakerRuntimeEnvironment {
      * 半成品 target 判成有效、或把刚写下的标记当残留删掉），因此这三段必须互斥。
      */
     private val importLock = Any()
+
+    /**
+     * 在途导入登记：`gameType → 该次导入的临时目录`（进程级，跨设置页重建存活）。
+     *
+     * 用途见 [clearRtp]：清除必须能识别「同子类型有导入正在写」，否则会删掉别人的临时目录，
+     * 让那次导入以残缺内容提交。导入结束（成功/失败/异常）在 `finally` 里注销。
+     * `internal` 仅为单测可注入（生产只由 zip/目录两条导入路径写入）。
+     */
+    internal val inFlightImports = java.util.concurrent.ConcurrentHashMap<String, File>()
 
     // 用户挑选的 RTP 包解压上限。数值与 NativePluginInstaller.unzipSafely **不同**
     // （那边是 32 条目 / 512MiB 总量，面向内置插件包）：RTP 是整包素材，条目数与总量
@@ -215,27 +228,56 @@ object RpgMakerRuntimeEnvironment {
     }
 
     /**
+     * RTP 清除结果（core→ui 类型化协议；文案由 UI 组装）。
+     *
+     * [IMPORT_IN_FLIGHT] 是独立分支而不是并入 [FAILED]：清除与在途导入并发时，把导入的临时
+     * 目录删掉会让它拿着残缺内容继续提交（把半成品装成 `app` 并删掉备份），必须直接拒绝。
+     */
+    enum class RtpClearResult {
+        /** 已清除（或本就未导入）。 */
+        CLEARED,
+
+        /** IO 失败（标记/备份/app 任一步删不掉），可让用户重试。 */
+        FAILED,
+
+        /** 该子类型有导入在途：此时不得触碰导入现场，等导入结束后再清除。 */
+        IMPORT_IN_FLIGHT,
+    }
+
+    /**
      * 清除该子类型的 RTP（仅删 `app` 层级，保留同目录其余用户内容）。
      *
      * 顺带清理备份与提交标记：只删 `app` 的话，中断替换留下的备份会在下次
      * [recoverPendingImport] 时被**归位**——用户看到「清除成功却又回来了」。
      * 顺序：先删标记（标记在则恢复逻辑会把备份归位），再删备份，最后删 app；
-     * 任一步失败都返回 false 让用户重试，不留半个现场。
+     * 任一步失败都返回 [RtpClearResult.FAILED] 让用户重试，不留半个现场。
      *
-     * 同时清理全部导入临时目录：UI 侧「清除」与「导入」互斥（导入在途时清除入口不可用），
-     * 因此走到这里时不存在并发导入，残留只可能是崩溃留下的半成品。
+     * **与在途导入的互斥由本类承担**（[inFlightImports] 进程级登记），不依赖 UI 的按钮置灰：
+     * 后者可被「退出/重建设置页」「导入 A 期间又导入 B」绕过，而这里删掉别人正在写的临时
+     * 目录会让那次导入以残缺内容提交。同子类型在途时直接返回
+     * [RtpClearResult.IMPORT_IN_FLIGHT]；正因如此，走到清理临时目录这一步时同目录内不可能有
+     * 在途导入，残留只可能是崩溃留下的半成品，可以全清。
      */
-    fun clearRtp(gameType: String): Boolean = synchronized(importLock) {
+    fun clearRtp(gameType: String): RtpClearResult = synchronized(importLock) {
+        if (inFlightImports.containsKey(gameType)) return@synchronized RtpClearResult.IMPORT_IN_FLIGHT
         val root = rtpDir(gameType)
         val appDir = File(root, "app")
         val backup = File(root, IMPORT_BACKUP_DIR)
         val marker = File(root, IMPORT_MARKER_FILE)
         deleteStaleImportTemps(root, keep = null, staleBefore = Long.MAX_VALUE)
-        if (marker.exists() && !marker.delete()) return@synchronized false
-        if (backup.exists() && !backup.deleteRecursively()) return@synchronized false
-        if (!appDir.exists()) return@synchronized true
-        appDir.deleteRecursively()
+        if (marker.exists() && !marker.delete()) return@synchronized RtpClearResult.FAILED
+        if (backup.exists() && !backup.deleteRecursively()) return@synchronized RtpClearResult.FAILED
+        if (!appDir.exists()) return@synchronized RtpClearResult.CLEARED
+        return@synchronized if (appDir.deleteRecursively()) RtpClearResult.CLEARED else RtpClearResult.FAILED
     }
+
+    /**
+     * 该子类型是否有导入在途。
+     *
+     * 供 UI 恢复「导入中」态：Composable 里的在途标记会随页面重建丢失，而导入在 IO 线程
+     * 继续跑（阻塞式文件 IO 不响应协程取消）。
+     */
+    fun isRtpImportInFlight(gameType: String): Boolean = inFlightImports.containsKey(gameType)
 
     /**
      * 分配本次导入专用的临时目录（`<parent>/.import_tmp.<盐><序号>`）。
@@ -287,6 +329,8 @@ object RpgMakerRuntimeEnvironment {
             // 本次导入专属临时目录（并发导入各写各的，不共用固定名）
             val temp = newImportTempDir(parent)
             created = temp
+            // 登记在途：清除（clearRtp）据此拒绝，避免删掉正在写入的临时目录
+            inFlightImports[gameType] = temp
             deleteStaleImportTemps(parent, keep = temp)
             temp.deleteRecursively()
             if (!temp.mkdirs()) return RtpImportRejection.IoFailed(temp.name)
@@ -302,6 +346,7 @@ object RpgMakerRuntimeEnvironment {
             // 都按类型化失败返回（本方法是 core 门面，调用方只按返回值分支）
             RtpImportRejection.IoFailed(created?.name ?: IMPORT_TEMP_DIR)
         } finally {
+            created?.let { inFlightImports.remove(gameType, it) }
             created?.deleteRecursively()
         }
     }
@@ -321,6 +366,8 @@ object RpgMakerRuntimeEnvironment {
             // 本次导入专属临时目录（并发导入各写各的，不共用固定名）
             val temp = newImportTempDir(parent)
             created = temp
+            // 登记在途：清除（clearRtp）据此拒绝，避免删掉正在写入的临时目录
+            inFlightImports[gameType] = temp
             deleteStaleImportTemps(parent, keep = temp)
             temp.deleteRecursively()
             if (!temp.mkdirs()) return RtpImportRejection.IoFailed(temp.name)
@@ -331,6 +378,7 @@ object RpgMakerRuntimeEnvironment {
         } catch (_: Throwable) {
             RtpImportRejection.IoFailed(created?.name ?: IMPORT_TEMP_DIR)
         } finally {
+            created?.let { inFlightImports.remove(gameType, it) }
             created?.deleteRecursively()
         }
     }
@@ -405,7 +453,11 @@ object RpgMakerRuntimeEnvironment {
         // 不用 onError = TERMINATE：`copyRecursively` 在 TERMINATE 下的返回值不保证为
         // false（走查中断时仍可能返回 true），会把不完整安装当成成功提交。
         val installed = temp.renameTo(target) ||
-            runCatching { temp.copyRecursively(target, overwrite = true) }.getOrDefault(false)
+            runCatching { temp.copyRecursively(target, overwrite = true) }
+                // 用户侧只看到类型化「读写失败」，磁盘满 / 权限不足 / 目录被删无法区分：
+                // 留日志（含异常）才能归因，且不为返回协议引入新分支
+                .onFailure { Log.w(TAG, "rtp commit copy failed: ${target.absolutePath}", it) }
+                .getOrDefault(false)
         if (!installed || target.listFiles()?.isNotEmpty() != true) {
             // 回滚：清掉半成品、删标记，把旧目录放回去。
             // 顺序很关键——标记必须先删：若先放回旧数据却留下标记，下次恢复会把
@@ -667,12 +719,19 @@ object RpgMakerRuntimeEnvironment {
         maxTotalBytes: Long = MAX_TOTAL_UNCOMPRESSED_BYTES,
         counters: CopyCounters = CopyCounters(),
     ): RtpImportRejection? {
+        val destRoot = runCatching { dest.canonicalPath }.getOrNull() ?: dest.absolutePath
         for (child in source.listFiles()) {
             val name = child.name ?: continue
+            // 与 zip 路径同一套包含校验：`DocumentFile.name` 完全由 DocumentsProvider 提供，
+            // 恶意 provider 可以返回 `../x`、`a/b` 或绝对路径，直接拼 `File(dest, name)`
+            // 会借本应用的 MANAGE_EXTERNAL_STORAGE 在共享存储任意位置创建/截断文件
+            // （Zip Slip 的 SAF 版本）。不安全的名字直接跳过，不中止整次导入。
+            val childFile = safeChild(dest, destRoot, name) ?: continue
             if (child.isDirectory) {
-                val dir = File(dest, name)
-                if (!dir.exists() && !dir.mkdirs()) return RtpImportRejection.DirectoryCreateFailed(name)
-                copyDocumentTree(context, child, dir, maxEntries, maxEntryBytes, maxTotalBytes, counters)
+                if (!childFile.exists() && !childFile.mkdirs()) {
+                    return RtpImportRejection.DirectoryCreateFailed(name)
+                }
+                copyDocumentTree(context, child, childFile, maxEntries, maxEntryBytes, maxTotalBytes, counters)
                     ?.let { return it }
             } else {
                 // 条目数先计数再复制：构造海量小文件同样能拖垮导入
@@ -680,7 +739,7 @@ object RpgMakerRuntimeEnvironment {
                 if (counters.entries > maxEntries) {
                     return RtpImportRejection.EntryCountExceeded(counters.entries, maxEntries)
                 }
-                val target = File(dest, name)
+                val target = childFile
                 // 上限超限走类型化原因；openInputStream 为 null / 拷贝抛异常归为 IoFailed。
                 // 半成品文件必须删掉：调用方会把整个临时目录丢弃，但若将来复用，
                 // 截断文件会被当成有效素材。
@@ -697,7 +756,8 @@ object RpgMakerRuntimeEnvironment {
                         }
                         limitRejection == null
                     }
-                }.getOrDefault(false)
+                }.onFailure { Log.w(TAG, "rtp tree copy failed: ${child.uri}", it) }
+                    .getOrDefault(false)
                 if (!copied) {
                     runCatching { target.delete() }
                     return limitRejection ?: RtpImportRejection.IoFailed(name)
@@ -705,6 +765,21 @@ object RpgMakerRuntimeEnvironment {
             }
         }
         return null
+    }
+
+    /**
+     * 把 provider 给的条目名安全地落到 [dest] 之下；不安全返回 null（调用方跳过该条目）。
+     *
+     * 拒绝三类名字：空串、含路径分隔符（`/` `\`）、以及规范化后不在 [destRoot] 之内
+     * （`..`、绝对路径、符号链接绕行）。与 zip 条目共用同一判定口径。
+     */
+    private fun safeChild(dest: File, destRoot: String, name: String): File? {
+        if (name.isBlank()) return null
+        if (name.contains('/') || name.contains('\\')) return null
+        if (name == "." || name == "..") return null
+        val file = File(dest, name)
+        val canonical = runCatching { file.canonicalPath }.getOrNull() ?: return null
+        return if (canonical.startsWith(destRoot + File.separator)) file else null
     }
 
     /**

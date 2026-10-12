@@ -246,6 +246,27 @@ class RtpImportReplaceSemanticsTest {
     // ---------- 并发导入：临时目录必须逐次唯一 ----------
 
     @Test
+    fun clearRtpIsRefusedWhileAnImportIsInFlight() {
+        // 「清除」与「导入」的互斥不能只靠 UI 按钮置灰：退出/重建设置页会丢掉那个标记，
+        // 而导入在 IO 线程继续跑（阻塞文件 IO 不响应协程取消）。此时若清除把在途临时目录
+        // 删掉，导入会拿残缺内容继续提交（半成品装成 app 并删掉备份）——必须由 core 拒绝。
+        val inFlightTemp = RpgMakerRuntimeEnvironment.newImportTempDir(temporaryFolder.newFolder("inflight"))
+        RpgMakerRuntimeEnvironment.inFlightImports["rpgmvx"] = inFlightTemp
+        try {
+            assertTrue(RpgMakerRuntimeEnvironment.isRtpImportInFlight("rpgmvx"))
+            assertEquals(
+                "在途导入期间清除必须被拒绝",
+                RpgMakerRuntimeEnvironment.RtpClearResult.IMPORT_IN_FLIGHT,
+                RpgMakerRuntimeEnvironment.clearRtp("rpgmvx"),
+            )
+            assertFalse("被拒绝的清除不得动别的子类型登记", RpgMakerRuntimeEnvironment.isRtpImportInFlight("rpgmxp"))
+        } finally {
+            RpgMakerRuntimeEnvironment.inFlightImports.remove("rpgmvx")
+        }
+        assertFalse("导入结束后登记必须注销", RpgMakerRuntimeEnvironment.isRtpImportInFlight("rpgmvx"))
+    }
+
+    @Test
     fun importTempDirsAreUniquePerCall() {
         // 导入耗时可到分钟级，UI 未加在途守卫时两次导入会同时进行：
         // 固定名 .import_tmp 会让第二次 deleteRecursively() 删掉第一次正在写的目录，
