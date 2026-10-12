@@ -40,10 +40,23 @@
     // 部分引擎在 window 上额外监听（keydown 冒泡到 window 即可，无需重复派发）
   }
 
+  /** 鼠标键缺少 __tnMouse 时只提示一次（Tyrano/VN/WebOther 不注入虚拟鼠标层）。 */
+  var mouseWarned = false;
+
   function mouse(canonical) {
     var c = center();
     var tn = window.__tnMouse;
-    if (!tn) return;
+    if (!tn) {
+      // 静默失败会让用户以为「按键/手柄坏了」：打一条日志，并把鼠标键在
+      // 本页标记为不可用（v1 只在 MV/MZ 注入 __tnMouse）
+      if (!mouseWarned) {
+        mouseWarned = true;
+        if (window.console && console.warn) {
+          console.warn("[tyranor] mouse key " + canonical + " ignored: __tnMouse is not injected on this host");
+        }
+      }
+      return;
+    }
     if (canonical === 1000) { tn.click(c.x, c.y); return; }
     if (canonical === 1001) { tn.rclick(c.x, c.y); return; }
     if (canonical === 1002) { tn.down(c.x, c.y, 1); tn.up(c.x, c.y, 1); return; }

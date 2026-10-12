@@ -333,10 +333,6 @@ class RpgMakerActivity : Activity() {
             theme = EngineThemeColors.fromIntent(intent),
             engineDefaultsEnabled = true,
         ) { js -> webView?.let { v -> runCatching { v.evaluateJavascript(js, null) } } }
-        browser.addJavascriptInterface(
-            requireNotNull(inputRemap).Bridge(),
-            InputRemapController.BRIDGE_NAME,
-        )
 
         configureWebView(browser)
         browser.addJavascriptInterface(RpgMakerSaveBridge(saves), RPG_MAKER_SAVE_BRIDGE_NAME)
@@ -363,6 +359,11 @@ class RpgMakerActivity : Activity() {
                 RpgMakerModBridge(rpgMakerModGameId),
                 RPG_MAKER_MOD_BRIDGE_NAME,
             )
+            // 输入重映射桥的唯一消费方是修改器 UI（__rpgmaker_mod_ui.js，同一开关下注入）：
+            // 只在修改器开启时注册，避免关闭修改器后仍给页面留「重置按键布局」入口
+            inputRemap?.let {
+                browser.addJavascriptInterface(it.Bridge(), InputRemapController.BRIDGE_NAME)
+            }
         }
         // PIXI legacy 兼容渲染（?android-legacy=1，__rpg_v12.js 的既定开关）：
         // 由设置页开关经 rpgLegacyRenderer extra 控制，规避部分 Android GPU

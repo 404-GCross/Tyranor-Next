@@ -11,14 +11,21 @@ import com.core.input.StickBinding
 import com.tyranor.next.core.engine.EngineType
 import com.tyranor.next.core.settings.EngineSettingsStore
 import com.tyranor.next.core.settings.PerGameSettingsStore
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.json.JSONObject
 
 /**
  * 输入重映射（虚拟按键方案 + 手柄映射）应用侧仓储。
  *
  * 存储位置与 engine 侧 [InputConfigStore] 同源（同一 filesDir 下的 input/ 目录与
- * 共享 prefs 键），本类只做应用侧读写门面：设置页、方案管理与旧数据迁移都经此收口，
- * 不直接碰文件与 prefs 键名。
+ * 共享 prefs 键），本类做应用侧读写门面：**方案文件、手柄映射、旧数据迁移**都经此收口，
+ * 调用方不直接碰文件路径与 prefs 键名。
+ *
+ * 例外（有意保留）：**单游戏的三个开关**（`F_INPUT_PAD_ENABLED` /
+ * `F_INPUT_GAMEPAD_ENABLED` / `F_INPUT_PROFILE_ID`）由单游戏设置页直接经
+ * [PerGameSettingsStore] 读写——它本来就是「逐字段覆盖」的表单模型，与方案/映射这类
+ * 结构化数据不同；键名由 [PerGameSettingsStore] 的 `F_*` 常量与 engine 侧字面量锚定。
  *
  * 数据分类：
  *  - 方案文件：`<filesDir>/input/profiles/<id>.json`（游戏内编辑保存与设置页共同读写；
@@ -199,6 +206,15 @@ object InputRemapRepository {
 
     // ---------- 手柄映射 ----------
 
+    /**
+     * 手柄映射「读 → 改 → 写」互斥锁。
+     *
+     * 写盘本身是原子替换（不产生半截文件），但读改写不是原子的：连点「确定」或
+     * 「改完逻辑键立刻改摇杆方向」时两次读到同一快照，后写会静默覆盖先写（用户一次改动消失）。
+     * 所有会改动该文件的入口都必须经本锁（引擎侧只读该文件，竞争仅限 app 进程内）。
+     */
+    private val gamepadWriteMutex = Mutex()
+
     fun writeGamepadMap(context: Context, map: GamepadMap): Boolean =
         InputConfigStore.writeGamepadMap(context, map)
 
@@ -207,8 +223,9 @@ object InputRemapRepository {
      *
      * @return 是否写盘成功（UI 据此提示成败；只返回默认表会让 UI 恒报「已恢复」）
      */
-    fun resetGamepadMap(context: Context): Boolean =
+    suspend fun resetGamepadMap(context: Context): Boolean = gamepadWriteMutex.withLock {
         writeGamepadMap(context, GamepadMap.default())
+    }
 
     // ---------- 旧数据迁移 ----------
 
@@ -368,13 +385,14 @@ object InputRemapRepository {
         }
     }
 
-    fun setGamepadBinding(context: Context, id: String, keys: List<Int>, autoKeep: Boolean): Boolean {
-        val map = InputConfigStore.readGamepadMap(context)
-        return InputConfigStore.writeGamepadMap(
-            context,
-            map.withBinding(id, GamepadBinding(keys = keys, autoKeep = autoKeep)),
-        )
-    }
+    suspend fun setGamepadBinding(context: Context, id: String, keys: List<Int>, autoKeep: Boolean): Boolean =
+        gamepadWriteMutex.withLock {
+            val map = InputConfigStore.readGamepadMap(context)
+            InputConfigStore.writeGamepadMap(
+                context,
+                map.withBinding(id, GamepadBinding(keys = keys, autoKeep = autoKeep)),
+            )
+        }
 
     /** 摇杆方向：`stick` ∈ {left, right}，`direction` ∈ {up, down, left, right}。 */
     fun stickEntries(context: Context): List<StickEntry> {
@@ -387,15 +405,16 @@ object InputRemapRepository {
         }
     }
 
-    fun setStickBinding(context: Context, stick: String, direction: String, keys: List<Int>): Boolean {
-        val map = InputConfigStore.readGamepadMap(context)
-        val updated = if (stick == STICK_LEFT) {
-            map.copy(leftStick = map.leftStick.with(direction, GamepadBinding(keys = keys)))
-        } else {
-            map.copy(rightStick = map.rightStick.with(direction, GamepadBinding(keys = keys)))
+    suspend fun setStickBinding(context: Context, stick: String, direction: String, keys: List<Int>): Boolean =
+        gamepadWriteMutex.withLock {
+            val map = InputConfigStore.readGamepadMap(context)
+            val updated = if (stick == STICK_LEFT) {
+                map.copy(leftStick = map.leftStick.with(direction, GamepadBinding(keys = keys)))
+            } else {
+                map.copy(rightStick = map.rightStick.with(direction, GamepadBinding(keys = keys)))
+            }
+            InputConfigStore.writeGamepadMap(context, updated)
         }
-        return InputConfigStore.writeGamepadMap(context, updated)
-    }
 
     const val STICK_LEFT = "left"
     const val STICK_RIGHT = "right"

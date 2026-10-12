@@ -79,7 +79,8 @@ internal fun PadLayoutEditScreen(profileId: String) {
             primaryColor = primary,
             // 主题色实底组件内文字固定白色（项目规范，避免深色模式下 onPrimary 退色）
             onPrimaryColor = Color.WHITE,
-            onSaved = {
+            // 回调只给 id / 展示名（core 门面不向 ui 泄漏 engine 类型）；本页无需使用
+            onSaved = { _, _ ->
                 Toast.makeText(ctx, savedMessage, Toast.LENGTH_SHORT).show()
                 // 保存即完成本页使命，直接退出（编辑面板随视图树回收）
                 activity?.finish()

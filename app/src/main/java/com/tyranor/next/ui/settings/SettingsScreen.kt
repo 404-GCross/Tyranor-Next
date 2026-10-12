@@ -40,7 +40,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -427,29 +426,34 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
                             )
-                            TextButton(
+                            DialogTextButton(
+                                text = stringResource(R.string.common_delete),
+                                contentColor = MaterialTheme.colorScheme.error,
                                 onClick = {
                                     GameLibraryFacade.removeRootAndGames(ctx, android.net.Uri.parse(dir))
                                     scanDirs = GameLibraryFacade.loadRoots(ctx)
                                 },
-                            ) {
-                                Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error)
-                            }
+                            )
                         }
                     }
                 }
             },
             confirmButton = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    TextButton(
+                    DialogTextButton(
+                        text = stringResource(R.string.settings_input_path),
+                        modifier = Modifier.padding(end = 8.dp),
                         onClick = { showPathDialog = true },
+                    )
+                    DialogTextButton(
+                        text = stringResource(R.string.settings_add_dir),
                         modifier = Modifier.padding(end = 8.dp),
-                    ) { Text(stringResource(R.string.settings_input_path)) }
-                    TextButton(
                         onClick = { dirPicker.launch(null) },
-                        modifier = Modifier.padding(end = 8.dp),
-                    ) { Text(stringResource(R.string.settings_add_dir)) }
-                    TextButton(onClick = { showScanDirs = false }) { Text(stringResource(R.string.settings_done)) }
+                    )
+                    DialogTextButton(
+                        text = stringResource(R.string.settings_done),
+                        onClick = { showScanDirs = false },
+                    )
                 }
             },
         )
@@ -499,16 +503,18 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
             },
             confirmButton = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    TextButton(
-                        onClick = savePath,
+                    DialogTextButton(
+                        text = stringResource(R.string.common_confirm),
                         modifier = Modifier.padding(end = 8.dp),
-                    ) { Text(stringResource(R.string.common_confirm), style = MaterialTheme.typography.bodyMedium) }
-                    TextButton(
+                        onClick = savePath,
+                    )
+                    DialogTextButton(
+                        text = stringResource(R.string.common_cancel),
                         onClick = {
                             showPathDialog = false
                             pathInput = ""
                         },
-                    ) { Text(stringResource(R.string.common_cancel), style = MaterialTheme.typography.bodyMedium) }
+                    )
                 }
             },
         )
@@ -523,18 +529,31 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    AppNavItem(stringResource(R.string.settings_qq_group), leadingIcon = R.drawable.ic_group_qq, containerColor = DialogItemSurface) {
+                    AppNavItem(
+                        stringResource(R.string.settings_qq_group),
+                        leadingIcon = R.drawable.ic_group_qq,
+                        containerColor = DialogItemSurface,
+                        indication = null,
+                    ) {
                         showGroupDialog = false
                         ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://qm.qq.com/q/M9JH8A9Yys")))
                     }
-                    AppNavItem(stringResource(R.string.settings_telegram_channel), leadingIcon = R.drawable.ic_group_telegram, containerColor = DialogItemSurface) {
+                    AppNavItem(
+                        stringResource(R.string.settings_telegram_channel),
+                        leadingIcon = R.drawable.ic_group_telegram,
+                        containerColor = DialogItemSurface,
+                        indication = null,
+                    ) {
                         showGroupDialog = false
                         ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/tyranornext")))
                     }
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showGroupDialog = false }) { Text(stringResource(R.string.common_cancel)) }
+                DialogTextButton(
+                    text = stringResource(R.string.common_cancel),
+                    onClick = { showGroupDialog = false },
+                )
             },
         )
     }
@@ -651,23 +670,38 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                     null -> Unit
                     is UpdateDownloadPhase.Downloading -> Unit
                     is UpdateDownloadPhase.Completed, is UpdateDownloadPhase.Failed -> {
-                        TextButton(onClick = { closeUpdateDialog() }) { Text(stringResource(R.string.common_cancel)) }
+                        DialogTextButton(
+                            text = stringResource(R.string.common_cancel),
+                            onClick = { closeUpdateDialog() },
+                        )
                     }
                 }
             },
             confirmButton = {
                 when (downloadPhase) {
                     null -> {
-                        TextButton(onClick = { closeUpdateDialog() }) { Text(stringResource(R.string.common_cancel)) }
+                        DialogTextButton(
+                            text = stringResource(R.string.common_cancel),
+                            onClick = { closeUpdateDialog() },
+                        )
                     }
                     is UpdateDownloadPhase.Downloading -> {
-                        TextButton(onClick = { closeUpdateDialog() }) { Text(stringResource(R.string.update_download_cancel)) }
+                        DialogTextButton(
+                            text = stringResource(R.string.update_download_cancel),
+                            onClick = { closeUpdateDialog() },
+                        )
                     }
                     is UpdateDownloadPhase.Completed -> {
-                        TextButton(onClick = { installUpdateApk(downloadPhase.apkFile) }) { Text(stringResource(R.string.update_install)) }
+                        DialogTextButton(
+                            text = stringResource(R.string.update_install),
+                            onClick = { installUpdateApk(downloadPhase.apkFile) },
+                        )
                     }
                     is UpdateDownloadPhase.Failed -> {
-                        TextButton(onClick = { activeCandidate?.let { startApkDownload(it) } }) { Text(stringResource(R.string.update_retry)) }
+                        DialogTextButton(
+                            text = stringResource(R.string.update_retry),
+                            onClick = { activeCandidate?.let { startApkDownload(it) } },
+                        )
                     }
                 }
             },

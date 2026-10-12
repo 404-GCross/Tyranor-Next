@@ -656,6 +656,7 @@
     <string name="engine_settings_rpgm_rtp_vxace">RPG Maker VX Ace RTP</string>
     <string name="engine_settings_rpgm_rtp_imported_status">已导入</string>
     <string name="engine_settings_rpgm_rtp_missing_status">未导入</string>
+    <string name="engine_settings_rpgm_rtp_checking_status">检测中…</string>
     <string name="engine_settings_rpgm_rtp_import">导入</string>
     <string name="engine_settings_rpgm_rtp_imported">RTP 导入完成</string>
     <string name="engine_settings_rpgm_rtp_import_failed">RTP 导入失败（%1$s）</string>

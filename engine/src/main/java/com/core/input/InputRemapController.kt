@@ -323,7 +323,12 @@ class InputRemapController private constructor(
 
     companion object {
 
-        /** JS 桥注册名（app 侧修改器 UI 固定引用）。 */
+        /**
+         * JS 桥注册名；**引用方在 engine assets**（`__rpgmaker_mod_ui.js` 的 `inputBridge()`）。
+         *
+         * 该字面量跨 Kotlin / JS 边界，改名只表现为「点了没反应」，由
+         * `InputBridgeContractTest` 锚定两侧一致。
+         */
         const val BRIDGE_NAME = "TyranorInputNative"
 
         private const val TAG = "TyranorInput"
@@ -336,7 +341,7 @@ class InputRemapController private constructor(
             theme: EngineThemeColors.Palette,
             sink: InputSink,
             /** 未显式设置开关时的默认值；宿主按引擎类型传入（MV/MZ 为 true，其余 Web 为 false）。 */
-            engineDefaultsEnabled: Boolean = true,
+            engineDefaultsEnabled: Boolean,
         ): InputRemapController = InputRemapController(
             activity, container, gameId, theme, sink, engineDefaultsEnabled,
         )
@@ -366,6 +371,10 @@ class InputRemapController private constructor(
         private fun handleHostAction(activity: Activity, action: Int): Boolean = when (action) {
             CanonicalKeys.ACTION_SCREENSHOT -> {
                 ScreenCapture.capture(activity) { result ->
+                    // 截屏可拖到写盘结束（看门狗上限 5s，MediaStore 慢时更久）：期间用户可能
+                    // 已退出游戏。回调仍持有 activity，这里先判存活，避免在已销毁的宿主上弹
+                    // Toast（并把 activity 多留一段时间的强引用）。
+                    if (activity.isFinishing || activity.isDestroyed) return@capture
                     val publicDir = ScreenCapture.publicDirectory()
                     val message = when (result) {
                         is ScreenCapture.CaptureResult.Saved -> {
@@ -390,7 +399,10 @@ class InputRemapController private constructor(
                         ScreenCapture.CaptureResult.Failed ->
                             activity.getString(R.string.engine_input_screenshot_failed)
                     }
-                    runCatching { Toast.makeText(activity, message, Toast.LENGTH_LONG).show() }
+                    // Toast 不依赖窗口令牌，用 applicationContext 更稳（且不再持有 Activity）
+                    runCatching {
+                        Toast.makeText(activity.applicationContext, message, Toast.LENGTH_LONG).show()
+                    }
                 }
                 true
             }

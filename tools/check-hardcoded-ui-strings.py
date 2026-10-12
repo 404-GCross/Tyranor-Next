@@ -11,9 +11,10 @@ engine 模块的扫描范围与边界：
 
 - `engine/src/main/res/values{,-en,-ja}/strings.xml`：参与键齐平校验；
 - `engine/src/main/java/**/*.kt`：参与 CJK 字面量扫描；
-- `engine/src/main/assets/**/*.js`：**不在扫描范围**。assets 是随游戏注入的引擎脚本
-  （`__touch_pad.js` 等的后继），其中的中文多为注释与调试文本，不属于 App 界面文案，
-  且这些脚本不参与 Android 资源本地化。
+- `engine/src/main/assets/**/*.js`：**不在扫描范围**。原因是这些脚本随游戏页面注入、不参与
+  Android 资源本地化（无法用 `strings.xml` 供文案），因此它们的文案只能就地写。
+  注意：这不代表其中没有界面文案——例如 `__rpgmaker_mod_ui.js` 的「虚拟按键」卡片就是
+  纯中文的游戏内 UI 文案；改动这些脚本时需人工保证三语言一致（引擎侧无法自动校验）。
 - `engine/src/test/**` 同样不参与：测试里的中文是断言消息，不是界面文案。
 """
 from pathlib import Path
@@ -49,9 +50,34 @@ RESOURCE_KEY = re.compile(r'<string\s+name="([^"]+)"')
 
 # 允许 CJK 字面量的例外：engine 的 KRKR 壳必须用游戏自身的语言词典匹配系统对话框文案，
 # 这里的字面量是**匹配键**（游戏产出的文本），不是 App 界面文案。
+# 粒度是「整文件豁免」，因此额外用数量基线兜底：允许清单里的文件一旦新增 CJK 字面量
+# （可能夹带真实界面文案）就会失败，需要人来确认是匹配键还是文案。
 LITERAL_ALLOWLIST = {
-    ROOT / "engine" / "src" / "main" / "java" / "com" / "core" / "engine" / "EngineUiText.kt",
+    ROOT / "engine" / "src" / "main" / "java" / "com" / "core" / "engine" / "EngineUiText.kt": 6,
 }
+
+
+def check_kotlin_cjk_literals(name: str, java_root: Path) -> list[str]:
+    errors: list[str] = []
+    for path in sorted(java_root.rglob("*.kt")):
+        allowed_count = LITERAL_ALLOWLIST.get(path)
+        source = path.read_text(encoding="utf-8")
+        hits = [
+            (index, code)
+            for index, code in strip_comments(source)
+            if VISIBLE_CJK_STRING.search(code)
+        ]
+        if allowed_count is not None:
+            if len(hits) > allowed_count:
+                errors.append(
+                    f"[{name}] {path.relative_to(ROOT)}: 整文件豁免的 CJK 字面量基线为 "
+                    f"{allowed_count}，实际 {len(hits)}——新增的请确认是匹配键还是界面文案"
+                )
+                errors.extend(f"  - {index}: {code.strip()}" for index, code in hits)
+            continue
+        for index, code in hits:
+            errors.append(f"[{name}] {path.relative_to(ROOT)}:{index}: {code.strip()}")
+    return errors
 
 
 def strip_comments(source: str) -> list[tuple[int, str]]:
@@ -117,18 +143,6 @@ def check_resource_parity(name: str, string_files: list[Path]) -> list[str]:
         if missing:
             errors.append(f"[{name}] {path.relative_to(ROOT)} is missing {len(missing)} string keys:")
             errors.extend(f"  - {key}" for key in missing)
-    return errors
-
-
-def check_kotlin_cjk_literals(name: str, java_root: Path) -> list[str]:
-    errors: list[str] = []
-    for path in sorted(java_root.rglob("*.kt")):
-        if path in LITERAL_ALLOWLIST:
-            continue
-        source = path.read_text(encoding="utf-8")
-        for index, code in strip_comments(source):
-            if VISIBLE_CJK_STRING.search(code):
-                errors.append(f"[{name}] {path.relative_to(ROOT)}:{index}: {code.strip()}")
     return errors
 
 

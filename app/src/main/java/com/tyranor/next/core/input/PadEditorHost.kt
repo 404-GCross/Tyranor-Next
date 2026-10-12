@@ -40,7 +40,14 @@ import kotlinx.coroutines.withContext
 class PadEditorHost private constructor(
     private val pad: VirtualPadView,
     val rootView: View,
-    private val onSavedCallback: (PadProfile) -> Unit,
+    /**
+     * 保存成功回调（**id / 展示名**，不带 engine 的 `PadProfile`）。
+     *
+     * 签名刻意不出现 engine 类型：本门面的对外承诺是「UI 不接触任何 engine 类型」，
+     * 回调解出 `PadProfile` 会让任何需要用到保存结果（显示方案名、保存后跳转）的页面
+     * 被迫 `import com.core.input.PadProfile`，直接违反三层架构。
+     */
+    private val onSavedCallback: (id: String, name: String) -> Unit,
     /**
      * 编辑会话结束（保存成功与取消共用）。
      *
@@ -84,7 +91,7 @@ class PadEditorHost private constructor(
             profileId: String,
             primaryColor: Int,
             onPrimaryColor: Int,
-            onSaved: (PadProfile) -> Unit,
+            onSaved: (id: String, name: String) -> Unit,
             onEditEnded: () -> Unit,
             onSaveFailed: () -> Unit = {},
         ): PadEditorHost? {
@@ -175,7 +182,7 @@ class PadEditorHost private constructor(
                             // 崩溃，且会话停在 pending、编辑态不收尾。收尾放 finally、回调自身
                             // 的异常吞掉（finally 里的收尾同样包住，避免收尾自身抛出）。
                             try {
-                                runCatching { host.onSavedCallback(committed) }
+                                runCatching { host.onSavedCallback(committed.id, committed.name) }
                             } finally {
                                 runCatching { pad.completeDeferredSave(session, true) }
                             }

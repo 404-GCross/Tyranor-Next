@@ -55,6 +55,20 @@ class KeyDispatcherTest {
     }
 
     @Test
+    fun autoKeepToggleOffReleasesKeysRegisteredAtPressTime() {
+        // 保持期间绑定被改写（编辑方案 / 换方案后再次触发同一控件）时，
+        // 关闭保持必须释放**当初登记**的键；用「本次传入的 keys」释放会漏掉旧键
+        // （keyHolders 残留该 id → 真卡键），并可能误发从未按下过的键的 keyup
+        val sink = RecordingSink()
+        val dispatcher = KeyDispatcher(sink)
+        dispatcher.press("skip", listOf(113), autoKeep = true)
+        dispatcher.press("skip", listOf(114), autoKeep = true) // 再按一次：关闭保持
+
+        assertEquals(listOf(113 to true, 113 to false), sink.events)
+        assertEquals(false, dispatcher.isToggled("skip"))
+    }
+
+    @Test
     fun releaseScopeClearsToggledKeys() {
         val sink = RecordingSink()
         val dispatcher = KeyDispatcher(sink)

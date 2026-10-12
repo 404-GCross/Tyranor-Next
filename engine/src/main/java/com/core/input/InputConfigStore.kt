@@ -163,11 +163,15 @@ object InputConfigStore {
      * 打开」与「从未设置」，因此这里用 `contains()` 区分，未设置时回落到宿主给出的
      * [engineDefaultsEnabled]（改造前这些 Web 宿主没有按键层，默认全开会让老用户
      * 一升级就凭空多出一层按键）。
+     *
+     * [engineDefaultsEnabled] **故意不给默认值**：宿主必须按自己的引擎类型显式声明策略
+     * （MV/MZ = true，Tyrano/VN/WebOther = false，见 `TyranoActivity.installWeb` 调用点），
+     * app 侧同一策略的展示来源是 `InputRemapRepository.engineDefaultsPadEnabled`。
      */
     fun resolve(
         context: Context,
         gameId: String,
-        engineDefaultsEnabled: Boolean = true,
+        engineDefaultsEnabled: Boolean,
     ): InputSettings {
         val blob = if (gameId.isNotBlank()) gameOverrideBlob(context, gameId) else null
         val global = context.getSharedPreferences(EnginePrefs.APP_PREFS, Context.MODE_PRIVATE)
@@ -303,8 +307,10 @@ object InputConfigStore {
             } finally {
                 if (!installed) tmp.delete()
             }
-        } catch (_: Throwable) {
-            // 磁盘满 / 权限 / 目录被删等：调用方按「写盘失败」处理，不得让异常穿出
+        } catch (error: Throwable) {
+            // 磁盘满 / 权限 / 目录被删等：调用方按「写盘失败」处理，不得让异常穿出。
+            // 仍记日志：返回值只有 false，线上排障需要文件路径与 errno 级线索
+            Log.w(TAG, "atomicWrite failed: ${target.absolutePath}", error)
             false
         }
     }

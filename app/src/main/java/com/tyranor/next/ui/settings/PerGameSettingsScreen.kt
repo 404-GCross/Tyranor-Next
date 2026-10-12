@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -1022,7 +1021,10 @@ fun PerGameSettingsScreen(game: ScanGame) {
             },
             text = { Text(message, style = MaterialTheme.typography.bodyMedium) },
             confirmButton = {
-                TextButton(onClick = { artPatchResult = null }) { Text(stringResource(R.string.common_confirm)) }
+                DialogTextButton(
+                    text = stringResource(R.string.common_confirm),
+                    onClick = { artPatchResult = null },
+                )
             },
         )
     }
@@ -1144,7 +1146,10 @@ private fun OverrideFontPreference(
                 }
             },
             confirmButton = {
-                TextButton(onClick = { open = false }) { Text(stringResource(R.string.common_cancel)) }
+                DialogTextButton(
+                    text = stringResource(R.string.common_cancel),
+                    onClick = { open = false },
+                )
             },
         )
     }

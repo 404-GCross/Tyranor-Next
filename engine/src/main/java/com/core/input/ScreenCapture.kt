@@ -89,32 +89,37 @@ object ScreenCapture {
     /**
      * 截取 [activity] 当前窗口并保存为 PNG。
      *
-     * [onResult] 在主线程回调，且**总会**被调用一次：成功给 [CaptureResult.Saved]，
+     * [onResult] **总在主线程**回调，且**总会**被调用一次：成功给 [CaptureResult.Saved]，
      * 上一张仍在保存时给 [CaptureResult.Busy]（连点不再静默丢弃），其余失败给
-     * [CaptureResult.Failed]。
+     * [CaptureResult.Failed]。调用方因此可以安全地直接弹 Toast / 改 UI。
      */
     fun capture(activity: Activity, onResult: (CaptureResult) -> Unit) {
+        // 早退分支同样经主线程投递：KDoc 承诺「总在主线程回调」，而早期实现只在
+        // 成功/失败路径 post，窗口尺寸为 0 / Busy / 建位图失败三处直接在调用线程回调——
+        // 调用方一旦在后台线程触发（后续 KRKR/Siglus 宿主计划如此），
+        // 「Can't toast on a thread that has not called Looper.prepare()」就会从这里抛。
+        val mainHandler = Handler(Looper.getMainLooper())
+        val deliver: (CaptureResult) -> Unit = { result -> mainHandler.post { onResult(result) } }
         val window = activity.window
         val decor = window.decorView
         val width = decor.width
         val height = decor.height
         if (width <= 0 || height <= 0) {
             Log.w(TAG, "capture skipped: window size ${width}x$height")
-            onResult(CaptureResult.Failed)
+            deliver(CaptureResult.Failed)
             return
         }
         if (!capturing.compareAndSet(false, true)) {
-            onResult(CaptureResult.Busy)
+            deliver(CaptureResult.Busy)
             return
         }
         val myGeneration = generation.incrementAndGet()
-        val mainHandler = Handler(Looper.getMainLooper())
         val bitmap = runCatching {
             Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         }.getOrNull()
         if (bitmap == null) {
             capturing.set(false)
-            onResult(CaptureResult.Failed)
+            deliver(CaptureResult.Failed)
             return
         }
         // 兜底：PixelCopy 在极少数情况下可能不回调（窗口被立即销毁等），
@@ -173,7 +178,10 @@ object ScreenCapture {
                     }
                     val appContext = activity.applicationContext
                     ioExecutor.execute {
-                        val file = save(appContext, bitmap)
+                        // 保存阶段不在看门狗保护内（PixelCopy 已回调、pixelCopyDone 已置位），
+                        // 这里若抛出，finish 永不执行 → capturing 永久为 true，
+                        // 之后每次截屏都被判 Busy（与「不会永久失效」的承诺矛盾）
+                        val file = runCatching { save(appContext, bitmap) }.getOrNull()
                         finish(if (file != null) CaptureResult.Saved(file) else CaptureResult.Failed)
                     }
                 },

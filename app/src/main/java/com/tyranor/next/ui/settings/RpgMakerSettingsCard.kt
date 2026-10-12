@@ -33,6 +33,7 @@ import com.tyranor.next.R
 import com.tyranor.next.core.engine.external.ExternalEngineLauncher
 import com.tyranor.next.core.engine.external.RpgMakerExternalEngineModule
 import com.tyranor.next.core.engine.external.RpgMakerRuntimeEnvironment
+import com.tyranor.next.core.engine.external.RtpImportRejection
 import com.tyranor.next.core.settings.EngineSettingsStore
 import com.tyranor.next.theme.DialogItemSurface
 import com.tyranor.next.ui.common.AppAlertDialog
@@ -70,7 +71,13 @@ internal fun RpgMakerRgssSettingsCard(
     var showRtpSourceDialog by remember { mutableStateOf(false) }
     var pendingRtpType by remember { mutableStateOf<String?>(null) }
     var clearingRtpType by remember { mutableStateOf<String?>(null) }
-    var rtpImported by remember { mutableStateOf(RPGM_RTP_TYPES.associateWith { false }) }
+    // null = 状态尚未读出（IO 还在跑）：先显示「检测中」，避免把真实状态反着显示、
+    // 并顺手藏掉「清除」入口（首帧固定 false 时它会出现又消失）
+    var rtpImported by remember { mutableStateOf(RPGM_RTP_TYPES.associateWith<String, Boolean?> { null }) }
+    // 导入在途守卫：导入耗时可到分钟级，期间再次点「导入」会（在修复临时目录前）让两次
+    // 导入互相破坏；现在临时目录已逐次唯一，但并发导入仍是无意义操作，入口直接置灰。
+    // 同时它也是「清除」与在途导入互斥的依据（见 RpgmRtpRow 的 enabled）。
+    var importingRtpType by remember { mutableStateOf<String?>(null) }
 
     // RTP 状态读盘（含中断恢复的文件操作）放 IO 线程：组合期在主线程逐个 stat/rename
     // 目录有 ANR 风险（恢复路径会 deleteRecursively 半成品）
@@ -95,22 +102,29 @@ internal fun RpgMakerRgssSettingsCard(
         rtpImported = rtpImported.toMutableMap().apply { put(type, imported) }
     }
 
-    val zipLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        val type = pendingRtpType
-        pendingRtpType = null
-        if (uri == null || type == null) return@rememberLauncherForActivityResult
-        scope.launch {
-            val importedMsg = ctx.getString(R.string.engine_settings_rpgm_rtp_imported)
-            val rejection = withContext(Dispatchers.IO) { RpgMakerRuntimeEnvironment.importRtpZip(ctx, type, uri) }
+    /** 导入在途标记的收尾：无论成功、失败还是被取消，都要把入口重新放开。 */
+    suspend fun runRtpImport(type: String, block: suspend () -> RtpImportRejection?) {
+        importingRtpType = type
+        try {
+            val rejection = withContext(Dispatchers.IO) { block() }
             refreshRtp(type)
             // 失败时带上原因（如「条目数超过上限」「源里没有可导入内容」）：只报「导入失败」
             // 会让用户无从判断是包损坏、格式不对，还是被安全上限拦下。
             // core 返回类型化原因，文案与括号样式由 UI 层资源组装（AGENT.md 错误处理协议）
             val message = rejection?.let {
                 ctx.getString(R.string.engine_settings_rpgm_rtp_import_failed, it.userMessage(ctx))
-            } ?: importedMsg
+            } ?: ctx.getString(R.string.engine_settings_rpgm_rtp_imported)
             Toast.makeText(ctx, message, Toast.LENGTH_LONG).show()
+        } finally {
+            importingRtpType = null
         }
+    }
+
+    val zipLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        val type = pendingRtpType
+        pendingRtpType = null
+        if (uri == null || type == null) return@rememberLauncherForActivityResult
+        scope.launch { runRtpImport(type) { RpgMakerRuntimeEnvironment.importRtpZip(ctx, type, uri) } }
     }
 
     val treeLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
@@ -123,16 +137,7 @@ internal fun RpgMakerRgssSettingsCard(
                 android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION,
             )
         }
-        scope.launch {
-            val importedMsg = ctx.getString(R.string.engine_settings_rpgm_rtp_imported)
-            val rejection = withContext(Dispatchers.IO) { RpgMakerRuntimeEnvironment.importRtpTree(ctx, type, uri) }
-            refreshRtp(type)
-            // 目录导入同样带原因（选错目录 / 空目录 / 空间不足在提示里可区分）
-            val message = rejection?.let {
-                ctx.getString(R.string.engine_settings_rpgm_rtp_import_failed, it.userMessage(ctx))
-            } ?: importedMsg
-            Toast.makeText(ctx, message, Toast.LENGTH_LONG).show()
-        }
+        scope.launch { runRtpImport(type) { RpgMakerRuntimeEnvironment.importRtpTree(ctx, type, uri) } }
     }
 
     val fontLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
@@ -304,7 +309,8 @@ internal fun RpgMakerRgssSettingsCard(
                         else -> R.string.engine_settings_rpgm_rtp_vxace
                     },
                 ),
-                imported = rtpImported[type] == true,
+                imported = rtpImported[type],
+                importing = importingRtpType == type,
                 onImport = {
                     pendingRtpType = type
                     showRtpSourceDialog = true
@@ -439,7 +445,10 @@ private fun RpgmGroupLabel(text: String) {
 @Composable
 private fun RpgmRtpRow(
     title: String,
-    imported: Boolean,
+    /** null = 状态尚未读出（IO 在跑）。 */
+    imported: Boolean?,
+    /** 本类型正在导入：入口全部置灰（导入与清除互斥，见 RpgmRtpRow 契约）。 */
+    importing: Boolean,
     onImport: () -> Unit,
     onClear: () -> Unit,
 ) {
@@ -451,7 +460,11 @@ private fun RpgmRtpRow(
             Text(title, style = MaterialTheme.typography.titleMedium)
             Text(
                 stringResource(
-                    if (imported) R.string.engine_settings_rpgm_rtp_imported_status else R.string.engine_settings_rpgm_rtp_missing_status,
+                    when (imported) {
+                        null -> R.string.engine_settings_rpgm_rtp_checking_status
+                        true -> R.string.engine_settings_rpgm_rtp_imported_status
+                        false -> R.string.engine_settings_rpgm_rtp_missing_status
+                    },
                 ),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -459,13 +472,17 @@ private fun RpgmRtpRow(
         }
         NoRippleTextButton(
             text = stringResource(R.string.engine_settings_rpgm_rtp_import),
+            // 导入在途：禁用入口，避免两次导入并发（也避免把清除与导入交错）
+            enabled = !importing,
             onClick = onImport,
         )
-        if (imported) {
-            // 清除是破坏性动作；无点击反馈实现（AGENT.md 弹窗/页内按钮规范）——
-            // 共享组件不暴露自定义颜色，沿用页内文本按钮的默认主色
+        if (imported == true) {
+            // 清除是破坏性动作；无点击反馈实现（AGENT.md 弹窗/页内按钮规范），
+            // 语义色取 colorScheme.error（AGENT.md 3.3：error 用于错误/删除）
             NoRippleTextButton(
                 text = stringResource(R.string.engine_settings_rpgm_rtp_clear),
+                enabled = !importing,
+                contentColor = MaterialTheme.colorScheme.error,
                 onClick = onClear,
             )
         }

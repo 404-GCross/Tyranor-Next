@@ -38,8 +38,11 @@ class KeyDispatcher(private val sink: InputSink) {
             actions.forEach { sink.performAction(it) }
             if (plainKeys.isEmpty()) return
             if (toggled.remove(id)) {
-                active.remove(id)
-                releaseKeys(id, plainKeys)
+                // 释放**按下时登记**的 keys：保持期间绑定可能已被改写（编辑方案 / 换方案后
+                // 再次触发同一控件），用本次传入的 plainKeys 会漏放旧键（keyHolders 残留该 id
+                // → 真卡键），还会误放从未按下过的新键。active 缺失（理论不可达）才回落本次 keys。
+                val held = active.remove(id) ?: plainKeys
+                releaseKeys(id, held)
             } else {
                 toggled.add(id)
                 active[id] = plainKeys

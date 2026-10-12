@@ -59,7 +59,29 @@ sealed interface RtpImportRejection {
 object RpgMakerRuntimeEnvironment {
     private const val RTP_PARENT = "JoiPlay/RTP"
     private const val FONT_PARENT = "JoiPlay/fonts"
-    private const val IMPORT_TEMP_DIR = ".import_tmp"
+
+    /**
+     * 导入临时目录名前缀（**每次导入唯一**，见 [newImportTempDir]）。
+     *
+     * 历史实现用固定名 `.import_tmp`：两次导入同时进行时，后者会 `deleteRecursively()`
+     * 删掉前者正在写入的目录，先提交者把两次内容**混合** rename 成 `app`（`isRtpImported`
+     * 仍报「已导入」），后提交者以「读写失败：.import_tmp」失败。因此临时目录必须逐次唯一。
+     */
+    internal const val IMPORT_TEMP_DIR = ".import_tmp"
+
+    /**
+     * 陈旧临时目录的老化阈值：超过该年龄才在下次导入/清除时清理。
+     *
+     * 不清「新鲜」的临时目录是有意为之——它可能是并发的另一次导入正在写入的目录
+     * （UI 有在途守卫，但守卫之外仍可能并发），删掉它等于让那次导入失败。
+     */
+    private const val STALE_IMPORT_TEMP_AGE_MS = 24L * 60L * 60L * 1000L
+
+    /** 同进程内并发导入的序号；配合每进程随机盐保证唯一（纯 JVM 单测也可用，不依赖 android.os）。 */
+    private val importTempSeq = java.util.concurrent.atomic.AtomicInteger(0)
+
+    /** 每进程随机盐：跨进程（多开/残留进程）并发导入同样不会撞名。 */
+    private val importTempSalt = java.util.UUID.randomUUID().toString().take(8)
 
     /** 备份式替换用的旧目录暂存名（与 [IMPORT_TEMP_DIR] 同层，替换成功即删）。 */
     private const val IMPORT_BACKUP_DIR = ".import_backup"
@@ -199,16 +221,54 @@ object RpgMakerRuntimeEnvironment {
      * [recoverPendingImport] 时被**归位**——用户看到「清除成功却又回来了」。
      * 顺序：先删标记（标记在则恢复逻辑会把备份归位），再删备份，最后删 app；
      * 任一步失败都返回 false 让用户重试，不留半个现场。
+     *
+     * 同时清理全部导入临时目录：UI 侧「清除」与「导入」互斥（导入在途时清除入口不可用），
+     * 因此走到这里时不存在并发导入，残留只可能是崩溃留下的半成品。
      */
     fun clearRtp(gameType: String): Boolean = synchronized(importLock) {
         val root = rtpDir(gameType)
         val appDir = File(root, "app")
         val backup = File(root, IMPORT_BACKUP_DIR)
         val marker = File(root, IMPORT_MARKER_FILE)
+        deleteStaleImportTemps(root, keep = null, staleBefore = Long.MAX_VALUE)
         if (marker.exists() && !marker.delete()) return@synchronized false
         if (backup.exists() && !backup.deleteRecursively()) return@synchronized false
         if (!appDir.exists()) return@synchronized true
         appDir.deleteRecursively()
+    }
+
+    /**
+     * 分配本次导入专用的临时目录（`<parent>/.import_tmp.<盐><序号>`）。
+     *
+     * 唯一性是并发导入不互相破坏的前提：两次导入各写各的目录，提交段再由
+     * [commitImportTemp] 的 `importLock` 串行化替换 `app`。
+     * 不用 `android.os.Process.myPid()`：纯 JVM 单测（本文件大量语义都靠它锚定）无法调用。
+     */
+    internal fun newImportTempDir(parent: File): File =
+        File(parent, "$IMPORT_TEMP_DIR.$importTempSalt${importTempSeq.incrementAndGet()}")
+
+    /**
+     * 清理**陈旧**的导入临时目录（[newImportTempDir] 的产物之外的兄弟目录不动）。
+     *
+     * 兼容历史固定名 `.import_tmp`（旧版本崩溃残留）一并纳入清理范围。
+     *
+     * @param keep 当前在途的临时目录（若有），永不删除。
+     * @param staleBefore 修改时间早于该时刻才算陈旧；默认「一天前」，避免删掉并发的
+     *   另一次导入正在写入的目录（它一定是刚创建的）。清除路径传 [Long.MAX_VALUE] 表示全清。
+     */
+    internal fun deleteStaleImportTemps(
+        parent: File,
+        keep: File?,
+        staleBefore: Long = System.currentTimeMillis() - STALE_IMPORT_TEMP_AGE_MS,
+    ) {
+        parent.listFiles { file ->
+            file.isDirectory &&
+                (file.name == IMPORT_TEMP_DIR || file.name.startsWith("$IMPORT_TEMP_DIR."))
+        }?.forEach { dir ->
+            if (keep != null && dir.absolutePath == keep.absolutePath) return@forEach
+            if (dir.lastModified() >= staleBefore) return@forEach
+            dir.deleteRecursively()
+        }
     }
 
     /**
@@ -224,8 +284,10 @@ object RpgMakerRuntimeEnvironment {
             val target = rtpAppDir(gameType)
             val parent = target.parentFile ?: return RtpImportRejection.IoFailed(target.path)
             if (!parent.exists() && !parent.mkdirs()) return RtpImportRejection.IoFailed(parent.name)
-            val temp = File(parent, IMPORT_TEMP_DIR)
+            // 本次导入专属临时目录（并发导入各写各的，不共用固定名）
+            val temp = newImportTempDir(parent)
             created = temp
+            deleteStaleImportTemps(parent, keep = temp)
             temp.deleteRecursively()
             if (!temp.mkdirs()) return RtpImportRejection.IoFailed(temp.name)
             extractZip(context, uri, temp)?.let { return it }
@@ -256,8 +318,10 @@ object RpgMakerRuntimeEnvironment {
             val target = rtpAppDir(gameType)
             val parent = target.parentFile ?: return RtpImportRejection.IoFailed(target.path)
             if (!parent.exists() && !parent.mkdirs()) return RtpImportRejection.IoFailed(parent.name)
-            val temp = File(parent, IMPORT_TEMP_DIR)
+            // 本次导入专属临时目录（并发导入各写各的，不共用固定名）
+            val temp = newImportTempDir(parent)
             created = temp
+            deleteStaleImportTemps(parent, keep = temp)
             temp.deleteRecursively()
             if (!temp.mkdirs()) return RtpImportRejection.IoFailed(temp.name)
             copyDocumentTree(context, source, temp)?.let { return it }
@@ -334,7 +398,14 @@ object RpgMakerRuntimeEnvironment {
             return@synchronized RtpImportRejection.IoFailed(marker.name)
         }
 
-        val installed = temp.renameTo(target) || temp.copyRecursively(target, overwrite = true)
+        // `copyRecursively` 默认 onError 是**抛出**而非返回 false：中途 IO 失败会跳过下面
+        // 整个回滚块（半成品 target + 标记 + 备份留在盘上，只能等下次 recover 归位），
+        // 并把错误归因成「读写失败：.import_tmp」。这里把异常收敛成 installed=false，
+        // 让本次调用就走完整回滚（清半成品 → 删标记 → 回滚备份）。
+        // 不用 onError = TERMINATE：`copyRecursively` 在 TERMINATE 下的返回值不保证为
+        // false（走查中断时仍可能返回 true），会把不完整安装当成成功提交。
+        val installed = temp.renameTo(target) ||
+            runCatching { temp.copyRecursively(target, overwrite = true) }.getOrDefault(false)
         if (!installed || target.listFiles()?.isNotEmpty() != true) {
             // 回滚：清掉半成品、删标记，把旧目录放回去。
             // 顺序很关键——标记必须先删：若先放回旧数据却留下标记，下次恢复会把
@@ -376,6 +447,7 @@ object RpgMakerRuntimeEnvironment {
      *
      * 先写同目录临时文件再 rename：直写目标名会在写入失败/被杀时留下半成品并**截断
      * 旧字体**；临时文件 + rename 让目标名的替换是原子的，失败时旧字体保持原样。
+     * 「失败」包含**零字节/短读源**——见 [copyFontToStaging]。
      */
     fun importCustomFont(context: Context, uri: Uri): String? {
         var temp: File? = null
@@ -393,8 +465,8 @@ object RpgMakerRuntimeEnvironment {
             val staging = File(dir, ".$name.${System.currentTimeMillis()}.tmp")
             temp = staging
             val copied = context.contentResolver.openInputStream(uri)?.use { input ->
-                staging.outputStream().use { output -> input.copyTo(output) }
-            } != null
+                copyFontToStaging(input, staging)
+            } ?: false
             if (!copied) return null
             // rename 覆盖已存在目标（同目录原子替换）；失败则保留旧字体，返回 null
             if (!staging.renameTo(target)) return null
@@ -405,6 +477,22 @@ object RpgMakerRuntimeEnvironment {
             // 失败/被杀路径不留半成品（成功时 staging 已改名，此处无操作）
             temp?.let { if (it.exists()) runCatching { it.delete() } }
         }
+    }
+
+    /**
+     * 把字体源写入同目录 staging 文件；**实际写入 0 字节视为失败**（删除半成品并返回 false）。
+     *
+     * 不能用 `copyTo(...) != null` 判定：`copyTo` 返回 `Long`（字节数），非空判定恒真。
+     * 于是 0 字节源（或第三方 SAF provider 的短读）会被 rename 成目标名，**原子地覆盖掉
+     * 用户已导入的可用字体**，而函数注释承诺的「失败时旧字体保持原样」并不成立。
+     */
+    internal fun copyFontToStaging(input: InputStream, staging: File): Boolean {
+        val written = staging.outputStream().use { output -> input.copyTo(output) }
+        if (written <= 0L) {
+            runCatching { staging.delete() }
+            return false
+        }
+        return true
     }
 
     fun isCustomFontPresent(path: String): Boolean =

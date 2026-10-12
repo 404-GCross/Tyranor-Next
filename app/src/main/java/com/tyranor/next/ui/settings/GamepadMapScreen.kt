@@ -3,6 +3,7 @@ package com.tyranor.next.ui.settings
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,6 +19,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -26,6 +28,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color as ComposeColor
 import com.tyranor.next.R
@@ -71,7 +74,7 @@ internal fun GamepadMapScreen() {
             sticks = InputRemapRepository.stickEntries(ctx)
         }
     }
-    androidx.compose.runtime.LaunchedEffect(Unit) { reload() }
+    LaunchedEffect(Unit) { reload() }
 
     // 编辑目标：逻辑按键 id，或 "left.up" 形式的摇杆方向
     var editingButton by remember { mutableStateOf<String?>(null) }
@@ -185,11 +188,11 @@ internal fun GamepadMapScreen() {
 }
 
 /** 手柄映射写盘失败提示（两处保存回调共用）。 */
-private fun toastBindingFailed(context: android.content.Context) {
-    android.widget.Toast.makeText(
+private fun toastBindingFailed(context: Context) {
+    Toast.makeText(
         context,
         context.getString(R.string.input_save_failed),
-        android.widget.Toast.LENGTH_SHORT,
+        Toast.LENGTH_SHORT,
     ).show()
 }
 
@@ -204,7 +207,7 @@ private fun StickRow(
         Text(
             text = title,
             style = MaterialTheme.typography.titleMedium,
-            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+            fontWeight = FontWeight.Bold,
             color = MiuixTheme.colorScheme.onSurface,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
         )

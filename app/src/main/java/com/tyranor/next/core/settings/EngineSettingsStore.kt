@@ -825,11 +825,13 @@ object EngineSettingsStore {
     /**
      * 全局虚拟按键开关。
      *
-     * [default] 由调用方给出，因为「用户未设置」的生效值随引擎而异：MV/MZ 改造前就有
-     * 按键层故默认开，Tyrano/VN/WebOther 默认关（引擎侧 `InputConfigStore.resolve`
-     * 用同一个 prefs 键 + `contains` 判定显式性，两处必须给出同样的默认）。
+     * [default] 必须由调用方显式给出（**故意不给默认值**）：「用户未设置」的生效值随引擎而异，
+     * MV/MZ 改造前就有按键层故默认开、Tyrano/VN/WebOther 默认关；留一个隐式默认值意味着
+     * 某个调用点可能悄悄用错策略（设置页「跟随全局」显示与游戏内实际按键层相悖）。
+     * 唯一策略来源：[com.tyranor.next.core.input.InputRemapRepository.engineDefaultsPadEnabled]；
+     * 引擎侧 `InputConfigStore.resolve` 用同一个 prefs 键 + `contains` 判定显式性，两处必须一致。
      */
-    fun isInputPadEnabled(c: Context, default: Boolean = false): Boolean =
+    fun isInputPadEnabled(c: Context, default: Boolean): Boolean =
         prefs(c).getBoolean(KEY_INPUT_PAD_ENABLED, default)
     fun setInputPadEnabled(c: Context, b: Boolean) = prefs(c).edit().putBoolean(KEY_INPUT_PAD_ENABLED, b).apply()
     fun isInputGamepadEnabled(c: Context): Boolean = prefs(c).getBoolean(KEY_INPUT_GAMEPAD_ENABLED, true)

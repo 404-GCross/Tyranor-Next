@@ -21,6 +21,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.mutableStateOf
@@ -95,14 +96,24 @@ internal fun InputSettingsScreen() {
     var profiles by remember { mutableStateOf<List<InputRemapRepository.ProfileSummary>>(emptyList()) }
     suspend fun reloadProfiles() {
         profiles = withContext(Dispatchers.IO) { InputRemapRepository.listProfileSummaries(ctx) }
+        // 方案选择可能刚被本页改动（导入/新建后指向新方案），一并重读
         profileId = InputRemapRepository.globalProfileId(ctx)
     }
-    androidx.compose.runtime.LaunchedEffect(Unit) { reloadProfiles() }
+
+    /** 回到前台重读全部展示值：开关也可能被单游戏设置页/其它入口改过（同一会话内保持一致）。 */
+    fun reloadAll() {
+        padEnabled = InputRemapRepository.globalPadSwitchValue(ctx)
+        gamepadEnabled = InputRemapRepository.globalGamepadEnabled(ctx)
+        profileId = InputRemapRepository.globalProfileId(ctx)
+    }
+
+    LaunchedEffect(Unit) { reloadProfiles() }
 
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
+                reloadAll()
                 scope.launch { reloadProfiles() }
             }
         }
@@ -504,7 +515,12 @@ private fun ProfileRow(
             }
             if (onDelete != null) {
                 Box(Modifier.weight(1f)) {
-                    NoRippleTextButton(text = stringResource(R.string.input_settings_profile_delete), onClick = onDelete)
+                    NoRippleTextButton(
+                        text = stringResource(R.string.input_settings_profile_delete),
+                        // 删除是破坏性动作：语义色取 colorScheme.error（AGENT.md 3.3）
+                        contentColor = MaterialTheme.colorScheme.error,
+                        onClick = onDelete,
+                    )
                 }
             }
         }

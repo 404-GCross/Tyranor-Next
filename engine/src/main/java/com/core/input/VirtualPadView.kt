@@ -1056,7 +1056,10 @@ class VirtualPadView(
 
     fun setPadVisible(visible: Boolean) {
         padVisible = visible
-        releaseAllPointers()
+        // 隐藏与「进编辑 / 退后台 / detach」同样要清 autoKeep 保持态：只 releaseAllPointers
+        // 会留下已抬指的 toggle（默认 skip=Ctrl）持续下压，而按钮已不可见——用户视角即「卡键」，
+        // 只能重新显示再按一次才能恢复。
+        if (!visible) releaseAllKeys() else releaseAllPointers()
         invalidate()
     }
 

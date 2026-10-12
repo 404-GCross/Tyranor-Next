@@ -242,4 +242,64 @@ class RtpImportReplaceSemanticsTest {
         assertTrue(rejection is RtpImportRejection.EntrySizeExceeded)
         assertFalse("超限条目不得留下截断文件", File(dest, "app/big.bin").exists())
     }
+
+    // ---------- 并发导入：临时目录必须逐次唯一 ----------
+
+    @Test
+    fun importTempDirsAreUniquePerCall() {
+        // 导入耗时可到分钟级，UI 未加在途守卫时两次导入会同时进行：
+        // 固定名 .import_tmp 会让第二次 deleteRecursively() 删掉第一次正在写的目录，
+        // 先提交者把两次内容混合 rename 成 app，后提交者以「读写失败：.import_tmp」失败
+        val parent = temporaryFolder.newFolder("temp-unique")
+
+        val first = RpgMakerRuntimeEnvironment.newImportTempDir(parent)
+        val second = RpgMakerRuntimeEnvironment.newImportTempDir(parent)
+
+        assertTrue("临时目录必须与固定名区分", first.name.startsWith(RpgMakerRuntimeEnvironment.IMPORT_TEMP_DIR))
+        assertTrue("两次导入不得共用同一临时目录：$first / $second", first != second)
+        assertEquals("临时目录必须落在同一父目录（同分区才能 rename）", parent, first.parentFile)
+        assertEquals(parent, second.parentFile)
+    }
+
+    @Test
+    fun staleImportTempCleanupKeepsActiveTempAndImportSiteState() {
+        // 清陈旧临时目录时不得碰到 .importing / .import_backup / app：
+        // 那是导入状态机与「唯一旧数据」的落点
+        val parent = temporaryFolder.newFolder("stale-clean")
+        val active = RpgMakerRuntimeEnvironment.newImportTempDir(parent).apply { mkdirs() }
+        val stale = RpgMakerRuntimeEnvironment.newImportTempDir(parent).apply { mkdirs() }
+        File(stale, "half.bin").writeText("half")
+        val marker = File(parent, ".importing").apply { writeText("") }
+        val backup = File(parent, ".import_backup").apply { mkdirs() }
+        File(backup, "old.bin").writeText("old")
+        val app = File(parent, "app").apply { mkdirs() }
+        File(app, "data.bin").writeText("data")
+
+        // 全部视为陈旧（清除路径即如此调用）
+        RpgMakerRuntimeEnvironment.deleteStaleImportTemps(
+            parent,
+            keep = active,
+            staleBefore = Long.MAX_VALUE,
+        )
+
+        assertTrue("在途临时目录必须保留", active.isDirectory)
+        assertFalse("陈旧临时目录必须清理", stale.exists())
+        assertTrue("提交标记不得被清理", marker.isFile)
+        assertTrue("备份（唯一旧数据）不得被清理", File(backup, "old.bin").isFile)
+        assertTrue("已导入内容不得被清理", File(app, "data.bin").isFile)
+    }
+
+    @Test
+    fun freshImportTempSurvivesCleanupOfAnotherImport() {
+        // 默认老化阈值下，新鲜临时目录可能是**并发的另一次导入**正在写的目录：
+        // 删掉它等于让那次导入失败（清理只针对崩溃残留）
+        val parent = temporaryFolder.newFolder("fresh-clean")
+        val inFlight = RpgMakerRuntimeEnvironment.newImportTempDir(parent).apply { mkdirs() }
+        File(inFlight, "half.bin").writeText("half")
+
+        RpgMakerRuntimeEnvironment.deleteStaleImportTemps(parent, keep = null)
+
+        assertTrue("新鲜（可能是在途）临时目录不得被清理", inFlight.isDirectory)
+        assertTrue("其内容也不得被动", File(inFlight, "half.bin").isFile)
+    }
 }

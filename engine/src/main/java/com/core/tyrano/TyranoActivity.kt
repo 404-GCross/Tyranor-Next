@@ -242,10 +242,6 @@ class TyranoActivity : Activity() {
             theme = EngineThemeColors.fromIntent(intent),
             engineDefaultsEnabled = rpgMakerWebGame,
         ) { js -> webView?.let { v -> runCatching { v.evaluateJavascript(js, null) } } }
-        browser.addJavascriptInterface(
-            requireNotNull(inputRemap).Bridge(),
-            InputRemapController.BRIDGE_NAME,
-        )
 
         configureWebView(browser)
         when (webGameType) {
@@ -256,6 +252,13 @@ class TyranoActivity : Activity() {
                         RpgMakerModBridge(rpgMakerModGameId),
                         RPG_MAKER_MOD_BRIDGE_NAME,
                     )
+                    // 输入重映射桥的唯一消费方是**修改器 UI**（engine assets 的
+                    // __rpgmaker_mod_ui.js，同一开关下注入），因此只在修改器开启时注册：
+                    // 避免给 Tyrano / VN / WebOther 页面（可加载外部网络资源）暴露
+                    // 「重置按键布局」这类 JS 入口，也避免 MV/MZ 关闭修改器后仍留桥。
+                    inputRemap?.let {
+                        browser.addJavascriptInterface(it.Bridge(), InputRemapController.BRIDGE_NAME)
+                    }
                 }
             }
             WebGameType.TYRANO -> browser.addJavascriptInterface(TyranoJsBridge(saves), JS_BRIDGE_NAME)
