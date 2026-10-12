@@ -1047,7 +1047,8 @@ private class LensIconEffectCache(
         forceRefresh: Boolean,
     ): androidx.compose.ui.graphics.RenderEffect {
         val first = cachedEffect == null
-        var changed = first || forceRefresh
+        val force = first || forceRefresh
+        var changed = force
         if (first) {
             shader.setFloatUniform("seamWidth", seamWidthPx)
             shader.setFloatUniform("dispersion", dispersion)
@@ -1055,43 +1056,43 @@ private class LensIconEffectCache(
             shader.setColorUniform("lensTint", lensTint)
             shader.setColorUniform("fringeSurface", fringeSurface)
         }
-        if (first || forceRefresh || centerX.toRawBits() != lastCenterX.toRawBits() ||
-            centerY.toRawBits() != lastCenterY.toRawBits()
+        if (force || centerX.hasChangedFrom(lastCenterX) ||
+            centerY.hasChangedFrom(lastCenterY)
         ) {
             shader.setFloatUniform("lensCenter", centerX, centerY)
             lastCenterX = centerX
             lastCenterY = centerY
             changed = true
         }
-        if (first || forceRefresh || lensWidth.toRawBits() != lastLensWidth.toRawBits()) {
+        if (force || lensWidth.hasChangedFrom(lastLensWidth)) {
             shader.setFloatUniform("lensSize", lensWidth, lensHeightPx)
             lastLensWidth = lensWidth
             changed = true
         }
-        if (first || forceRefresh || scaleX.toRawBits() != lastScaleX.toRawBits() ||
-            scaleY.toRawBits() != lastScaleY.toRawBits()
+        if (force || scaleX.hasChangedFrom(lastScaleX) ||
+            scaleY.hasChangedFrom(lastScaleY)
         ) {
             shader.setFloatUniform("lensScale", scaleX, scaleY)
             lastScaleX = scaleX
             lastScaleY = scaleY
             changed = true
         }
-        if (first || forceRefresh || tabWidth.toRawBits() != lastTabWidth.toRawBits()) {
+        if (force || tabWidth.hasChangedFrom(lastTabWidth)) {
             shader.setFloatUniform("iconGrid", paddingPx, tabWidth, tabs)
             lastTabWidth = tabWidth
             changed = true
         }
-        if (first || forceRefresh || iconScale.toRawBits() != lastIconScale.toRawBits()) {
+        if (force || iconScale.hasChangedFrom(lastIconScale)) {
             shader.setFloatUniform("iconScale", iconScale)
             lastIconScale = iconScale
             changed = true
         }
-        if (first || forceRefresh || refractionHeight.toRawBits() != lastRefractionHeight.toRawBits()) {
+        if (force || refractionHeight.hasChangedFrom(lastRefractionHeight)) {
             shader.setFloatUniform("refractionHeight", refractionHeight)
             lastRefractionHeight = refractionHeight
             changed = true
         }
-        if (first || forceRefresh || refractionAmount.toRawBits() != lastRefractionAmount.toRawBits()) {
+        if (force || refractionAmount.hasChangedFrom(lastRefractionAmount)) {
             shader.setFloatUniform("refractionAmount", refractionAmount)
             lastRefractionAmount = refractionAmount
             changed = true
@@ -1101,6 +1102,9 @@ private class LensIconEffectCache(
         }
         return checkNotNull(cachedEffect)
     }
+
+    private fun Float.hasChangedFrom(previous: Float): Boolean =
+        toRawBits() != previous.toRawBits()
 }
 
 /** 仅供此透镜底栏使用，不改变公共 lens 效果或其他导航样式。 */

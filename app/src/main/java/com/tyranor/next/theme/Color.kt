@@ -126,6 +126,9 @@ val FloatingNavGlassSurface = Color(0xFFFFFFFF)
 /** 悬浮按钮导航的固定玻璃表面（深色档）：近黑中性玻璃膜（与默认深色页面对齐）。 */
 val FloatingNavGlassSurfaceDark = Color(0xFF17191C)
 
+/** 悬浮按钮导航深色档的未选中图标：独立中性色，不随高级玻璃样式调整。 */
+val FloatingNavGlassUnselectedDark = Color(0xFFB6BBC3)
+
 // ===== 液态玻璃 · 透镜档的光学中性色（不随主题色 / 色调切换变化）=====
 
 /**

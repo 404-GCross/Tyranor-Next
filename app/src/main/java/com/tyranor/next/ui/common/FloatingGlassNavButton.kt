@@ -62,8 +62,8 @@ import androidx.compose.ui.zIndex
 import com.kyant.backdrop.Backdrop
 import com.tyranor.next.R
 import com.tyranor.next.core.settings.AppSettingsStore
-import com.tyranor.next.theme.AdvancedGlassUnselected
 import com.tyranor.next.theme.AppThemeColors
+import com.tyranor.next.theme.FloatingNavGlassUnselectedDark
 import com.tyranor.next.theme.GlassUnselected
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Job
@@ -100,7 +100,10 @@ private class FloatingNavGestureActions(
     val cancel: () -> Unit,
 )
 
-/** Tap/hold/slide selection and hold-while-open relocation share one continuous pointer. */
+/**
+ * 点击、长按滑选和展开后移动共用同一指针；单点子项保持展开，滑选确认后收起。
+ * API 31+ 使用 backdrop 采样；较低版本或没有采样源时回退为实底玻璃。
+ */
 @Composable
 internal fun FloatingGlassNavButton(
     backdrop: Backdrop?,
@@ -467,7 +470,7 @@ internal fun FloatingGlassNavButton(
             ) {
                 FloatingNavOrb(
                     motion, backdrop, primaryColor,
-                    if (index == selectedIndex) primaryColor else if (dark) AdvancedGlassUnselected else GlassUnselected,
+                    if (index == selectedIndex) primaryColor else if (dark) FloatingNavGlassUnselectedDark else GlassUnselected,
                     dark, Modifier.size(sizeDp), committed = committedIndex == index,
                 ) { tint -> FloatingNavIcon(item.iconRes, tint, Modifier.size(28.dp)) }
             }
