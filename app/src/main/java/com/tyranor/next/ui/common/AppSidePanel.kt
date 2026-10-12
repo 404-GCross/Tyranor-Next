@@ -34,6 +34,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -220,14 +221,17 @@ internal fun AppSidePanel(
  *   一律放行（不消费、不唤出），由导航栏自行处理；无底栏时传 `Float.POSITIVE_INFINITY`。
  *
  * @param bottomBarTopY 底部导航栏顶边取数回调（宿主布局后上报；手势发生时读取最新值）
+ * @param excludeStart 指定控件拥有的手势起点，不参与侧栏识别；其它区域保持原有规则
  */
 @Composable
 internal fun rememberSidePanelSwipeModifier(
     onOpen: () -> Unit,
     bottomBarTopY: () -> Float = { Float.POSITIVE_INFINITY },
+    excludeStart: (Offset) -> Boolean = { false },
 ): Modifier {
     val currentOnOpen by rememberUpdatedState(onOpen)
     val currentBottomBarTopY by rememberUpdatedState(bottomBarTopY)
+    val currentExcludeStart by rememberUpdatedState(excludeStart)
     val density = LocalDensity.current
     val startInsetPx = with(density) { SidePanelSwipeStartInset.toPx() }
     val thresholdPx = with(density) { SidePanelSwipeThreshold.toPx() }
@@ -244,6 +248,7 @@ internal fun rememberSidePanelSwipeModifier(
                 // 底部导航栏区域不参与：起点落在导航栏顶边（含）之下直接放行，
                 // 避免在底栏上滑动（切页/误触）被本手势占用而唤出侧边栏
                 if (down.position.y >= currentBottomBarTopY()) return@awaitEachGesture
+                if (currentExcludeStart(down.position)) return@awaitEachGesture
                 val touchSlop = viewConfiguration.touchSlop
                 var dx = 0f
                 var dy = 0f

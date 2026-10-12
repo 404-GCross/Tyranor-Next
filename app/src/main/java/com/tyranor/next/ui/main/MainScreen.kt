@@ -84,6 +84,8 @@ import com.tyranor.next.ui.common.AppNavItem
 import com.tyranor.next.ui.common.AppNavigationRail
 import com.tyranor.next.ui.common.AppSidePanel
 import com.tyranor.next.ui.common.FloatingGlassNavButton
+import com.tyranor.next.ui.common.FloatingNavOutsideTapBridge
+import com.tyranor.next.ui.common.observeFloatingNavOutsideTaps
 import com.tyranor.next.ui.common.LaunchErrorDialog
 import com.tyranor.next.ui.common.LaunchErrorState
 import com.tyranor.next.ui.common.LiquidGlassNavigationBar
@@ -216,12 +218,15 @@ fun MainScreen(modifier: Modifier = Modifier) {
   val enhanceLiquidGlass = navStyle == AppSettingsStore.NAV_STYLE_LIQUID_GLASS_ENHANCED
   // 平板/大窗口：主导航移到侧边。侧栏按外观风格取「默认导航栏」形态，
   // 液态玻璃两档（尤其透镜）不参与侧栏适配，平板下自动落到主题默认形态。
-  val railLayout = isSideRailLayout()
-  val liquidBottomActive = liquidGlass && !railLayout
-  // 悬浮按钮导航（第 4 档）：右下角圆形玻璃按钮，点击弧形展开四项；
-  // 与液态玻璃两档一致，平板下不参与侧栏适配，落到主题默认侧栏形态。
   val floatingButtonStyle = navStyle == AppSettingsStore.NAV_STYLE_FLOATING_BUTTON
+  val railLayout = isSideRailLayout() && !floatingButtonStyle
+  val liquidBottomActive = liquidGlass && !railLayout
+  // 悬浮导航在手机、平板共用圆球交互，安全区与扇形尺寸由组件自适应。
   val floatingButtonActive = floatingButtonStyle && !railLayout
+  val floatingNavOutsideTapBridge = remember { FloatingNavOutsideTapBridge() }
+  val floatingNavOutsideTapObserver = remember(floatingNavOutsideTapBridge) {
+    Modifier.observeFloatingNavOutsideTaps(floatingNavOutsideTapBridge)
+  }
   // 侧边栏唤出识别需跳过底部导航栏区域：各底栏形态在布局后把自己顶边（根布局坐标）上报到
   // bottomNavTopY；悬浮按钮 / 平板侧栏没有底部导航栏，恒按「无排除」处理。
   var bottomNavTopY by remember { mutableStateOf(Float.POSITIVE_INFINITY) }
@@ -234,6 +239,9 @@ fun MainScreen(modifier: Modifier = Modifier) {
     onOpen = { sidePanelOpen = true },
     bottomBarTopY = {
       if (railLayout || floatingButtonActive) Float.POSITIVE_INFINITY else bottomNavTopY
+    },
+    excludeStart = { point ->
+      floatingButtonActive && floatingNavOutsideTapBridge.containsControls(point)
     },
   )
   // 玻璃外观风格 + 默认导航样式：导航栏改为悬浮的圆角玻璃条（描边 + 玻璃底）
@@ -274,11 +282,14 @@ fun MainScreen(modifier: Modifier = Modifier) {
     // 这里判的是**实际生效的档**（enhancedBarActive）而不是设置值：AGSL 不可用时界面已回退成
     // 经典档，转场语义必须跟着回退，否则会出现「看着是经典档、行为是透镜档」的错配。
     // 默认路径保持原有守卫，避免把这一行为变更带给未开启该选项的用户（报告 §8.7）。
-    if (!enhancedBarActive && pageTransition.isRunning) return
+    if (!enhancedBarActive && !floatingButtonActive && pageTransition.isRunning) return
     selectedIndex = index
   }
   // 外层只负责布局：内容区 + 底部导航栏（不用 Scaffold，避免与子页顶部栏的 inset 冲突）
-  Box(modifier.fillMaxSize().then(sidePanelSwipeModifier)) {
+  Box(
+    modifier.fillMaxSize().then(sidePanelSwipeModifier)
+      .then(if (floatingButtonActive) floatingNavOutsideTapObserver else Modifier),
+  ) {
     // 内容层录制进 backdrop，供液态玻璃导航采样页面内容。
     // 关键：背景必须在 layerBackdrop 之后（内层）——layerBackdrop 只录制它之后的内容，
     // 放在外层（Surface/Column 背景）的内容不会被采样，玻璃会采到透明而漏出文字。
@@ -522,6 +533,7 @@ fun MainScreen(modifier: Modifier = Modifier) {
         onItemClick = { selectPage(it) },
         // 组件在安全区内自行摆放（长按可拖动、位置持久化），宿主只负责占满可用区域
         modifier = Modifier.fillMaxSize(),
+        outsideTapBridge = floatingNavOutsideTapBridge,
       )
     }
 

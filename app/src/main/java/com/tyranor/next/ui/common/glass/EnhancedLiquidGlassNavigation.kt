@@ -38,7 +38,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
@@ -252,6 +252,16 @@ fun EnhancedLiquidGlassNavigationBar(
                     panelOffsetMaxPx * fraction.sign * EaseOut.transform(abs(fraction))
                 }
             }
+        }
+    }
+    val panelShiftModifier = remember(density, spec) {
+        Modifier.graphicsLayer { translationX = panelShift }
+    }
+    val barSizeModifier = remember(paddingPx, tabs) {
+        Modifier.onGloballyPositioned { coords ->
+            val width = coords.size.width.toFloat()
+            barWidthPx = width
+            tabWidthPx = (width - paddingPx * 2) / tabs
         }
     }
 
@@ -470,13 +480,17 @@ fun EnhancedLiquidGlassNavigationBar(
         } else {
             val strokeColor = colors.edgeStroke.copy(alpha = enhancedEdgeAlpha)
             val strokeWidth = with(density) { GlassEdgeStrokeWidth.toPx() }
-            Modifier.drawWithContent {
-                drawContent()
-                drawOutline(
-                    outline = AppNavCapsuleShape.createOutline(size, layoutDirection, this),
-                    color = strokeColor,
-                    style = Stroke(width = strokeWidth),
-                )
+            val stroke = Stroke(width = strokeWidth)
+            Modifier.drawWithCache {
+                val outline = AppNavCapsuleShape.createOutline(size, layoutDirection, this)
+                onDrawWithContent {
+                    drawContent()
+                    drawOutline(
+                        outline = outline,
+                        color = strokeColor,
+                        style = stroke,
+                    )
+                }
             }
         }
     }
@@ -539,15 +553,21 @@ fun EnhancedLiquidGlassNavigationBar(
         // 边缘高光：不使用 Highlight.Default 的满强度（自带 50% 白），只取其中一部分（文档 §6 D12）
         val barHighlight: (() -> Highlight?)? = remember(blurEnabled, highlightAlpha) {
             if (blurEnabled) {
+                val highlight = if (highlightAlpha > 0f) {
+                    Highlight.Default.copy(alpha = highlightAlpha)
+                } else {
+                    null
+                }
                 // 注意这是常量（0.18 / 0.42），只有调用方传入 0 时才会走到 null 分支；
                 // 压力相关的那几处才是真正的逐帧判断（Backdrop 只在入参为 null 时早退）
-                {
+                val provider: () -> Highlight? = {
                     if (highlightAlpha <= 0f || !GlassShaderSupport.highlightAllowed) {
                         null
                     } else {
-                        Highlight.Default.copy(alpha = highlightAlpha)
+                        highlight
                     }
                 }
+                provider
             } else {
                 null
             }
@@ -559,8 +579,15 @@ fun EnhancedLiquidGlassNavigationBar(
             if (barInnerAlpha <= 0f) {
                 null
             } else {
-                { InnerShadow(radius = barInnerRadius, alpha = barInnerAlpha) }
+                val innerShadow = InnerShadow(radius = barInnerRadius, alpha = barInnerAlpha)
+                val provider: () -> InnerShadow? = { innerShadow }
+                provider
             }
+        }
+        val barShadow: () -> Shadow = remember {
+            val shadow = Shadow.Default.copy(alpha = 0.8f)
+            val provider: () -> Shadow = { shadow }
+            provider
         }
         val barSurface: DrawScope.() -> Unit = remember(containerColor) {
             { drawRect(containerColor) }
@@ -590,11 +617,8 @@ fun EnhancedLiquidGlassNavigationBar(
         Row(
             Modifier
                 .fillMaxWidth()
-                .onGloballyPositioned { coords ->
-                    barWidthPx = coords.size.width.toFloat()
-                    tabWidthPx = (barWidthPx - paddingPx * 2) / tabs
-                }
-                .graphicsLayer { translationX = panelShift }
+                .then(barSizeModifier)
+                .then(panelShiftModifier)
                 // 注意：这里**不再**放任何 pointerInput。
                 // 物理指针由 D 层 Overlay 独占（方案 §单一物理输入层）；此前这里的「吞掉全部事件」
                 // 节点会把 MOVE 全部消费掉，导致 D 层识别器一移动就判定被接管而中止，
@@ -607,7 +631,7 @@ fun EnhancedLiquidGlassNavigationBar(
                     // 阴影与经典档（`LiquidGlassNavigationBar` 的 `Shadow.Default.copy(alpha = 0.8f)`，
                     // 等效约 8% 黑）**完全一致**，两档观感统一（§6 D26）。更强的投影方案
                     // 「浅色 10% / 深色 20% 黑、24dp 模糊、下移 4dp」（强 2.5 倍）仍不采用（§6 D11）。
-                    shadow = { Shadow.Default.copy(alpha = 0.8f) },
+                    shadow = barShadow,
                     // 浅色档：贴着上下边缘的柔和内暗边，形成「玻璃厚度」的观感
                     innerShadow = barInnerShadow,
                     layerBlock = barPressLayer,
@@ -671,7 +695,7 @@ fun EnhancedLiquidGlassNavigationBar(
                 .clearAndSetSemantics { }
                 .alpha(0f)
                 .layerBackdrop(tabsBackdrop)
-                .graphicsLayer { translationX = panelShift }
+                .then(panelShiftModifier)
                 .drawBackdrop(
                     backdrop = backdrop,
                     shape = NavCapsuleShape,
@@ -776,11 +800,12 @@ fun EnhancedLiquidGlassNavigationBar(
                 }
             }
             val lensCover: DrawScope.() -> Unit = remember(refractionEnabled, colors, spec, controller) {
-                {
+                val staticCover = colors.staticLensCover.copy(alpha = spec.staticLensCoverAlpha)
+                val drawCover: DrawScope.() -> Unit = {
                     if (refractionEnabled) {
                         val progress = controller.pressure.coerceIn(0f, 1f)
                         drawRect(
-                            color = colors.staticLensCover.copy(alpha = spec.staticLensCoverAlpha),
+                            color = staticCover,
                             alpha = 1f - progress,
                         )
                         drawRect(colors.pressedLensCover.copy(alpha = spec.pressedLensCoverAlpha * progress))
@@ -789,16 +814,20 @@ fun EnhancedLiquidGlassNavigationBar(
                         drawRect(colors.lensFallbackTint)
                     }
                 }
+                drawCover
+            }
+            val lensPositionLayer: GraphicsLayerScope.() -> Unit = remember(controller, density, spec) {
+                {
+                    val shift = controller.index * currentTabWidthPx
+                    translationX = if (currentIsLtr) shift + panelShift else -shift + panelShift
+                }
             }
             // 外层：整槽宽度的**手势热区**（宽屏拉伸后单槽很宽，热区保持整槽才好按）；
             // 内层：视觉透镜，宽度按 spec.lensMaxWidth 封顶并居中，避免变成巨大胶囊
             Box(
                 Modifier
                     .padding(horizontal = spec.barInnerPadding)
-                    .graphicsLayer {
-                        val shift = controller.index * tabWidthPx
-                        translationX = if (isLtr) shift + panelShift else -shift + panelShift
-                    }
+                    .graphicsLayer(lensPositionLayer)
                     .height(spec.lensHeight)
                     .width(with(density) { tabWidthPx.toDp() }),
                 contentAlignment = Alignment.Center,
@@ -836,67 +865,76 @@ fun EnhancedLiquidGlassNavigationBar(
                 null
             }
         }
+        val iconLayer: GraphicsLayerScope.() -> Unit = remember(
+            iconShader, controller, density, spec, colors, pressDeltaPx, pressDeltaMax,
+            paddingPx, tabs, lensMaxWidthPx,
+        ) {
+            val effectCache = iconShader?.let { shader ->
+                LensIconEffectCache(
+                    shader = shader,
+                    lensHeightPx = with(density) { spec.lensHeight.roundToPx().toFloat() },
+                    paddingPx = paddingPx,
+                    tabs = tabs.toFloat(),
+                    seamWidthPx = with(density) { 1.5.dp.toPx() },
+                    dispersion = if (spec.movingLensChromatic) 1f else 0f,
+                    baseTint = colors.unselectedIcon.toArgb(),
+                    lensTint = colors.lensContentTint.toArgb(),
+                    fringeSurface = colors.surfaceTint.toArgb(),
+                )
+            }
+            val iconScaleOnPress = spec.iconScaleOnPress
+                .safeMotionValue(1f, 3f, GlassBottomBarSpec.Default.iconScaleOnPress)
+            val refractionHeightPx = with(density) { pressedRefractionHeight.toPx() }
+            val refractionAmountPx = with(density) { pressedRefractionAmount.toPx() }
+            val layer: GraphicsLayerScope.() -> Unit = {
+                if (effectCache != null && currentTabWidthPx > 0f && size.width > 0f) {
+                    val pressure = controller.pressure.coerceIn(0f, 1f)
+                    val barScale = lerp(
+                        1f,
+                        1f + (pressDeltaPx / size.width).fastCoerceIn(0f, pressDeltaMax),
+                        controller.pressure,
+                    )
+                    val fromStart = paddingPx + (controller.index + 0.5f) * currentTabWidthPx
+                    val lensCenterX = if (currentIsLtr) fromStart else size.width - fromStart
+                    renderEffect = effectCache.effect(
+                        centerX = size.width / 2f + (lensCenterX - size.width / 2f) / barScale,
+                        centerY = size.height / 2f,
+                        lensWidth = minOf(currentTabWidthPx, lensMaxWidthPx).toDp().roundToPx().toFloat(),
+                        scaleX = controller.scaleX / barScale,
+                        scaleY = controller.scaleY / barScale,
+                        tabWidth = currentTabWidthPx,
+                        iconScale = lerp(1f, iconScaleOnPress, pressure) / barScale,
+                        refractionHeight = refractionHeightPx * pressure,
+                        refractionAmount = refractionAmountPx * pressure,
+                        forceRefresh = controller.isAnimating ||
+                            controller.state == LensInteractionState.PressJump ||
+                            controller.state == LensInteractionState.PressedTracking ||
+                            sessionGrabbed || panelRecenterJob?.isActive == true,
+                    )
+                } else {
+                    renderEffect = null
+                }
+            }
+            layer
+        }
         Row(
             Modifier
                 .fillMaxWidth()
                 .selectableGroup()
-                .graphicsLayer { translationX = panelShift }
+                .then(panelShiftModifier)
                 .graphicsLayer(barPressLayer)
-                .graphicsLayer {
-                    if (iconShader != null && currentTabWidthPx > 0f && size.width > 0f) {
-                        val pressure = controller.pressure.coerceIn(0f, 1f)
-                        val barScale = lerp(
-                            1f,
-                            1f + (pressDeltaPx / size.width).fastCoerceIn(0f, pressDeltaMax),
-                            controller.pressure,
-                        )
-                        val fromStart = paddingPx + (controller.index + 0.5f) * currentTabWidthPx
-                        val lensCenterX = if (currentIsLtr) fromStart else size.width - fromStart
-                        iconShader.setFloatUniform(
-                            "lensCenter",
-                            size.width / 2f + (lensCenterX - size.width / 2f) / barScale,
-                            size.height / 2f,
-                        )
-                        iconShader.setFloatUniform(
-                            "lensSize",
-                            minOf(currentTabWidthPx, lensMaxWidthPx).toDp().roundToPx().toFloat(),
-                            spec.lensHeight.roundToPx().toFloat(),
-                        )
-                        iconShader.setFloatUniform(
-                            "lensScale", controller.scaleX / barScale, controller.scaleY / barScale,
-                        )
-                        iconShader.setFloatUniform("iconGrid", paddingPx, currentTabWidthPx, tabs.toFloat())
-                        iconShader.setFloatUniform(
-                            "iconScale",
-                            lerp(
-                                1f,
-                                spec.iconScaleOnPress.safeMotionValue(1f, 3f, GlassBottomBarSpec.Default.iconScaleOnPress),
-                                pressure,
-                            ) / barScale,
-                        )
-                        iconShader.setFloatUniform("seamWidth", 1.5.dp.toPx())
-                        iconShader.setFloatUniform(
-                            "refractionHeight",
-                            pressedRefractionHeight.toPx() * pressure,
-                        )
-                        iconShader.setFloatUniform(
-                            "refractionAmount",
-                            pressedRefractionAmount.toPx() * pressure,
-                        )
-                        iconShader.setFloatUniform("dispersion", if (spec.movingLensChromatic) 1f else 0f)
-                        iconShader.setColorUniform("baseTint", colors.unselectedIcon.toArgb())
-                        iconShader.setColorUniform("lensTint", colors.lensContentTint.toArgb())
-                        iconShader.setColorUniform("fringeSurface", colors.surfaceTint.toArgb())
-                        renderEffect = RenderEffect.createRuntimeShaderEffect(iconShader, "content").asComposeRenderEffect()
-                    } else {
-                        renderEffect = null
-                    }
-                }
+                .graphicsLayer(iconLayer)
                 .height(spec.barHeight)
                 .padding(spec.barInnerPadding),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             items.forEachIndexed { index, item ->
+                val onTabClick = remember(index, requestSelection) {
+                    {
+                        currentPressTick()
+                        requestSelection(index)
+                    }
+                }
                 VisibleTab(
                     item = item,
                     selected = index == selectedIndex,
@@ -906,10 +944,7 @@ fun EnhancedLiquidGlassNavigationBar(
                         else -> colors.unselectedIcon
                     },
                     iconSize = spec.iconSize,
-                    onClick = {
-                        currentPressTick()
-                        requestSelection(index)
-                    },
+                    onClick = onTabClick,
                 )
             }
         }
@@ -962,13 +997,110 @@ private fun TabIcon(
     tint: Color,
     iconSize: Dp,
 ) {
+    val iconModifier = remember(iconSize) { Modifier.size(iconSize) }
+    val tintFilter = remember(tint) { ColorFilter.tint(tint) }
     Image(
         painter = painterResource(item.iconRes),
         contentDescription = item.label,
-        modifier = Modifier.size(iconSize),
+        modifier = iconModifier,
         contentScale = ContentScale.Fit,
-        colorFilter = ColorFilter.tint(tint),
+        colorFilter = tintFilter,
     )
+}
+
+/**
+ * RuntimeShader effect 可能保存创建时的 uniform 快照：动态阶段保持逐次提交与重建。
+ * 仅在交互和动画均已闲置、全部 uniform 相同的帧之间复用；静态参数由 remember 的 key 管理。
+ */
+private class LensIconEffectCache(
+    private val shader: RuntimeShader,
+    private val lensHeightPx: Float,
+    private val paddingPx: Float,
+    private val tabs: Float,
+    private val seamWidthPx: Float,
+    private val dispersion: Float,
+    private val baseTint: Int,
+    private val lensTint: Int,
+    private val fringeSurface: Int,
+) {
+    private var lastCenterX = Float.NaN
+    private var lastCenterY = Float.NaN
+    private var lastLensWidth = Float.NaN
+    private var lastScaleX = Float.NaN
+    private var lastScaleY = Float.NaN
+    private var lastTabWidth = Float.NaN
+    private var lastIconScale = Float.NaN
+    private var lastRefractionHeight = Float.NaN
+    private var lastRefractionAmount = Float.NaN
+    private var cachedEffect: androidx.compose.ui.graphics.RenderEffect? = null
+
+    fun effect(
+        centerX: Float,
+        centerY: Float,
+        lensWidth: Float,
+        scaleX: Float,
+        scaleY: Float,
+        tabWidth: Float,
+        iconScale: Float,
+        refractionHeight: Float,
+        refractionAmount: Float,
+        forceRefresh: Boolean,
+    ): androidx.compose.ui.graphics.RenderEffect {
+        val first = cachedEffect == null
+        var changed = first || forceRefresh
+        if (first) {
+            shader.setFloatUniform("seamWidth", seamWidthPx)
+            shader.setFloatUniform("dispersion", dispersion)
+            shader.setColorUniform("baseTint", baseTint)
+            shader.setColorUniform("lensTint", lensTint)
+            shader.setColorUniform("fringeSurface", fringeSurface)
+        }
+        if (first || forceRefresh || centerX.toRawBits() != lastCenterX.toRawBits() ||
+            centerY.toRawBits() != lastCenterY.toRawBits()
+        ) {
+            shader.setFloatUniform("lensCenter", centerX, centerY)
+            lastCenterX = centerX
+            lastCenterY = centerY
+            changed = true
+        }
+        if (first || forceRefresh || lensWidth.toRawBits() != lastLensWidth.toRawBits()) {
+            shader.setFloatUniform("lensSize", lensWidth, lensHeightPx)
+            lastLensWidth = lensWidth
+            changed = true
+        }
+        if (first || forceRefresh || scaleX.toRawBits() != lastScaleX.toRawBits() ||
+            scaleY.toRawBits() != lastScaleY.toRawBits()
+        ) {
+            shader.setFloatUniform("lensScale", scaleX, scaleY)
+            lastScaleX = scaleX
+            lastScaleY = scaleY
+            changed = true
+        }
+        if (first || forceRefresh || tabWidth.toRawBits() != lastTabWidth.toRawBits()) {
+            shader.setFloatUniform("iconGrid", paddingPx, tabWidth, tabs)
+            lastTabWidth = tabWidth
+            changed = true
+        }
+        if (first || forceRefresh || iconScale.toRawBits() != lastIconScale.toRawBits()) {
+            shader.setFloatUniform("iconScale", iconScale)
+            lastIconScale = iconScale
+            changed = true
+        }
+        if (first || forceRefresh || refractionHeight.toRawBits() != lastRefractionHeight.toRawBits()) {
+            shader.setFloatUniform("refractionHeight", refractionHeight)
+            lastRefractionHeight = refractionHeight
+            changed = true
+        }
+        if (first || forceRefresh || refractionAmount.toRawBits() != lastRefractionAmount.toRawBits()) {
+            shader.setFloatUniform("refractionAmount", refractionAmount)
+            lastRefractionAmount = refractionAmount
+            changed = true
+        }
+        if (changed) {
+            cachedEffect = RenderEffect.createRuntimeShaderEffect(shader, "content").asComposeRenderEffect()
+        }
+        return checkNotNull(cachedEffect)
+    }
 }
 
 /** 仅供此透镜底栏使用，不改变公共 lens 效果或其他导航样式。 */
