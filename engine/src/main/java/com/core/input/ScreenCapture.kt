@@ -20,6 +20,7 @@ import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicBoolean
@@ -56,6 +57,15 @@ object ScreenCapture {
     /** PixelCopy 回调的等待上限；超时按失败处理并复位状态。 */
     private const val CAPTURE_TIMEOUT_MS = 5_000L
 
+    /**
+     * 保存阶段（PNG 编码 + MediaStore/文件写盘）的等待上限。
+     *
+     * PixelCopy 的看门狗在它回调那一刻就失效了（`pixelCopyDone` 已置位），而 `save()` 在
+     * MediaProvider 无响应等情况下可能长时间阻塞在 IO 上；没有独立超时的话 `capturing`
+     * 永不复位，之后每次截屏都恒返回 [CaptureResult.Busy]，用户只能杀进程恢复。
+     */
+    private const val SAVE_TIMEOUT_MS = 20_000L
+
     /** 截屏结果：调用方按实际落点提示，不猜测路径。 */
     sealed interface CaptureResult {
 
@@ -69,9 +79,24 @@ object ScreenCapture {
         data object Failed : CaptureResult
     }
 
-    /** PNG 编码在后台线程执行（整屏图编码数百毫秒，放主线程会明显卡顿）。 */
-    private val ioExecutor = Executors.newSingleThreadExecutor { runnable ->
+    /**
+     * PNG 编码在后台线程执行（整屏图编码数百毫秒，放主线程会明显卡顿）。
+     *
+     * 不是 `val`：单线程池一旦被卡死的写盘占住，后续保存会全部排在它后面（看门狗虽复位了
+     * 单飞标志，用户仍然拍不了新图），因此保存超时时整体换一个新线程池。
+     */
+    @Volatile
+    private var ioExecutor = newIoExecutor()
+
+    private fun newIoExecutor(): ExecutorService = Executors.newSingleThreadExecutor { runnable ->
         Thread(runnable, "tyranor-screenshot").apply { isDaemon = true }
+    }
+
+    /** 保存阶段的线程池卡死时换新：旧池只 `shutdown()`（让在途任务自然结束，不打扰写盘）。 */
+    private fun recycleStuckIoExecutor() {
+        val stuck = ioExecutor
+        ioExecutor = newIoExecutor()
+        stuck.shutdown()
     }
 
     /** 同一时刻只允许一次截屏（连点不叠加、避免写同名文件）。 */
@@ -140,12 +165,23 @@ object ScreenCapture {
             }
         }
         mainHandler.postDelayed(watchdog, CAPTURE_TIMEOUT_MS)
+        // 保存阶段看门狗（见 SAVE_TIMEOUT_MS）：与 finish 争同一个 CAS，谁先谁生效；
+        // 迟到的保存完成只会回收位图、不再回调（与 PixelCopy 看门狗同一套代际语义）
+        val saveWatchdog = Runnable {
+            if (generation.get() == myGeneration && capturing.compareAndSet(true, false)) {
+                Log.w(TAG, "save watchdog fired: screenshot write stuck")
+                // 写盘线程多半卡在系统调用上：换一个新线程池，否则后续保存永远排队
+                recycleStuckIoExecutor()
+                mainHandler.post { onResult(CaptureResult.Failed) }
+            }
+        }
         // 本次截屏的收尾：校验代际，避免上一次的迟到回调偷走本次的单飞标志
         val finish: (CaptureResult) -> Unit = runner@ { result ->
             if (generation.get() == myGeneration &&
                 capturing.compareAndSet(true, false)
             ) {
                 mainHandler.removeCallbacks(watchdog)
+                mainHandler.removeCallbacks(saveWatchdog)
                 bitmap.recycle()
                 mainHandler.post { onResult(result) }
                 return@runner
@@ -177,8 +213,10 @@ object ScreenCapture {
                         return@request
                     }
                     val appContext = activity.applicationContext
+                    // 保存阶段独立看门狗：写盘卡死时复位单飞标志并如实报失败
+                    mainHandler.postDelayed(saveWatchdog, SAVE_TIMEOUT_MS)
                     ioExecutor.execute {
-                        // 保存阶段不在看门狗保护内（PixelCopy 已回调、pixelCopyDone 已置位），
+                        // 保存阶段不在 PixelCopy 看门狗保护内（pixelCopyDone 已置位），
                         // 这里若抛出，finish 永不执行 → capturing 永久为 true，
                         // 之后每次截屏都被判 Busy（与「不会永久失效」的承诺矛盾）
                         val file = runCatching { save(appContext, bitmap) }.getOrNull()
