@@ -815,7 +815,7 @@ class VirtualPadView(
         val active = activeProfile()
         val button = active.buttons.firstOrNull { it.id == id } ?: return
         editProfile = active.withButton(
-            button.copy(text = text.take(12), keys = keys, autoKeep = autoKeep),
+            button.copy(text = text.take(PadProfile.MAX_BUTTON_TEXT), keys = keys, autoKeep = autoKeep),
         )
         rebuild()
         notifySelection()
@@ -1023,16 +1023,19 @@ class VirtualPadView(
         if (!editing) return
         val active = activeProfile()
         val button = active.buttons.firstOrNull { it.id == id } ?: return
-        val next = text.take(12)
+        val next = text.take(PadProfile.MAX_BUTTON_TEXT)
         if (button.text == next) return
         editProfile = active.withButton(button.copy(text = next))
         invalidate()
     }
 
-    /** 恢复出厂布局（保留方案 id / 名称）。编辑态作用于工作副本，非编辑态立即提交。 */
+    /** 恢复出厂布局（保留方案 id / 名称，以及迁移主布局标记）。编辑态作用于工作副本，非编辑态立即提交。 */
     fun resetToDefaults() {
         val active = activeProfile()
+        // 保留 legacyMain：迁移主布局恢复默认后仍是迁移主布局（id/占位名没变），
+        // 丢了标记会让列表把「改名到 Default 后再恢复默认」误认回「默认方案（迁移）」
         val defaults = PadProfile.defaultProfile(active.id, active.name)
+            .copy(legacyMain = active.legacyMain)
         if (editing) {
             editProfile = defaults
             selectedId = DIRECTION_ID

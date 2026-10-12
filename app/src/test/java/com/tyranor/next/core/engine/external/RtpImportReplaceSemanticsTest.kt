@@ -123,19 +123,80 @@ class RtpImportReplaceSemanticsTest {
     @Test
     fun emptyArchiveDoesNotDestroyExistingTarget() {
         // 空来源必须被拦在替换之前：旧实现会先删掉 target 再发现内容为空，
-        // 用户的既有 RTP 就此消失
-        val dest = temporaryFolder.newFolder("empty")
-        val existing = File(dest, "app").apply { mkdirs() }
+        // 用户的既有 RTP 就此消失。
+        // 此前该测试把「既有 RTP」放在一个目录、却对另一个 staging 目录解压，
+        // existing 完全不在调用路径上、断言恒真；这里直接走提交段验证。
+        val parent = temporaryFolder.newFolder("empty")
+        val temp = File(parent, ".import_tmp").apply { mkdirs() }
+        val existing = File(parent, "app").apply { mkdirs() }
         File(existing, "gfx.png").writeText("user-rtp")
 
-        val rejection = RpgMakerRuntimeEnvironment.extractZipStream(
-            ByteArrayInputStream(buildZip(emptyList())),
-            temporaryFolder.newFolder("staging"),
-        )
+        val rejection = RpgMakerRuntimeEnvironment.commitImportTemp(temp, existing)
 
         assertEquals(RtpImportRejection.EmptyArchive, rejection)
         assertTrue("既有内容不得被空来源清掉", File(existing, "gfx.png").isFile)
         assertEquals("user-rtp", File(existing, "gfx.png").readText())
+        assertFalse("空来源不得留下备份/标记现场", File(parent, ".import_backup").exists())
+        assertFalse(File(parent, ".importing").exists())
+    }
+
+    @Test
+    fun recoveryKeepsStateWhenPartialCannotBeDeleted() {
+        // 注入删除失败：半成品 target 删不掉时，恢复必须**中止**（返回 false），
+        // 保留「标记 + 备份」现场待重试——若继续删标记声称成功，下次恢复会把
+        // 「非空 target + 备份」判成「已成功替换的残留」而删掉唯一旧数据。
+        val parent = temporaryFolder.newFolder("delete-fail")
+        val target = File(parent, "app").apply { mkdirs() }
+        File(target, "half.bin").writeText("partial-copy")
+        val backup = File(parent, ".import_backup").apply { mkdirs() }
+        File(backup, "full.bin").writeText("complete-old")
+        File(parent, ".importing").writeText("")
+
+        val recovered = RpgMakerRuntimeEnvironment.recoverPendingImport(target) { false }
+
+        assertFalse("删除失败时恢复必须中止", recovered)
+        assertTrue("标记必须保留（下次恢复重试的依据）", File(parent, ".importing").exists())
+        assertTrue("备份必须保留", File(backup, "full.bin").isFile)
+        assertEquals("complete-old", File(backup, "full.bin").readText())
+        assertTrue("半成品 target 不得被声称清除", File(target, "half.bin").isFile)
+    }
+
+    @Test
+    fun recoveryKeepsStateWhenStaleBackupCannotBeDeleted() {
+        // 目标有效 + 陈旧备份删不掉（成功路径清理失败留下的孤儿占住 .import_backup）：
+        // 恢复必须中止而非继续——继续会让后续 target.renameTo(backup) 失败，被迫走
+        // 「删旧数据而不备份」的危险分支
+        val parent = temporaryFolder.newFolder("stale-delete-fail")
+        val target = File(parent, "app").apply { mkdirs() }
+        File(target, "current.bin").writeText("current")
+        val backup = File(parent, ".import_backup").apply { mkdirs() }
+        File(backup, "old.bin").writeText("old")
+
+        val recovered = RpgMakerRuntimeEnvironment.recoverPendingImport(target) { false }
+
+        assertFalse("陈旧备份删不掉时恢复必须中止", recovered)
+        assertEquals("current", File(target, "current.bin").readText())
+        assertTrue("备份仍保留", File(backup, "old.bin").isFile)
+    }
+
+    @Test
+    fun commitAbortsWithoutDataLossWhenStaleBackupCannotBeDeleted() {
+        // 与上一条同场景但走提交段入口：陈旧备份删不掉 → 本次导入必须放弃（IoFailed），
+        // 旧数据（target）原样保留
+        val parent = temporaryFolder.newFolder("commit-stale-fail")
+        val temp = File(parent, ".import_tmp").apply { mkdirs() }
+        File(temp, "new.bin").writeText("new-rtp")
+        val target = File(parent, "app").apply { mkdirs() }
+        File(target, "current.bin").writeText("current")
+        val backup = File(parent, ".import_backup").apply { mkdirs() }
+        File(backup, "old.bin").writeText("old")
+
+        val rejection = RpgMakerRuntimeEnvironment.commitImportTemp(temp, target) { false }
+
+        assertTrue("陈旧备份占位时必须放弃导入", rejection is RtpImportRejection.IoFailed)
+        assertEquals("current", File(target, "current.bin").readText())
+        assertTrue("旧数据仍在", File(backup, "old.bin").isFile)
+        assertFalse("导入未完成，不得留下提交标记", File(parent, ".importing").exists())
     }
 
     @Test

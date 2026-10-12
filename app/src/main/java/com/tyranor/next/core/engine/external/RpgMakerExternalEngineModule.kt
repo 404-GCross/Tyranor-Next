@@ -198,11 +198,11 @@ object RpgMakerExternalEngineModule : ExternalEngineModule {
 
     private fun ensureRtpEnvironment(context: Context, gameType: String) {
         runCatching {
-            val rtpAppDir = File(
-                Environment.getExternalStorageDirectory(),
-                "JoiPlay" + File.separator + "RTP" + File.separator +
-                    rtpDirNameForGameType(gameType) + File.separator + "app",
-            )
+            // 必须经 RpgMakerRuntimeEnvironment.rtpAppDir 取目录：它会先做一次**中断替换的
+            // 归位**。直接 mkdirs 会绕过恢复——若上一次导入在「旧目录已改名、新内容未顶上」
+            // 之间被杀，备份里是唯一旧数据、app 缺失，这里 mkdirs + 写入 sf.sf2 会把
+            // target 变成非空，后续恢复把备份当孤儿删掉，旧 RTP 永久丢失。
+            val rtpAppDir = RpgMakerRuntimeEnvironment.rtpAppDir(gameType)
             if (!rtpAppDir.exists() && !rtpAppDir.mkdirs()) {
                 Log.w(TAG, "mkdirs failed for RTP dir: ${rtpAppDir.absolutePath}")
                 return
@@ -279,13 +279,6 @@ object RpgMakerExternalEngineModule : ExternalEngineModule {
         }.onFailure { error ->
             Log.w(TAG, "copy asset $assetPath → $destination failed (non-fatal)", error)
         }
-    }
-
-    private fun rtpDirNameForGameType(gameType: String): String = when (gameType) {
-        TYPE_RPGMXP -> "RPGXP"
-        TYPE_RPGMVX -> "RPGVX"
-        TYPE_MKXP_Z -> "mkxp-z"
-        else -> "RPGVXACE"
     }
 
     private fun gameIdFor(folder: String, title: String): String =

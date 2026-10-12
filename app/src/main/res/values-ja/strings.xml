@@ -309,6 +309,7 @@
     <string name="input_settings_gamepad_summary">項目をタップして出力キーを選択。複数キーと押しっぱなしに対応</string>
     <string name="input_settings_reset_gamepad">初期割り当てに戻す</string>
     <string name="input_settings_reset_gamepad_done">初期割り当てに戻しました</string>
+    <string name="input_settings_reset_gamepad_failed">リセットに失敗しました。空き容量を確認して再試行してください。</string>
     <string name="input_settings_binding_empty">未割り当て</string>
     <string name="input_settings_binding_keys">%1$d キー</string>
     <string name="input_settings_auto_keep">保持</string>

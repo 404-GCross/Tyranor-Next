@@ -309,6 +309,7 @@
     <string name="input_settings_gamepad_summary">点按条目选择输出键位；支持多个输出键与“按下保持”</string>
     <string name="input_settings_reset_gamepad">恢复默认映射</string>
     <string name="input_settings_reset_gamepad_done">已恢复默认映射</string>
+    <string name="input_settings_reset_gamepad_failed">重置失败，请检查存储空间后重试</string>
     <string name="input_settings_binding_empty">未绑定</string>
     <string name="input_settings_binding_keys">%1$d 个键位</string>
     <string name="input_settings_auto_keep">保持</string>

@@ -223,6 +223,24 @@ class PadProfileTest {
     }
 
     @Test
+    fun parseDeduplicatesRepeatedButtonIds() {
+        // 重复按钮 id 会让 elementById 后写覆盖、渲染/命中不确定（导入的用户方案可达），
+        // 解析层必须去重且**保留首个**定义
+        val raw = """
+            {"id":"c","name":"c","buttons":[
+              {"id":"ok","text":"first","x":0.5,"y":0.5,"size":0.1},
+              {"id":"ok","text":"second","x":0.9,"y":0.9,"size":0.1,"keys":[66]},
+              {"id":"menu","text":"Menu","x":0.3,"y":0.3,"size":0.1}
+            ]}
+        """.trimIndent()
+        val profile = PadProfile.parse(raw)!!
+        assertEquals("重复 id 必须去重且保留首个", listOf("ok", "menu"), profile.buttons.map { it.id })
+        val ok = profile.buttons.first { it.id == "ok" }
+        assertEquals("必须保留首个定义", "first", ok.text)
+        assertEquals(0.5f, ok.x, 0.0001f)
+    }
+
+    @Test
     fun parseCapsKeysPerBinding() {
         // 键位数组无上限会让坏文件一次分配大量对象；上限同时约束方向键位
         val keys = (1..200).joinToString(",")

@@ -74,6 +74,13 @@ object RpgMakerRuntimeEnvironment {
      */
     private const val IMPORT_MARKER_FILE = ".importing"
 
+    /**
+     * 恢复/提交/清除共用 `.import_backup`、`.importing` 这两个固定名，是同一台状态机：
+     * 导入在 IO 线程、`isRtpImported`/清除在 UI 线程，交错会互相踩踏（如把「替换中」的
+     * 半成品 target 判成有效、或把刚写下的标记当残留删掉），因此这三段必须互斥。
+     */
+    private val importLock = Any()
+
     // 用户挑选的 RTP 包解压上限。数值与 NativePluginInstaller.unzipSafely **不同**
     // （那边是 32 条目 / 512MiB 总量，面向内置插件包）：RTP 是整包素材，条目数与总量
     // 都大得多，因此这里给到 10 万条目 / 4GiB、单条目同为 256MiB
@@ -113,44 +120,51 @@ object RpgMakerRuntimeEnvironment {
      * 把中断的替换留下的现场归位（幂等）。
      *
      * 现场有两种形态：
-     *  - **提交标记 `.importing`**（本次改造起）：上一次替换未正常收尾，`target` 可能是
-     *    半成品（备份式替换在「旧目录已改名、新内容未顶上」之间被杀，或 `copyRecursively`
-     *    只拷了一半）。有备份 → 删掉半成品 target、把备份归位；无备份 → 首次导入的
-     *    半成品，无旧数据可保护，整体清除（连同标记）。
+     *  - **提交标记 `.importing`**：上一次替换未正常收尾，`target` 可能是半成品（备份式
+     *    替换在「旧目录已改名、新内容未顶上」之间被杀，或 `copyRecursively` 只拷了一半）。
+     *    有备份 → 删掉半成品 target、把备份归位；无备份 → 首次导入的半成品，无旧数据可
+     *    保护，整体清除（连同标记）。
      *  - **仅备份（旧版遗留）**：目标缺失**或为空目录**、备份在 → 归位备份。目标为空目录
      *    只可能是上次替换在 `copyRecursively` 刚建目录就被杀留下的半成品，备份才是完整
      *    旧数据；[isRtpImported] 只看目录非空，不归位会让它误报「未导入」。
      *
+     * **删除失败必须中止恢复**：半成品 target 删不掉时若继续删标记、声称成功，下次恢复
+     * 会把「非空 target + 备份」判成「已成功替换的残留」而删掉备份——那是盘上唯一的旧
+     * 数据。此时保留「标记 + 备份」现场，等下次重试（[delete] 可注入以便测试）。
+     *
      * @return false = 现场无法收拾（备份路径被占等），调用方应放弃本次替换（不丢数据）
      */
-    internal fun recoverPendingImport(target: File): Boolean {
-        val parent = target.parentFile ?: return false
+    internal fun recoverPendingImport(
+        target: File,
+        delete: (File) -> Boolean = { it.deleteRecursively() },
+    ): Boolean = synchronized(importLock) {
+        val parent = target.parentFile ?: return@synchronized false
         val backup = File(parent, IMPORT_BACKUP_DIR)
         val marker = File(parent, IMPORT_MARKER_FILE)
         if (marker.exists()) {
             if (backup.exists()) {
-                runCatching { target.deleteRecursively() }
-                if (!marker.delete()) return false
-                if (!target.exists() && !backup.renameTo(target)) return false
+                if (target.exists() && !delete(target)) return@synchronized false
+                if (!marker.delete()) return@synchronized false
+                if (!backup.renameTo(target)) return@synchronized false
             } else {
-                runCatching { target.deleteRecursively() }
-                if (!marker.delete()) return false
+                if (target.exists() && !delete(target)) return@synchronized false
+                if (!marker.delete()) return@synchronized false
             }
-            return true
+            return@synchronized true
         }
         if (backup.exists()) {
             if (!target.exists() || target.listFiles()?.isEmpty() == true) {
                 // 目标缺失或为空目录：备份是唯一旧数据（或完整旧数据），归位
-                if (target.exists() && !target.deleteRecursively()) return false
-                if (!backup.renameTo(target)) return false
+                if (target.exists() && !delete(target)) return@synchronized false
+                if (!backup.renameTo(target)) return@synchronized false
             } else {
                 // 目标有效：备份是上一次已成功替换的残留（成功路径清理失败留下的孤儿）。
                 // 删不掉会占住 .import_backup 路径，使后续 target.renameTo(backup) 失败并
                 // 被迫走「删旧数据」分支——直接返回失败更安全（不丢数据）
-                if (!backup.deleteRecursively()) return false
+                if (!delete(backup)) return@synchronized false
             }
         }
-        return true
+        return@synchronized true
     }
 
     /** RTP 是否已导入（app 目录存在且非空）。 */
@@ -159,11 +173,23 @@ object RpgMakerRuntimeEnvironment {
         return dir.isDirectory && (dir.listFiles()?.isNotEmpty() == true)
     }
 
-    /** 清除该子类型的 RTP（仅删 `app` 层级，保留同目录其余用户内容）。 */
-    fun clearRtp(gameType: String): Boolean {
-        val appDir = rtpAppDir(gameType)
-        if (!appDir.exists()) return true
-        return appDir.deleteRecursively()
+    /**
+     * 清除该子类型的 RTP（仅删 `app` 层级，保留同目录其余用户内容）。
+     *
+     * 顺带清理备份与提交标记：只删 `app` 的话，中断替换留下的备份会在下次
+     * [recoverPendingImport] 时被**归位**——用户看到「清除成功却又回来了」。
+     * 顺序：先删标记（标记在则恢复逻辑会把备份归位），再删备份，最后删 app；
+     * 任一步失败都返回 false 让用户重试，不留半个现场。
+     */
+    fun clearRtp(gameType: String): Boolean = synchronized(importLock) {
+        val root = rtpDir(gameType)
+        val appDir = File(root, "app")
+        val backup = File(root, IMPORT_BACKUP_DIR)
+        val marker = File(root, IMPORT_MARKER_FILE)
+        if (marker.exists() && !marker.delete()) return@synchronized false
+        if (backup.exists() && !backup.deleteRecursively()) return@synchronized false
+        if (!appDir.exists()) return@synchronized true
+        appDir.deleteRecursively()
     }
 
     /**
@@ -187,8 +213,11 @@ object RpgMakerRuntimeEnvironment {
             commitImportTemp(temp, target)
         } catch (ce: CancellationException) {
             throw ce
+        } catch (e: java.util.zip.ZipException) {
+            // 损坏/非法 zip：归因到源文件而非临时目录（否则用户看到的是「读写失败：.import_tmp」）
+            RtpImportRejection.IoFailed(uri.lastPathSegment ?: "zip")
         } catch (_: Throwable) {
-            // 坏 zip（ZipException）、磁盘满、权限不足、源不可读：
+            // 磁盘满、权限不足、源不可读：
             // 都按类型化失败返回（本方法是 core 门面，调用方只按返回值分支）
             RtpImportRejection.IoFailed(created?.name ?: IMPORT_TEMP_DIR)
         } finally {
@@ -235,86 +264,128 @@ object RpgMakerRuntimeEnvironment {
      *    存在即表示 target 不可信（可能只拷了一半），[recoverPendingImport] 据此
      *    恢复，而不是让 [isRtpImported] 误报「已导入」却缺素材；
      *  - **旧目录不能改名时直接放弃本次替换，绝不删旧数据**：删除后若安装又失败，
-     *    旧 RTP 没有备份可回滚，将永久丢失。
+     *    旧 RTP 没有备份可回滚，将永久丢失；
+     *  - 回滚时半成品**删不掉也必须中止**（保留「标记 + 备份」现场）：删掉标记继续走
+     *    的话，下次恢复会把「非空 target + 备份」判成「已成功替换的残留」而删掉旧数据。
+     *
+     * 标记的落盘顺序（先改名、后写标记）是刻意的：标记 + 无备份 ⇔ 首次导入，恢复逻辑
+     * 据此可安全清除半成品 target；若反过来先写标记再改名，在两步之间被杀会留下
+     * 「标记 + 无备份 + 完整旧数据」——恢复逻辑无法把它与首次导入的半成品区分，
+     * 会把完整旧数据当半成品删掉。先改名后写标记的窗口（备份 + 无标记 + 无 target）
+     * 由任何先走 [recoverPendingImport] 的写入者归位（含启动路径，见
+     * `RpgMakerExternalEngineModule.ensureRtpEnvironment`）。
      *
      * 先前的「先删旧目录再铺新内容」有两个后果——`copyRecursively` 中途失败会留下半成品
      * 目录，而 [isRtpImported] 只看目录非空，下次会显示「已导入」却缺素材；删除与替换之间
      * 被杀则旧 RTP 直接丢失。
      */
-    internal fun commitImportTemp(temp: File, target: File): RtpImportRejection? {
+    internal fun commitImportTemp(
+        temp: File,
+        target: File,
+        delete: (File) -> Boolean = { it.deleteRecursively() },
+    ): RtpImportRejection? = synchronized(importLock) {
         flattenSingleRoot(temp)
         // 「无内容」在建目录前判定：空目录/空 zip 复制过去也只会得到空 app 目录，
         // 用户看到「导入成功」却没有任何素材。listFiles() 为 null 是 IO 错误而非空目录，
         // 按 IoFailed 上报（报成「没有内容」会把排查引到错误方向）
-        val children = temp.listFiles() ?: return RtpImportRejection.IoFailed(temp.name)
-        if (children.isEmpty()) return RtpImportRejection.EmptyArchive
+        val children = temp.listFiles() ?: return@synchronized RtpImportRejection.IoFailed(temp.name)
+        if (children.isEmpty()) return@synchronized RtpImportRejection.EmptyArchive
 
-        val parent = target.parentFile ?: return RtpImportRejection.IoFailed(target.name)
+        val parent = target.parentFile ?: return@synchronized RtpImportRejection.IoFailed(target.name)
         val backup = File(parent, IMPORT_BACKUP_DIR)
         val marker = File(parent, IMPORT_MARKER_FILE)
         // 上一次替换未正常收尾的现场（含半成品 target）先归位；收拾不了直接放弃本次替换
-        if (!recoverPendingImport(target)) return RtpImportRejection.IoFailed(target.name)
+        if (!recoverPendingImport(target, delete)) {
+            return@synchronized RtpImportRejection.IoFailed(target.name)
+        }
 
         var hadTarget = false
         if (target.exists()) {
             if (!target.renameTo(backup)) {
                 // 旧目录不能改名：**不删旧数据**。删除后若安装又失败，旧 RTP 将没有备份
                 // 可回滚而永久丢失，直接放弃本次替换（旧数据保持原样）
-                return RtpImportRejection.IoFailed(target.name)
+                return@synchronized RtpImportRejection.IoFailed(target.name)
             }
             hadTarget = true
         }
-        // 旧数据已移开（或本就无旧数据）后才置提交标记：标记+无备份 ⇔ 首次导入，恢复逻辑
-        // 据此可安全清除半成品 target。置位失败回滚 rename 并放弃。
+        // 旧数据已移开（或本就无旧数据）后才置提交标记（次序说明见函数 KDoc）。
+        // 置位失败回滚 rename 并放弃。
         if (!marker.createNewFile()) {
             if (hadTarget) runCatching { backup.renameTo(target) }
-            return RtpImportRejection.IoFailed(marker.name)
+            return@synchronized RtpImportRejection.IoFailed(marker.name)
         }
 
         val installed = temp.renameTo(target) || temp.copyRecursively(target, overwrite = true)
         if (!installed || target.listFiles()?.isNotEmpty() != true) {
             // 回滚：清掉半成品、删标记，把旧目录放回去。
             // 顺序很关键——标记必须先删：若先放回旧数据却留下标记，下次恢复会把
-            // 「放回的旧数据」误当成首次导入半成品而删掉。标记删不掉就保持
-            // 「标记 + 备份」现场（旧数据仍在备份），由下次恢复归位。
-            target.deleteRecursively()
+            // 「放回的旧数据」误当成首次导入半成品而删掉。
+            // 半成品删不掉则保持「标记 + 备份」现场（旧数据仍在备份），由下次恢复重试。
+            if (target.exists() && !delete(target)) {
+                return@synchronized RtpImportRejection.IoFailed(target.name)
+            }
             if (!marker.delete()) {
-                return RtpImportRejection.IoFailed(target.name)
+                return@synchronized RtpImportRejection.IoFailed(target.name)
             }
             if (hadTarget && backup.exists() && !backup.renameTo(target)) {
-                return RtpImportRejection.IoFailed(target.name)
+                return@synchronized RtpImportRejection.IoFailed(target.name)
             }
-            return if (installed) RtpImportRejection.EmptyArchive else RtpImportRejection.IoFailed(target.name)
+            return@synchronized if (installed) {
+                RtpImportRejection.EmptyArchive
+            } else {
+                RtpImportRejection.IoFailed(target.name)
+            }
         }
         // 成功：先删提交标记（提交点）再删备份。标记删不掉 = 无法确认提交（下次恢复会把
         // 新 target 回滚到旧数据），按失败处理；旧数据仍在备份，不丢。
         if (!marker.delete()) {
-            return RtpImportRejection.IoFailed(target.name)
+            return@synchronized RtpImportRejection.IoFailed(target.name)
         }
-        // 备份清理失败不阻塞本次成功，但会占住 .import_backup 路径（下次导入的
-        // recoverPendingImport 会先删它；若仍删不掉则放弃替换，不丢数据）
-        backup.deleteRecursively()
-        return null
+        // 备份清理失败不阻塞本次成功，但会占住 .import_backup 固定路径（下次导入的
+        // target.renameTo(backup) 会因目标已存在而失败 → 导入持续失败）：改名让位，
+        // 陈旧的孤儿备份留作磁盘残留即可，不再挡路。
+        if (backup.exists() && !backup.deleteRecursively()) {
+            runCatching {
+                backup.renameTo(File(parent, "$IMPORT_BACKUP_DIR.${System.currentTimeMillis()}"))
+            }
+        }
+        null
     }
 
-    /** 导入自定义字体到共享目录，返回插件可读的绝对路径；扩展名非法或 IO 失败返回 null。 */
-    fun importCustomFont(context: Context, uri: Uri): String? = try {
-        val displayName = runCatching {
-            context.contentResolver
-                .query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
-                ?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
-        }.getOrNull() ?: uri.lastPathSegment
-        val name = (displayName ?: "font.ttf").substringAfterLast('/').substringAfterLast('\\')
-        if (FONT_EXTENSIONS.none { name.lowercase(Locale.ROOT).endsWith(it) }) return null
-        val dir = File(Environment.getExternalStorageDirectory(), FONT_PARENT)
-        if (!dir.isDirectory && !dir.mkdirs()) return null
-        val target = File(dir, name)
-        context.contentResolver.openInputStream(uri)?.use { input ->
-            target.outputStream().use { output -> input.copyTo(output) }
-        } ?: return null
-        target.absolutePath
-    } catch (_: Throwable) {
-        null
+    /**
+     * 导入自定义字体到共享目录，返回插件可读的绝对路径；扩展名非法或 IO 失败返回 null。
+     *
+     * 先写同目录临时文件再 rename：直写目标名会在写入失败/被杀时留下半成品并**截断
+     * 旧字体**；临时文件 + rename 让目标名的替换是原子的，失败时旧字体保持原样。
+     */
+    fun importCustomFont(context: Context, uri: Uri): String? {
+        var temp: File? = null
+        return try {
+            val displayName = runCatching {
+                context.contentResolver
+                    .query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+                    ?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
+            }.getOrNull() ?: uri.lastPathSegment
+            val name = (displayName ?: "font.ttf").substringAfterLast('/').substringAfterLast('\\')
+            if (FONT_EXTENSIONS.none { name.lowercase(Locale.ROOT).endsWith(it) }) return null
+            val dir = File(Environment.getExternalStorageDirectory(), FONT_PARENT)
+            if (!dir.isDirectory && !dir.mkdirs()) return null
+            val target = File(dir, name)
+            val staging = File(dir, ".$name.${System.currentTimeMillis()}.tmp")
+            temp = staging
+            val copied = context.contentResolver.openInputStream(uri)?.use { input ->
+                staging.outputStream().use { output -> input.copyTo(output) }
+            } != null
+            if (!copied) return null
+            // rename 覆盖已存在目标（同目录原子替换）；失败则保留旧字体，返回 null
+            if (!staging.renameTo(target)) return null
+            target.absolutePath
+        } catch (_: Throwable) {
+            null
+        } finally {
+            // 失败/被杀路径不留半成品（成功时 staging 已改名，此处无操作）
+            temp?.let { if (it.exists()) runCatching { it.delete() } }
+        }
     }
 
     fun isCustomFontPresent(path: String): Boolean =
@@ -470,28 +541,91 @@ object RpgMakerRuntimeEnvironment {
         return DrainResult.Drained(total)
     }
 
-    /** 递归复制 SAF 目录树；失败给出类型化原因（null = 成功）。 */
-    private fun copyDocumentTree(context: Context, source: DocumentFile, dest: File): RtpImportRejection? {
+    /** 递归复制的累计计数（跨递归层共享）。 */
+    private class CopyCounters(var entries: Int = 0, var totalBytes: Long = 0L)
+
+    /**
+     * 递归复制 SAF 目录树；失败给出类型化原因（null = 成功）。
+     *
+     * 与 zip 路径共用同一组上限（条目数 / 单文件 / 累计字节，见 [extractZipStream]）：
+     * 目录树同样可能被构造得巨大（SAF 树没有压缩比问题，但条目数与总量仍可无界），
+     * 无上限复制会写满共享存储。
+     */
+    private fun copyDocumentTree(
+        context: Context,
+        source: DocumentFile,
+        dest: File,
+        maxEntries: Int = MAX_ZIP_ENTRIES,
+        maxEntryBytes: Long = MAX_ENTRY_UNCOMPRESSED_BYTES,
+        maxTotalBytes: Long = MAX_TOTAL_UNCOMPRESSED_BYTES,
+        counters: CopyCounters = CopyCounters(),
+    ): RtpImportRejection? {
         for (child in source.listFiles()) {
             val name = child.name ?: continue
             if (child.isDirectory) {
                 val dir = File(dest, name)
                 if (!dir.exists() && !dir.mkdirs()) return RtpImportRejection.DirectoryCreateFailed(name)
-                copyDocumentTree(context, child, dir)?.let { return it }
+                copyDocumentTree(context, child, dir, maxEntries, maxEntryBytes, maxTotalBytes, counters)
+                    ?.let { return it }
             } else {
+                // 条目数先计数再复制：构造海量小文件同样能拖垮导入
+                counters.entries += 1
+                if (counters.entries > maxEntries) {
+                    return RtpImportRejection.EntryCountExceeded(counters.entries, maxEntries)
+                }
                 val target = File(dest, name)
+                // 上限超限走类型化原因；openInputStream 为 null / 拷贝抛异常归为 IoFailed。
+                // 半成品文件必须删掉：调用方会把整个临时目录丢弃，但若将来复用，
+                // 截断文件会被当成有效素材。
+                var limitRejection: RtpImportRejection? = null
                 val copied = runCatching {
-                    context.contentResolver.openInputStream(child.uri)?.use { input ->
-                        target.outputStream().use { output -> input.copyTo(output) }
-                    } != null
+                    val input = context.contentResolver.openInputStream(child.uri)
+                    if (input == null) {
+                        false
+                    } else {
+                        input.use { src ->
+                            target.outputStream().use { dst ->
+                                limitRejection = copyFileBounded(src, dst, maxEntryBytes, maxTotalBytes, counters)
+                            }
+                        }
+                        limitRejection == null
+                    }
                 }.getOrDefault(false)
                 if (!copied) {
-                    // 半成品文件必须删掉：调用方会把整个临时目录丢弃，但若将来复用，
-                    // 截断文件会被当成有效素材
                     runCatching { target.delete() }
-                    return RtpImportRejection.IoFailed(name)
+                    return limitRejection ?: RtpImportRejection.IoFailed(name)
                 }
             }
+        }
+        return null
+    }
+
+    /**
+     * 有界拷贝单个文件：逐块读写并同时校验单文件与累计总量（与 zip 路径共用上限）。
+     *
+     * @return null = 成功；否则为超限拒绝原因
+     */
+    private fun copyFileBounded(
+        input: InputStream,
+        output: java.io.OutputStream,
+        maxEntryBytes: Long,
+        maxTotalBytes: Long,
+        counters: CopyCounters,
+    ): RtpImportRejection? {
+        val buffer = ByteArray(ZIP_BUFFER_SIZE)
+        var fileBytes = 0L
+        while (true) {
+            val read = input.read(buffer)
+            if (read < 0) break
+            fileBytes += read
+            counters.totalBytes += read
+            if (fileBytes > maxEntryBytes) {
+                return RtpImportRejection.EntrySizeExceeded(fileBytes, maxEntryBytes)
+            }
+            if (counters.totalBytes > maxTotalBytes) {
+                return RtpImportRejection.TotalSizeExceeded(counters.totalBytes, maxTotalBytes)
+            }
+            output.write(buffer, 0, read)
         }
         return null
     }

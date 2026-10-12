@@ -189,9 +189,9 @@ internal fun InputSettingsScreen() {
         }
     }
 
-    fun requestExport(target: InputRemapRepository.ProfileSummary) {
+    fun requestExport(target: InputRemapRepository.ProfileSummary, displayName: String) {
         exportTargetId = target.id
-        val suggested = (target.name.ifBlank { target.id }) + ".json"
+        val suggested = (displayName.ifBlank { target.id }) + ".json"
         runCatching { exportLauncher.launch(suggested) }
             .onFailure {
                 exportTargetId = null
@@ -221,9 +221,10 @@ internal fun InputSettingsScreen() {
             ) {
                 item {
                     EngineCard(stringResource(R.string.engine_settings_input_title)) {
-                        // 开关反映**实际生效值**：从未显式设置时 MV/MZ 默认开，
-                        // 若按「是否显式设置」显示为关，用户会看到「关着但游戏里有按键层」，
-                        // 且想关闭得点两下（先显式开、再显式关）。切换即写入显式设置。
+                        // 开关展示值：未显式设置时按「开」显示（与 MV/MZ 的默认一致，
+                        // 见 globalPadSwitchValue 的 KDoc），否则用户看到「关着但游戏里
+                        // 有按键层」、且想关闭得点两下（先显式开、再显式关）。切换即写入
+                        // 显式设置。Tyrano/VN/WebOther 的实际默认是关，由摘要文案说明。
                         SwitchPreference(
                             title = stringResource(R.string.engine_settings_input_pad_title),
                             summary = stringResource(R.string.engine_settings_input_pad_summary),
@@ -267,6 +268,9 @@ internal fun InputSettingsScreen() {
                             }
                         }
                         profiles.forEach { profile ->
+                            // 展示名在组合期算好再传入：onExport/onCopy 等回调是普通 lambda，
+                            // 不能在内部调用 @Composable 的 profileDisplayName
+                            val displayName = profileDisplayName(profile)
                             ProfileRow(
                                 profile = profile,
                                 selected = profile.id == profileId,
@@ -309,7 +313,7 @@ internal fun InputSettingsScreen() {
                                     }
                                 },
                                 onDelete = if (profile.isDefault) null else ({ deleteTarget = profile.id }),
-                                onExport = { requestExport(profile) },
+                                onExport = { requestExport(profile, displayName) },
                             )
                         }
                     }
@@ -332,13 +336,20 @@ internal fun InputSettingsScreen() {
                                     NoRippleTextButton(
                                         text = stringResource(R.string.input_settings_reset_gamepad),
                                         onClick = {
-                                            // 写盘带 fsync：放主线程会卡住点击瞬间，移到 IO 线程。
-                                            // 该函数返回默认表而非成败，因此这里只保证不阻塞 UI
+                                            // 写盘带 fsync：放主线程会卡住点击瞬间，移到 IO 线程
                                             scope.launch {
-                                                withContext(Dispatchers.IO) {
+                                                val ok = withContext(Dispatchers.IO) {
                                                     InputRemapRepository.resetGamepadMap(ctx)
                                                 }
-                                                toast(ctx, R.string.input_settings_reset_gamepad_done)
+                                                // 写盘失败必须提示：否则用户看到「已恢复」但映射没变
+                                                toast(
+                                                    ctx,
+                                                    if (ok) {
+                                                        R.string.input_settings_reset_gamepad_done
+                                                    } else {
+                                                        R.string.input_settings_reset_gamepad_failed
+                                                    },
+                                                )
                                             }
                                         },
                                     )
@@ -414,7 +425,7 @@ internal fun InputSettingsScreen() {
                 Text(
                     text = stringResource(
                         R.string.input_settings_profile_delete_message,
-                        profiles.firstOrNull { it.id == target }?.name.orEmpty(),
+                        profiles.firstOrNull { it.id == target }?.let { profileDisplayName(it) }.orEmpty(),
                     ),
                     style = MaterialTheme.typography.bodyMedium,
                 )
@@ -430,7 +441,9 @@ internal fun InputSettingsScreen() {
                             }
                             // 删除失败（占用/权限）必须提示，否则列表条目还在、用户以为点了没反应
                             if (!deleted) toast(ctx, R.string.input_settings_profile_delete_failed)
-                            if (profileId == target) {
+                            // 只有删除成功才回退全局选择：失败时把选择切到 default 会
+                            // 让用户失去当前方案（列表里它还在，但生效方案已被悄悄改掉）
+                            if (deleted && profileId == target) {
                                 profileId = InputRemapRepository.defaultProfileId()
                                 InputRemapRepository.setGlobalProfileId(ctx, profileId)
                             }
@@ -465,11 +478,7 @@ private fun ProfileRow(
     // 方案名是随方案持久化的用户数据。两类方案存的是语言中立占位名，此处按 id 本地化展示；
     // 迁移主布局用**不同文案**（默认方案（迁移）），否则它与内置默认方案同名、列表里
     // 出现两个无法区分的条目。用户改过名的方案原样显示（见 isLegacyMain 的判定）
-    val displayName = when {
-        profile.isDefault -> stringResource(R.string.input_settings_profile_default)
-        profile.isLegacyMain -> stringResource(R.string.input_settings_profile_default_migrated)
-        else -> profile.name
-    }
+    val displayName = profileDisplayName(profile)
     Column(Modifier.fillMaxWidth()) {
         ArrowPreference(
             title = displayName,
@@ -500,6 +509,17 @@ private fun ProfileRow(
             }
         }
     }
+}
+
+/**
+ * 方案展示名：内置默认与迁移主布局存的是语言中立占位名，按 id 本地化展示；
+ * 用户改过名的方案原样显示（见 isLegacyMain 的判定）。
+ */
+@Composable
+private fun profileDisplayName(profile: InputRemapRepository.ProfileSummary): String = when {
+    profile.isDefault -> stringResource(R.string.input_settings_profile_default)
+    profile.isLegacyMain -> stringResource(R.string.input_settings_profile_default_migrated)
+    else -> profile.name
 }
 
 /** 方案名输入弹窗（统一 AppSearchField + DialogTextButton + titleMedium 标题样式）。 */

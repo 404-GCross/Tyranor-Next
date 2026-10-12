@@ -266,9 +266,9 @@ object InputConfigStore {
      * 先前实现是「删掉目标再 rename」，只要第二次 rename 仍失败，**新旧配置就一起消失**。
      *
      * 备份式替换的触发**不依赖 target 是否存在**：若上一次替换中途被杀（备份在、目标缺失），
-     * [replaceViaBackup] 会先把备份归位再替换——少了这一步，备份会被当成可丢弃的残留删掉，
-     * 盘上唯一的旧配置就此消失。快路径成功时顺带清理陈旧 `.bak`（上一次成功后被杀的孤儿），
-     * 避免其永久占位、下次替换时被静默丢弃。
+     * 快路径先尝试把备份归位、[replaceViaBackup] 也会先把备份放回去再替换——少了这一步，
+     * 备份会被当成可丢弃的残留删掉，盘上唯一的旧配置就此消失。快路径成功时顺带清理陈旧
+     * `.bak`（上一次成功后被杀的孤儿），避免其永久占位、下次替换时被静默丢弃。
      *
      * 任何失败路径都必须删干净临时文件（含写入过程中抛异常）：残留的 `.tmp` 会一直躺在
      * profiles 目录里，虽然 [listProfiles] 按 `.json` 后缀过滤不会读到它，但会持续占用空间。
@@ -285,12 +285,18 @@ object InputConfigStore {
                     output.flush()
                     output.fd.sync()
                 }
+                // 上一次替换被杀留下的陈旧备份先归位：target 缺失时 `.bak` 是盘上唯一
+                // 旧数据，快路径直接 rename 落新内容、随后把 `.bak` 当残留删掉，等于在
+                // 替换流程之外静默丢弃旧数据——与 [replaceViaBackup]「备份是唯一旧数据时
+                // 必须先归位」的承诺不一致。先归位再替换；归位失败（目录不可写）时
+                // replaceViaBackup 内部会再试一次。
+                if (backup.exists() && !target.exists()) backup.renameTo(target)
                 installed = tmp.renameTo(target)
                 if (!installed) {
                     installed = replaceViaBackup(tmp, target, backup)
                 } else if (backup.exists()) {
-                    // 快路径成功：清理上一次替换成功后被杀留下的陈旧备份，避免孤儿文件
-                    // 永久占位（否则下次替换会在 replaceViaBackup 里把它当可丢弃残留删掉）
+                    // 快路径成功：清理陈旧备份（归位成功时备份已不存在；此处只剩
+                    // 「归位失败但新内容已落位」的极端情况，旧数据已被本次写入取代）
                     backup.delete()
                 }
                 installed

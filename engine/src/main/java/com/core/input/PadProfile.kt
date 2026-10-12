@@ -155,6 +155,9 @@ data class PadProfile(
                         // 保留 id 与方向控件撞键：两者同处 elementById，重名会让渲染、
                         // 命中与编辑全部错乱（导入的用户方案可达此路径）
                         if (button.id == DIRECTION_ID) continue
+                        // 重复按钮 id 同样会让 elementById 后写覆盖、渲染/命中不确定：
+                        // 解析层去重（保留首个），导入的用户方案可达此路径
+                        if (buttons.any { it.id == button.id }) continue
                         buttons.add(button)
                     }
                 }

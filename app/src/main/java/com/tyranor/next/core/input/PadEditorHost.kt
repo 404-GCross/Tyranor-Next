@@ -172,12 +172,12 @@ class PadEditorHost private constructor(
                             // 回收视图树），失败时才由页面提示并留在编辑态。
                             // 回调不设防会拖垮收尾：onSaved（Toast + finish）若抛出，异常会从
                             // launch 逃到未捕获处理器（SupervisorJob 只隔离兄弟协程）导致进程
-                            // 崩溃，且会话停在 pending、编辑态不收尾。收尾放 finally、回调自身的
-                            // 异常吞掉。
+                            // 崩溃，且会话停在 pending、编辑态不收尾。收尾放 finally、回调自身
+                            // 的异常吞掉（finally 里的收尾同样包住，避免收尾自身抛出）。
                             try {
                                 runCatching { host.onSavedCallback(committed) }
                             } finally {
-                                pad.completeDeferredSave(session, true)
+                                runCatching { pad.completeDeferredSave(session, true) }
                             }
                         } else {
                             runCatching { pad.completeDeferredSave(session, false) }

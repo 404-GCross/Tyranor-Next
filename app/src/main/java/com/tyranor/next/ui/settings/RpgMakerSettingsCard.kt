@@ -16,6 +16,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -69,20 +70,29 @@ internal fun RpgMakerRgssSettingsCard(
     var showRtpSourceDialog by remember { mutableStateOf(false) }
     var pendingRtpType by remember { mutableStateOf<String?>(null) }
     var clearingRtpType by remember { mutableStateOf<String?>(null) }
-    var rtpImported by remember {
-        mutableStateOf(RPGM_RTP_TYPES.associateWith { RpgMakerRuntimeEnvironment.isRtpImported(it) })
+    var rtpImported by remember { mutableStateOf(RPGM_RTP_TYPES.associateWith { false }) }
+
+    // RTP 状态读盘（含中断恢复的文件操作）放 IO 线程：组合期在主线程逐个 stat/rename
+    // 目录有 ANR 风险（恢复路径会 deleteRecursively 半成品）
+    LaunchedEffect(Unit) {
+        rtpImported = withContext(Dispatchers.IO) {
+            RPGM_RTP_TYPES.associateWith { RpgMakerRuntimeEnvironment.isRtpImported(it) }
+        }
     }
 
     // 从安装器返回后刷新模块/RTP 状态（与引擎页 ON_RESUME 刷新策略一致）
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
         moduleInstalled = ExternalEngineLauncher.isPackageInstalled(ctx, RpgMakerExternalEngineModule)
-        rtpImported = RPGM_RTP_TYPES.associateWith { RpgMakerRuntimeEnvironment.isRtpImported(it) }
+        scope.launch {
+            rtpImported = withContext(Dispatchers.IO) {
+                RPGM_RTP_TYPES.associateWith { RpgMakerRuntimeEnvironment.isRtpImported(it) }
+            }
+        }
     }
 
-    fun refreshRtp(type: String) {
-        rtpImported = rtpImported.toMutableMap().apply {
-            put(type, RpgMakerRuntimeEnvironment.isRtpImported(type))
-        }
+    suspend fun refreshRtp(type: String) {
+        val imported = withContext(Dispatchers.IO) { RpgMakerRuntimeEnvironment.isRtpImported(type) }
+        rtpImported = rtpImported.toMutableMap().apply { put(type, imported) }
     }
 
     val zipLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
@@ -367,15 +377,20 @@ internal fun RpgMakerRgssSettingsCard(
             text = { Text(stringResource(R.string.engine_settings_rpgm_rtp_clear_confirm)) },
             confirmButton = {
                 DialogTextButton(text = stringResource(R.string.common_confirm), onClick = {
-                    val cleared = RpgMakerRuntimeEnvironment.clearRtp(type)
-                    refreshRtp(type)
-                    clearingRtpType = null
-                    val msg = if (cleared) {
-                        R.string.engine_settings_rpgm_rtp_cleared
-                    } else {
-                        R.string.engine_settings_rpgm_rtp_clear_failed
+                    // clearRtp 会递归删目录：放 IO 线程，避免清除大 RTP 时卡住点击瞬间
+                    scope.launch {
+                        val cleared = withContext(Dispatchers.IO) {
+                            RpgMakerRuntimeEnvironment.clearRtp(type)
+                        }
+                        refreshRtp(type)
+                        clearingRtpType = null
+                        val msg = if (cleared) {
+                            R.string.engine_settings_rpgm_rtp_cleared
+                        } else {
+                            R.string.engine_settings_rpgm_rtp_clear_failed
+                        }
+                        Toast.makeText(ctx, ctx.getString(msg), Toast.LENGTH_SHORT).show()
                     }
-                    Toast.makeText(ctx, ctx.getString(msg), Toast.LENGTH_SHORT).show()
                 })
             },
             dismissButton = {

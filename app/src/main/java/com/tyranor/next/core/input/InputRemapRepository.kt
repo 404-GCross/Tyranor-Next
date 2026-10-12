@@ -204,11 +204,13 @@ object InputRemapRepository {
     fun writeGamepadMap(context: Context, map: GamepadMap): Boolean =
         InputConfigStore.writeGamepadMap(context, map)
 
-    fun resetGamepadMap(context: Context): GamepadMap {
-        val defaults = GamepadMap.default()
-        writeGamepadMap(context, defaults)
-        return defaults
-    }
+    /**
+     * 恢复默认映射并落盘。
+     *
+     * @return 是否写盘成功（UI 据此提示成败；只返回默认表会让 UI 恒报「已恢复」）
+     */
+    fun resetGamepadMap(context: Context): Boolean =
+        writeGamepadMap(context, GamepadMap.default())
 
     // ---------- 旧数据迁移 ----------
 
@@ -471,7 +473,9 @@ object InputRemapRepository {
     fun importProfileAsNew(context: Context, raw: String?, newId: String, newName: String): ProfileSummary? {
         val parsed = PadProfile.parse(raw) ?: return null
         if (InputConfigStore.sanitizeProfileId(newId) == null) return null
-        val profile = parsed.copy(id = newId, name = newName)
+        // 导入即新方案（新 id 不匹配迁移主布局正则）：显式清掉 legacyMain，
+        // 与 duplicateProfile 保持一致，避免把源文件里的迁移标记写进新方案
+        val profile = parsed.copy(id = newId, name = newName, legacyMain = false)
         if (!writeProfile(context, profile)) return null
         return ProfileSummary(id = newId, name = newName, isDefault = false, isLegacyMain = false)
     }
