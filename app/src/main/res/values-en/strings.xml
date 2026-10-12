@@ -298,6 +298,7 @@
     <string name="engine_settings_fvp_text_hidpi_summary">Rasterize text at the screen scale for sharper text on high-DPI displays</string>
     <string name="engine_settings_ppsspp_title">PPSSPP engine settings</string>
     <string name="engine_settings_input_title">Input &amp; gamepad</string>
+    <string name="engine_settings_input_summary">Switches and management for the virtual pad, key profiles and gamepad mapping</string>
     <string name="engine_settings_input_pad_title">Virtual pad</string>
     <string name="engine_settings_input_pad_summary">Show an editable on-screen key overlay during games; on by default for RPG Maker MV/MZ only, enabling it applies to all Web engines</string>
     <string name="engine_settings_input_gamepad_title">Gamepad mapping</string>

@@ -209,12 +209,21 @@ data class GamepadMap(
                 down = keysFromJson(obj.optJSONArray("down")),
                 left = keysFromJson(obj.optJSONArray("left")),
                 right = keysFromJson(obj.optJSONArray("right")),
-                deadzone = obj.optDouble("deadzone", StickBinding.DEFAULT_DEADZONE.toDouble())
-                    .toFloat().coerceIn(StickBinding.MIN_DEADZONE, StickBinding.MAX_DEADZONE),
-                hysteresis = obj.optDouble("hysteresis", StickBinding.DEFAULT_HYSTERESIS.toDouble())
-                    .toFloat().coerceIn(0f, 0.4f),
+                deadzone = finiteFloat(obj.optDouble("deadzone", StickBinding.DEFAULT_DEADZONE.toDouble()), StickBinding.DEFAULT_DEADZONE)
+                    .coerceIn(StickBinding.MIN_DEADZONE, StickBinding.MAX_DEADZONE),
+                hysteresis = finiteFloat(obj.optDouble("hysteresis", StickBinding.DEFAULT_HYSTERESIS.toDouble()), StickBinding.DEFAULT_HYSTERESIS)
+                    .coerceIn(0f, 0.4f),
             )
         }
+
+        /**
+         * JSON 数值 → Float，**非有限值回落 [fallback]**。
+         *
+         * `org.json` 的 `optDouble` 会把字符串 `"NaN"` 解析成 `Double.NaN`，而 `coerceIn`
+         * 对 NaN 不生效（比较全为 false）——导入的构造文件可注入 NaN 死区/滞回。
+         */
+        private fun finiteFloat(raw: Double, fallback: Float): Float =
+            if (raw.isFinite()) raw.toFloat() else fallback
 
         private fun keysToJson(keys: List<Int>): JSONArray = JSONArray().apply {
             keys.forEach { put(it) }

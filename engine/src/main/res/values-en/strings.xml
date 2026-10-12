@@ -69,7 +69,7 @@
     <string name="engine_input_direction_right">Right</string>
     <string name="engine_input_pick_direction_key">Choose keys for this direction</string>
     <string name="engine_input_unavailable_format">%1$s (%2$s)</string>
-    <string name="input_settings_binding_empty">Not bound</string>
+    <string name="engine_input_binding_empty">Not bound</string>
     <string name="engine_input_delete">Delete</string>
     <string name="engine_input_reset">Reset</string>
     <string name="engine_input_save">Save</string>

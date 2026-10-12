@@ -504,6 +504,10 @@ class VirtualPadView(
 
     private fun pressButton(button: PadButton) {
         if (!button.visible) return
+        // 多指可按同一按钮，但派发只由**第一根**手指触发：autoKeep 是翻转语义，
+        // 第二根手指再 press 会立刻发出 keyup（把「保持」打断），非 autoKeep 也会让
+        // pressedIds 记账与实际按压不一致（抬起路径已用 isHeldById 做了对称守卫）
+        if (button.id in pressedIds) return
         pressedIds.add(button.id)
         dispatcher.press(PAD_SCOPE + button.id, button.keys, button.autoKeep)
         invalidate()

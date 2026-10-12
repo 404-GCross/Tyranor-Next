@@ -241,6 +241,46 @@ class PadProfileTest {
     }
 
     @Test
+    fun parseRejectsReservedDirectionDispatchPrefix() {
+        // 方向控件的派发 id 是 `pad:direction.<方向>`（见 VirtualPadView.applyDirectionState）：
+        // `direction.` 前缀的按钮 id 会与它撞同一个派发作用域（如 direction.up），
+        // 导入的用户方案可达此路径，解析层一并丢弃
+        val raw = """
+            {"id":"c","name":"c","buttons":[
+              {"id":"direction.up","text":"fake","x":0.5,"y":0.5,"size":0.1},
+              {"id":"ok","text":"OK","x":0.5,"y":0.5,"size":0.1}
+            ]}
+        """.trimIndent()
+        val profile = PadProfile.parse(raw)!!
+        assertEquals("方向派发前缀的按钮必须被丢弃", listOf("ok"), profile.buttons.map { it.id })
+    }
+
+    @Test
+    fun parseFallsBackForNonFiniteNumbers() {
+        // Android 运行时的 org.json 会把 "NaN"/"Infinity" 解析成非有限 Double，而 coerceIn
+        // 对 NaN 不生效（比较全为 false）——导入的构造文件可注入 NaN 坐标/尺寸，元素随之
+        // 不绘制、不可点、拖不动。非有限值必须回落默认。
+        // 这里用 JVM 侧 org.json 也能产出的非有限值（1e400 → ±Infinity）锚定回落行为。
+        // 先锚定前提，避免「注入值其实被 org.json 当成非法而回落默认」导致的恒真测试。
+        val probe = JSONObject("""{"x":1e400}""").optDouble("x", 0.5)
+        org.junit.Assert.assertFalse("前提：1e400 必须被解析为非有限值，实际 $probe", probe.isFinite())
+        val raw = """
+            {"id":"c","name":"c","buttons":[
+              {"id":"ok","text":"OK","x":1e400,"y":-1e400,"size":1e400,"aspect":1e400}
+            ],"direction":{"x":1e400,"y":-1e400,"size":1e400}}
+        """.trimIndent()
+        val profile = PadProfile.parse(raw)!!
+        val ok = profile.buttons.single()
+        assertEquals("非有限坐标必须回落默认而不是 clamp", 0.5f, ok.x, 0.0001f)
+        assertEquals(0.5f, ok.y, 0.0001f)
+        assertEquals(0.1f, ok.size, 0.0001f)
+        assertEquals(PadButton.DEFAULT_ASPECT, ok.aspect, 0.0001f)
+        assertEquals(0.17f, profile.direction.x, 0.0001f)
+        assertEquals(0.80f, profile.direction.y, 0.0001f)
+        assertEquals(0.30f, profile.direction.size, 0.0001f)
+    }
+
+    @Test
     fun parseCapsKeysPerBinding() {
         // 键位数组无上限会让坏文件一次分配大量对象；上限同时约束方向键位
         val keys = (1..200).joinToString(",")

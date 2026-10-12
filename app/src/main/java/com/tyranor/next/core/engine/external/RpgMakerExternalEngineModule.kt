@@ -198,11 +198,16 @@ object RpgMakerExternalEngineModule : ExternalEngineModule {
 
     private fun ensureRtpEnvironment(context: Context, gameType: String) {
         runCatching {
-            // 必须经 RpgMakerRuntimeEnvironment.rtpAppDir 取目录：它会先做一次**中断替换的
-            // 归位**。直接 mkdirs 会绕过恢复——若上一次导入在「旧目录已改名、新内容未顶上」
-            // 之间被杀，备份里是唯一旧数据、app 缺失，这里 mkdirs + 写入 sf.sf2 会把
-            // target 变成非空，后续恢复把备份当孤儿删掉，旧 RTP 永久丢失。
-            val rtpAppDir = RpgMakerRuntimeEnvironment.rtpAppDir(gameType)
+            // 必须经 RpgMakerRuntimeEnvironment 取目录：它会先做一次**中断替换的归位**，
+            // 且只在现场已收尾时返回（rtpAppDirIfReady）。直接 mkdirs 会绕过恢复——若上
+            // 一次导入在「旧目录已改名、新内容未顶上」之间被杀，备份里是唯一旧数据、app
+            // 缺失，这里 mkdirs + 写入 sf.sf2 会把 target 变成非空，后续恢复把备份当孤儿
+            // 删掉，旧 RTP 永久丢失。归位失败时返回 null → 本次不写入，留给下次重试。
+            val rtpAppDir = RpgMakerRuntimeEnvironment.rtpAppDirIfReady(gameType)
+            if (rtpAppDir == null) {
+                Log.w(TAG, "RTP pending import unresolved; skip app dir setup for $gameType")
+                return
+            }
             if (!rtpAppDir.exists() && !rtpAppDir.mkdirs()) {
                 Log.w(TAG, "mkdirs failed for RTP dir: ${rtpAppDir.absolutePath}")
                 return

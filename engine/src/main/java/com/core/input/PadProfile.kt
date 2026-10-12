@@ -153,8 +153,11 @@ data class PadProfile(
                         val obj = array.optJSONObject(i) ?: continue
                         val button = buttonFromJson(obj) ?: continue
                         // 保留 id 与方向控件撞键：两者同处 elementById，重名会让渲染、
-                        // 命中与编辑全部错乱（导入的用户方案可达此路径）
-                        if (button.id == DIRECTION_ID) continue
+                        // 命中与编辑全部错乱（导入的用户方案可达此路径）。
+                        // 方向控件的**派发 id** 是 `pad:direction.<方向>`（见
+                        // VirtualPadView.applyDirectionState），因此 `direction.` 前缀的按钮
+                        // id 会与它撞派发作用域（如 `direction.up`），一并丢弃。
+                        if (button.id == DIRECTION_ID || button.id.startsWith("$DIRECTION_ID.")) continue
                         // 重复按钮 id 同样会让 elementById 后写覆盖、渲染/命中不确定：
                         // 解析层去重（保留首个），导入的用户方案可达此路径
                         if (buttons.any { it.id == button.id }) continue
@@ -438,11 +441,11 @@ data class PadProfile(
             return PadButton(
                 id = id,
                 text = obj.optString("text").take(MAX_BUTTON_TEXT),
-                x = obj.optDouble("x", 0.5).toFloat().coerceIn(-0.1f, 1.1f),
-                y = obj.optDouble("y", 0.5).toFloat().coerceIn(-0.1f, 1.1f),
-                size = obj.optDouble("size", 0.1).toFloat()
+                x = finiteFloat(obj.optDouble("x", 0.5), 0.5f).coerceIn(-0.1f, 1.1f),
+                y = finiteFloat(obj.optDouble("y", 0.5), 0.5f).coerceIn(-0.1f, 1.1f),
+                size = finiteFloat(obj.optDouble("size", 0.1), 0.1f)
                     .coerceIn(PadButton.MIN_SIZE, PadButton.MAX_SIZE),
-                aspect = obj.optDouble("aspect", PadButton.DEFAULT_ASPECT.toDouble()).toFloat()
+                aspect = finiteFloat(obj.optDouble("aspect", PadButton.DEFAULT_ASPECT.toDouble()), PadButton.DEFAULT_ASPECT)
                     .coerceIn(0.1f, 2f),
                 shape = obj.optString("shape", PadButton.SHAPE_ROUND),
                 visible = obj.optBoolean("visible", true),
@@ -450,6 +453,16 @@ data class PadProfile(
                 autoKeep = obj.optBoolean("autoKeep", false),
             )
         }
+
+        /**
+         * JSON 数值 → Float，**非有限值回落 [fallback]**。
+         *
+         * `org.json` 的 `optDouble` 会把字符串 `"NaN"` 解析成 `Double.NaN`，而
+         * `coerceIn` 对 NaN 不生效（比较全为 false）——导入的构造文件可注入 NaN 坐标/尺寸，
+         * 元素随之不绘制、不可点、拖不动。Infinity 虽会被 clamp，也一并按回落处理。
+         */
+        private fun finiteFloat(raw: Double, fallback: Float): Float =
+            if (raw.isFinite()) raw.toFloat() else fallback
 
         private fun directionToJson(direction: PadDirection): JSONObject = JSONObject().apply {
             put("x", direction.x.toDouble())
@@ -466,9 +479,9 @@ data class PadProfile(
         private fun directionFromJson(obj: JSONObject?): PadDirection {
             if (obj == null) return PadDirection()
             return PadDirection(
-                x = obj.optDouble("x", 0.17).toFloat().coerceIn(-0.1f, 1.1f),
-                y = obj.optDouble("y", 0.80).toFloat().coerceIn(-0.1f, 1.1f),
-                size = obj.optDouble("size", 0.30).toFloat().coerceIn(0.08f, 0.8f),
+                x = finiteFloat(obj.optDouble("x", 0.17), 0.17f).coerceIn(-0.1f, 1.1f),
+                y = finiteFloat(obj.optDouble("y", 0.80), 0.80f).coerceIn(-0.1f, 1.1f),
+                size = finiteFloat(obj.optDouble("size", 0.30), 0.30f).coerceIn(0.08f, 0.8f),
                 visible = obj.optBoolean("visible", true),
                 eightDir = obj.optBoolean("eightDir", true),
                 // 字段缺失 = 用出厂方向键；字段存在但为空数组 = 该方向不输出（显式解绑）

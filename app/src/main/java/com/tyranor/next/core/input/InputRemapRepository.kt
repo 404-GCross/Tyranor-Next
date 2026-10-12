@@ -199,8 +199,6 @@ object InputRemapRepository {
 
     // ---------- 手柄映射 ----------
 
-    fun readGamepadMap(context: Context): GamepadMap = InputConfigStore.readGamepadMap(context)
-
     fun writeGamepadMap(context: Context, map: GamepadMap): Boolean =
         InputConfigStore.writeGamepadMap(context, map)
 
@@ -403,23 +401,24 @@ object InputRemapRepository {
     const val STICK_RIGHT = "right"
     private val STICKS = listOf(STICK_LEFT, STICK_RIGHT)
 
-    // 手柄逻辑按键 id 常量（UI 用它们做标签映射；值由 engine 侧定义，此处只做再导出）
-    const val GAMEPAD_A = "A"
-    const val GAMEPAD_B = "B"
-    const val GAMEPAD_X = "X"
-    const val GAMEPAD_Y = "Y"
-    const val GAMEPAD_START = "START"
-    const val GAMEPAD_SELECT = "SELECT"
-    const val GAMEPAD_L1 = "L1"
-    const val GAMEPAD_R1 = "R1"
-    const val GAMEPAD_L2 = "L2"
-    const val GAMEPAD_R2 = "R2"
-    const val GAMEPAD_L3 = "L3"
-    const val GAMEPAD_R3 = "R3"
-    const val GAMEPAD_DPAD_UP = "DPAD_UP"
-    const val GAMEPAD_DPAD_DOWN = "DPAD_DOWN"
-    const val GAMEPAD_DPAD_LEFT = "DPAD_LEFT"
-    const val GAMEPAD_DPAD_RIGHT = "DPAD_RIGHT"
+    // 手柄逻辑按键 id 常量（UI 用它们做标签映射）。**直接再导出** engine 侧定义而不是
+    // 复制字面量：engine 改 id 时这里会编译失败，避免「复制版」静默失配
+    const val GAMEPAD_A = GamepadButtons.A
+    const val GAMEPAD_B = GamepadButtons.B
+    const val GAMEPAD_X = GamepadButtons.X
+    const val GAMEPAD_Y = GamepadButtons.Y
+    const val GAMEPAD_START = GamepadButtons.START
+    const val GAMEPAD_SELECT = GamepadButtons.SELECT
+    const val GAMEPAD_L1 = GamepadButtons.L1
+    const val GAMEPAD_R1 = GamepadButtons.R1
+    const val GAMEPAD_L2 = GamepadButtons.L2
+    const val GAMEPAD_R2 = GamepadButtons.R2
+    const val GAMEPAD_L3 = GamepadButtons.L3
+    const val GAMEPAD_R3 = GamepadButtons.R3
+    const val GAMEPAD_DPAD_UP = GamepadButtons.DPAD_UP
+    const val GAMEPAD_DPAD_DOWN = GamepadButtons.DPAD_DOWN
+    const val GAMEPAD_DPAD_LEFT = GamepadButtons.DPAD_LEFT
+    const val GAMEPAD_DPAD_RIGHT = GamepadButtons.DPAD_RIGHT
 
     /**
      * 方案名去重（新增 / 复制 / 导入用）。

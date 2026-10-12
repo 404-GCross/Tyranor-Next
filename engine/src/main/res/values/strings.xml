@@ -69,7 +69,7 @@
     <string name="engine_input_direction_right">右</string>
     <string name="engine_input_pick_direction_key">选择该方向的键位</string>
     <string name="engine_input_unavailable_format">%1$s（%2$s）</string>
-    <string name="input_settings_binding_empty">未绑定</string>
+    <string name="engine_input_binding_empty">未绑定</string>
     <string name="engine_input_delete">删除</string>
     <string name="engine_input_reset">恢复默认</string>
     <string name="engine_input_save">保存</string>

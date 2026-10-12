@@ -340,9 +340,11 @@ internal fun RpgMakerRgssSettingsCard(
             },
             text = {
                 Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    // 弹窗点击反馈规范：共享条目组件显式 indication = null（与其他弹窗一致）
                     AppNavItem(
                         title = stringResource(R.string.engine_settings_rpgm_rtp_from_zip),
                         containerColor = DialogItemSurface,
+                        indication = null,
                     ) {
                         showRtpSourceDialog = false
                         zipLauncher.launch("*/*")
@@ -350,6 +352,7 @@ internal fun RpgMakerRgssSettingsCard(
                     AppNavItem(
                         title = stringResource(R.string.engine_settings_rpgm_rtp_from_dir),
                         containerColor = DialogItemSurface,
+                        indication = null,
                     ) {
                         showRtpSourceDialog = false
                         treeLauncher.launch(null)

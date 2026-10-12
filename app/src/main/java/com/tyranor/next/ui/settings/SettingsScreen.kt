@@ -334,7 +334,9 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                             )
                             ArrowPreference(
                                 title = stringResource(R.string.engine_settings_input_title),
-                                summary = stringResource(R.string.engine_settings_input_pad_summary),
+                                // 入口摘要须覆盖整页能力（虚拟按键 + 按键方案 + 手柄映射），
+                                // 不能只写虚拟按键的开关说明
+                                summary = stringResource(R.string.engine_settings_input_summary),
                                 startAction = { SettingsItemIcon(R.drawable.ic_settings_engine) },
                                 onClick = { startActivityWithPageTransition(ctx, InputSettingsActivity.createIntent(ctx)) },
                             )

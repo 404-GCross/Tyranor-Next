@@ -298,6 +298,7 @@
     <string name="engine_settings_fvp_text_hidpi_summary">画面スケールでテキストをラスタライズし、高解像度画面でくっきり表示します</string>
     <string name="engine_settings_ppsspp_title">PPSSPP エンジン設定</string>
     <string name="engine_settings_input_title">入力とゲームパッド</string>
+    <string name="engine_settings_input_summary">バーチャルパッド・キー配置・ゲームパッド割り当ての切り替えと管理</string>
     <string name="engine_settings_input_pad_title">バーチャルパッド</string>
     <string name="engine_settings_input_pad_summary">ゲーム画面に編集可能な仮想キーを重ねて表示します。既定では RPG Maker MV/MZ のみ有効で、オンにするとすべての Web エンジンに適用されます</string>
     <string name="engine_settings_input_gamepad_title">ゲームパッド割り当て</string>

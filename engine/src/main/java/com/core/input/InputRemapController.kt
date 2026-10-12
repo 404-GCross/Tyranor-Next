@@ -202,7 +202,10 @@ class InputRemapController private constructor(
     }
 
     fun onResume() {
-        // 页面重载 / 切回前台：重新读取生效设置（设置页可能已改开关或方案）
+        // 页面重载 / 切回前台：重新读取生效设置。
+        // 注意 prefs 的跨进程可见性：方案 JSON 与手柄映射文件走文件系统、即时生效；
+        // 三个 prefs 键（开关/方案选择）会被独立进程缓存，设置页改动需新开游戏才生效
+        // （见 applyEnabledState 的 KDoc）。
         val current = InputConfigStore.resolve(activity, gameId, engineDefaultsEnabled)
         applyEnabledState(current)
         router?.updateMap(InputConfigStore.readGamepadMap(activity))
@@ -216,8 +219,14 @@ class InputRemapController private constructor(
     /**
      * 按最新设置挂载/卸载虚拟按键与手柄映射。
      *
-     * 设置页改动后回到游戏即可生效，无需重启：原先只在构造时判定一次，
-     * 用户在设置页关掉开关、回到游戏仍然有按键层（与设置不一致）。
+     * 作用范围（原先只在构造时判定一次，用户在设置页关掉开关、回到游戏仍然有按键层，
+     * 与设置不一致，这是本方法存在的理由）：
+     *  - **方案 JSON 内容、手柄映射文件**：每次 [onResume] 重读文件系统，编辑后切回游戏
+     *    即时生效；
+     *  - **`input_pad_enabled` / `input_gamepad_enabled` / `input_profile_id`**：存在共享
+     *    prefs，而引擎宿主跑在独立进程（`:tyrano` / `:rpgmaker` / ...），读到的是**本进程
+     *    缓存的** `tyranor_prefs`——app 设置页（主进程）写完后，存活的引擎进程不会观察到，
+     *    需新开一次游戏（进程重启）才生效。
      */
     private fun applyEnabledState(current: InputConfigStore.InputSettings) {
         if (current.padEnabled && padView == null) {

@@ -316,7 +316,7 @@ class VirtualPadEditPanel(
             context.getString(R.string.engine_input_direction_right) to info.right,
         ).joinToString("　") { (label, keys) ->
             val text = if (keys.isEmpty()) {
-                context.getString(R.string.input_settings_binding_empty)
+                context.getString(R.string.engine_input_binding_empty)
             } else {
                 keys.joinToString("+") { key ->
                     InputKeyCatalog.label(context, key).ifBlank { key.toString() }

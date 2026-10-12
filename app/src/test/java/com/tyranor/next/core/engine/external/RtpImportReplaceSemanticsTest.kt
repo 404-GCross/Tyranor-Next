@@ -8,6 +8,7 @@ import java.util.zip.ZipOutputStream
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -197,6 +198,25 @@ class RtpImportReplaceSemanticsTest {
         assertEquals("current", File(target, "current.bin").readText())
         assertTrue("旧数据仍在", File(backup, "old.bin").isFile)
         assertFalse("导入未完成，不得留下提交标记", File(parent, ".importing").exists())
+    }
+
+    @Test
+    fun readyAppDirIsNullWhenRecoveryFailsWithoutLosingOldData() {
+        // 启动路径（ensureRtpEnvironment）用的取目录接口：归位失败时必须返回 null，
+        // 让调用方**不要** mkdirs / 写 sf.sf2——否则 target 变非空，下次恢复会把备份
+        // 当「成功替换的陈旧孤儿」删掉，旧 RTP 永久丢失
+        val root = temporaryFolder.newFolder("ready-fail")
+        val target = File(root, "app").apply { mkdirs() }
+        File(target, "half.bin").writeText("partial-copy")
+        val backup = File(root, ".import_backup").apply { mkdirs() }
+        File(backup, "full.bin").writeText("complete-old")
+        File(root, ".importing").writeText("")
+
+        val ready = RpgMakerRuntimeEnvironment.rtpAppDirIfReady(root) { false }
+
+        assertNull("归位失败时不得交出可写目录", ready)
+        assertTrue("备份（唯一旧数据）必须保留", File(backup, "full.bin").isFile)
+        assertEquals("complete-old", File(backup, "full.bin").readText())
     }
 
     @Test

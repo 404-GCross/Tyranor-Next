@@ -72,6 +72,25 @@ class GamepadMapTest {
     }
 
     @Test
+    fun nonFiniteDeadzoneAndHysteresisFallBackToDefaults() {
+        // 非有限值不得进入死区/滞回：Android 运行时的 org.json 会把 "NaN"/"Infinity"
+        // 解析成非有限 Double，而 coerceIn 对 NaN 不生效（比较全为 false）——NaN 死区会让
+        // 摇杆方向判定失效。此处用 JVM org.json 也能产出的非有限值（1e400 → Infinity）锚定。
+        // 先锚定前提，避免「注入值其实被 org.json 当成非法而回落默认」导致的恒真测试。
+        val probe = org.json.JSONObject("""{"x":1e400}""").optDouble("x", 0.5)
+        org.junit.Assert.assertFalse("前提：1e400 必须被解析为非有限值，实际 $probe", probe.isFinite())
+        val raw = """{"schema":1,"buttons":{},"sticks":{"left":{"deadzone":1e400,"hysteresis":-1e400}}}"""
+        val parsed = GamepadMap.parse(raw)!!
+        assertEquals(
+            "非有限死区必须回落默认而不是 clamp",
+            StickBinding.DEFAULT_DEADZONE,
+            parsed.leftStick.deadzone,
+            0.0001f,
+        )
+        assertEquals(StickBinding.DEFAULT_HYSTERESIS, parsed.leftStick.hysteresis, 0.0001f)
+    }
+
+    @Test
     fun higherSchemaIsRejected() {
         // 与 PadProfile 同一约束：高版本文件可能带未知字段，静默按低版本读会丢字段
         assertNull(GamepadMap.parse("""{"schema":${GamepadMap.SCHEMA + 1},"buttons":{}}"""))

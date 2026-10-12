@@ -117,6 +117,25 @@ object RpgMakerRuntimeEnvironment {
     }
 
     /**
+     * RTP 根目录（`.../<子类型>/app`），**仅在无未收尾现场时**返回。
+     *
+     * 与 [rtpAppDir] 的区别：归位失败（如「标记已删、备份 rename 回 target 失败」留下
+     * 「无标记 + 仅备份 + target 缺失」）时返回 null。**会向 app 目录写入**的调用方必须用本
+     * 方法——若此时先把 target 建成非空（如 mkdirs + 写 sf.sf2），下一次恢复会把备份当成
+     * 「已成功替换的陈旧孤儿」删掉，旧 RTP 永久丢失。
+     */
+    internal fun rtpAppDirIfReady(gameType: String): File? = rtpAppDirIfReady(rtpDir(gameType))
+
+    /** [rtpAppDirIfReady] 的可测重载：以 [root] 为 `<子类型>` 目录，[delete] 可注入失败。 */
+    internal fun rtpAppDirIfReady(
+        root: File,
+        delete: (File) -> Boolean = { it.deleteRecursively() },
+    ): File? {
+        val dir = File(root, "app")
+        return if (recoverPendingImport(dir, delete)) dir else null
+    }
+
+    /**
      * 把中断的替换留下的现场归位（幂等）。
      *
      * 现场有两种形态：
