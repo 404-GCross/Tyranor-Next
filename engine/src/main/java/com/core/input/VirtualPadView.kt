@@ -24,10 +24,18 @@ import kotlin.math.roundToInt
  * 送到对应引擎（Web 见 [WebInputSink]）。
  *
  * 触摸策略：本 View 铺满全屏且位于游戏画面之上，因此**逐指针**决定是否消费——
- * 只有命中按键层元素（按钮 / 方向控件 / FAB）的指针才被接管，未命中的 ACTION_DOWN 与
- * ACTION_POINTER_DOWN 一律返回 false 放行给下层 WebView / 虚拟鼠标层（这样「按住方向键
- * 的同时另一指点屏幕交互」仍然可用）；按键层隐藏时只有 FAB 参与，其余全部放行。
- * 编辑模式下则全量拦截（模态画布）。
+ * 命中按键层元素（按钮 / 方向控件 / FAB）的指针被接管，未命中的 ACTION_DOWN 与
+ * ACTION_POINTER_DOWN 返回 false 放行给下层 WebView / 虚拟鼠标层；按键层隐藏时只有 FAB
+ * 参与，其余全部放行。编辑模式下则全量拦截（模态画布）。
+ *
+ * **已知限制（框架分发语义，本类无法拒绝）**：放行只在「本 View 尚未接管任何指针」时生效。
+ * 一旦手指 1 落在按键层元素上（本 View 已是 touch target），后续新指针由 `ViewGroup` 按
+ * **几何边界**追加给已有 target——AOSP `ViewGroup.dispatchTouchEvent` 的 pointer-down 分支里，
+ * 新指针若落在某个已有 target 的子 View 边界内，直接 `newTouchTarget.pointerIdBits |=
+ * idBitsToAssign; break;`，**不征求该子 View 的 onTouchEvent 返回值**；本 View 铺满全屏，
+ * 于是「按住方向键 + 另一指点屏幕交互」的那根手指被本 View 收下（不产生任何输入，游戏收不到）。
+ * 因此「游戏侧手势在先、再按按键」「已放行的手指之后第二指点画面」正常，反方向失效。
+ * 真修需改交互结构（自定义根 ViewGroup 逐指针重定向 / 按键层不铺满），见设计文档 §10。
  */
 class VirtualPadView(
     context: Context,
@@ -390,15 +398,15 @@ class VirtualPadView(
                 }
                 if (!padVisible) {
                     // 隐藏时只有 FAB 参与（且仅由 ACTION_DOWN 起手）：其余指针一律放行。
-                    // 这里必须返回 false——本 View 铺满全屏且在上层，若把 POINTER_DOWN 也
-                    // 消费掉，游戏侧就再也收不到「按住按键层时第二根手指点画面」的那根手指。
+                    // 本 View 铺满全屏且在上层，未命中时返回 false 才能让下层拿到这根手指。
                     return false
                 }
-                // 未命中按键层元素：放行**该指针**给下层（WebView / 虚拟鼠标层）。
-                // 注意 Android 的分发语义：ACTION_DOWN 放行后本 View 不接管该手势；
-                // 已有其他手指被本 View 接管的场景下，POINTER_DOWN 是新指针的最后一次
-                // 「归谁」机会，返回 true 会把整根手指吃掉（旧实现在这里 return true，
-                // 导致「按住方向键 + 另一指点屏幕」失效）。
+                // 未命中按键层元素：尝试放行**该指针**给下层（WebView / 虚拟鼠标层）。
+                // 生效条件：本 View 此刻还不是 touch target（`newTouchTarget == null` 且
+                // `mFirstTouchTarget` 里没有本 View），框架才会征求 onTouchEvent 的返回值。
+                // 若本 View 已被先落下的手指接管，新指针会由 ViewGroup 按几何边界直接追加给
+                // 本 View（铺满全屏 → 必然命中），这里的 return false 不会被咨询，那根手指会
+                // 被本 View 静默收下（不产生输入）——此限制见类 KDoc 与设计文档 §10。
                 val element = hitTest(x, y) ?: return false
                 if (element.isDirection) {
                     if (dirPointerId != -1) return true
