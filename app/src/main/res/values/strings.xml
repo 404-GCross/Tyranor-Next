@@ -70,6 +70,7 @@
     <string name="side_panel_title">妙妙工具</string>
     <string name="side_panel_kr2_native_title">启动 kr2 原生</string>
     <string name="side_panel_archive_tool_title">解封包工具</string>
+    <string name="side_panel_input_tool_title">输入与手柄</string>
     <string name="settings_invalid_theme_color">不支持透明色或黑白灰色</string>
 
     <string name="settings_update_latest">已经是最新版本</string>
@@ -308,7 +309,6 @@
     <string name="engine_settings_xsys35_uninstall_hint">卸载或删除游戏会清除应用独立存档目录</string>
     <string name="engine_settings_ppsspp_title">PPSSPP引擎设置</string>
     <string name="engine_settings_input_title">输入与手柄</string>
-    <string name="engine_settings_input_summary">虚拟按键、按键方案与手柄映射的开关和管理</string>
     <string name="engine_settings_input_pad_title">虚拟按键</string>
     <string name="engine_settings_input_pad_summary">在游戏画面上叠加可编辑的虚拟按键层；默认仅对 RPG Maker MV/MZ 开启，开启后对所有 Web 引擎生效</string>
     <string name="engine_settings_input_profile_title">按键方案</string>

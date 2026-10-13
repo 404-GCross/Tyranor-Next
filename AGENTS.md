@@ -377,6 +377,7 @@ Column(fillMaxSize)                                // 页面根
 | 加入群聊（企鹅群聊/飞机频道） | `SettingsScreen.kt`（加入群聊弹窗）              | `ic_group_qq` / `ic_group_telegram` |
 | 妙妙工具面板（启动 kr2 原生） | `MainScreen.kt`（`AppSidePanel` 的 `content` 槽） | `ic_settings_engine` |
 | 妙妙工具面板（解封包工具） | `MainScreen.kt`（`AppSidePanel` 的 `content` 槽） | `ic_sheet_archive` |
+| 妙妙工具面板（输入与手柄） | `MainScreen.kt`（`AppSidePanel` 的 `content` 槽） | `ic_input_gamepad` |
 
 ***
 

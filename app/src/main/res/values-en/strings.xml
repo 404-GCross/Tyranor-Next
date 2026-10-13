@@ -70,6 +70,7 @@
     <string name="side_panel_title">Miaomiao Tools</string>
     <string name="side_panel_kr2_native_title">Launch kr2 Native</string>
     <string name="side_panel_archive_tool_title">Unpack / Pack Tool</string>
+    <string name="side_panel_input_tool_title">Input &amp; gamepad</string>
     <string name="settings_invalid_theme_color">Transparent, black, white, or gray colors are not supported</string>
 
     <string name="settings_update_latest">You are on the latest version</string>
@@ -308,7 +309,6 @@
     <string name="engine_settings_xsys35_uninstall_hint">Uninstalling or removing the game clears its scoped save directory</string>
     <string name="engine_settings_ppsspp_title">PPSSPP engine settings</string>
     <string name="engine_settings_input_title">Input &amp; gamepad</string>
-    <string name="engine_settings_input_summary">Switches and management for the virtual pad, key profiles and gamepad mapping</string>
     <string name="engine_settings_input_pad_title">Virtual pad</string>
     <string name="engine_settings_input_pad_summary">Show an editable on-screen key overlay during games; on by default for RPG Maker MV/MZ only, enabling it applies to all Web engines</string>
     <string name="engine_settings_input_profile_title">Button layout</string>

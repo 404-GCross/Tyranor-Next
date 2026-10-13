@@ -70,6 +70,7 @@
     <string name="side_panel_title">妙妙ツール</string>
     <string name="side_panel_kr2_native_title">kr2 ネイティブを起動</string>
     <string name="side_panel_archive_tool_title">解凍 / 圧縮ツール</string>
+    <string name="side_panel_input_tool_title">入力とゲームパッド</string>
     <string name="settings_invalid_theme_color">透明色、白黒、グレーは使用できません</string>
 
     <string name="settings_update_latest">最新バージョンです</string>
@@ -308,7 +309,6 @@
     <string name="engine_settings_xsys35_uninstall_hint">アンインストールまたはゲーム削除時にアプリ専用セーブフォルダが消去されます</string>
     <string name="engine_settings_ppsspp_title">PPSSPP エンジン設定</string>
     <string name="engine_settings_input_title">入力とゲームパッド</string>
-    <string name="engine_settings_input_summary">バーチャルパッド・キー配置・ゲームパッド割り当ての切り替えと管理</string>
     <string name="engine_settings_input_pad_title">バーチャルパッド</string>
     <string name="engine_settings_input_pad_summary">ゲーム画面に編集可能な仮想キーを重ねて表示します。既定では RPG Maker MV/MZ のみ有効で、オンにするとすべての Web エンジンに適用されます</string>
     <string name="engine_settings_input_profile_title">ボタン配置</string>

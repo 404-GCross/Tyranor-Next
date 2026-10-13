@@ -65,8 +65,8 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 /**
  * 输入与手柄设置页：全局虚拟按键/手柄映射开关、按键方案管理与手柄映射入口。
  *
- * 入口在设置页「引擎设置」下方，与 EngineSettingsMenuActivity 平级（不隶属单一引擎）。
- * 本页只消费 `core/input` 门面（[InputRemapRepository] / [PadEditorHost]），
+ * 入口在侧边栏「妙妙工具」面板（原设置页入口已迁入），与 EngineSettingsMenuActivity 同为顶层入口（不隶属单一引擎）。
+ * 本页只消费 `core/input` 门面（[InputRemapRepository] / [com.tyranor.next.core.input.PadEditorHost]），
  * 不直接依赖 engine 类型（三层架构：ui 不得 import `com.core.*`）。
  */
 class InputSettingsActivity : AppScreenActivity() {

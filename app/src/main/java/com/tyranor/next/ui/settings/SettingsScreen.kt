@@ -323,21 +323,13 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                     }
                 }
                 item {
-                    // 工具入口：引擎设置与输入重映射合入同一卡片（解包 / 封包入口已迁至侧边栏「妙妙工具」面板）
+                    // 工具入口：引擎设置；输入与手柄、解包 / 封包入口已迁至侧边栏「妙妙工具」面板
                     MiuixCard(modifier = Modifier.fillMaxWidth().glassShadow().glassBorder(), cornerRadius = AppComponentCornerRadius) {
                         Column(Modifier.padding(vertical = 4.dp)) {
                             ArrowPreference(
                                 title = stringResource(R.string.settings_engine_settings),
                                 startAction = { SettingsItemIcon(R.drawable.ic_engine_manage) },
                                 onClick = { startActivityWithPageTransition(ctx, EngineSettingsMenuActivity.createIntent(ctx)) },
-                            )
-                            ArrowPreference(
-                                title = stringResource(R.string.engine_settings_input_title),
-                                // 入口摘要须覆盖整页能力（虚拟按键 + 按键方案 + 手柄映射），
-                                // 不能只写虚拟按键的开关说明
-                                summary = stringResource(R.string.engine_settings_input_summary),
-                                startAction = { SettingsItemIcon(R.drawable.ic_settings_engine) },
-                                onClick = { startActivityWithPageTransition(ctx, InputSettingsActivity.createIntent(ctx)) },
                             )
                         }
                     }
