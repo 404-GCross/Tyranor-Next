@@ -320,6 +320,7 @@
     <string name="input_settings_choose_keys">选择输出键位</string>
     <string name="input_settings_profiles_title">按键方案</string>
     <string name="input_settings_profile_missing">方案缺失（引用已失效）</string>
+    <string name="input_settings_profile_load_failed">方案加载失败（可重进本页重试）</string>
     <string name="input_settings_profile_default">默认方案</string>
     <string name="input_settings_profile_default_migrated">默认方案（迁移）</string>
     <string name="input_settings_profile_new">新建方案</string>

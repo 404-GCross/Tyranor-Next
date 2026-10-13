@@ -263,7 +263,10 @@ class RtpImportReplaceSemanticsTest {
                 RpgMakerRuntimeEnvironment.RtpClearResult.IMPORT_IN_FLIGHT,
                 RpgMakerRuntimeEnvironment.clearRtp("rpgmvx"),
             )
-            assertTrue("被拒绝的清除不得删掉在途临时目录", inFlightTemp.isDirectory)
+            // 清除不得吞掉在途登记（它正是靠这条登记才拒绝的）。别写「不得删掉在途临时目录」：
+            // clearRtp 删的是真实外部存储的 `<子类型>` 目录，与本测试的 TemporaryFolder 无关，
+            // 那种断言在任何路径下都成立（第八轮复审）
+            assertTrue("被拒绝的清除不得吞掉在途登记", RpgMakerRuntimeEnvironment.isRtpImportInFlight("rpgmvx"))
             // 另一子类型的登记必须仍然在列（非恒真断言：这条登记确实写过）
             assertTrue("被拒绝的清除不得动别的子类型登记", RpgMakerRuntimeEnvironment.isRtpImportInFlight("rpgmxp"))
         } finally {
@@ -276,17 +279,19 @@ class RtpImportReplaceSemanticsTest {
 
     @Test
     fun sameSubtypeConcurrentImportsKeepIndependentRegistrations() {
-        // 同子类型两次导入并发（UI 置灰可被页面重建绕过）：登记必须是集合，否则后登记覆盖先登记，
-        // 先结束者的注销会让仍在途的那次「无登记」，清除便能删掉它正在写的目录
+        // 同子类型两次导入并发（UI 置灰可被页面重建绕过）：登记必须是集合。旧实现（键上只留最后
+        // 一次登记 + 条件注销）正是在**后登记者先结束**时摘掉整条键，让先登记者（仍在途）失去
+        // 登记，清除便能删掉它正在写的目录——因此注销顺序必须是「先注销后登记的那个」；反过来
+        // （先注销先登记的那个）条件注销与当前值不匹配、是空操作，缺陷不显现，断言会变成恒真。
         val parent = temporaryFolder.newFolder("concurrent")
         val first = RpgMakerRuntimeEnvironment.newImportTempDir(parent).apply { mkdirs() }
         val second = RpgMakerRuntimeEnvironment.newImportTempDir(parent).apply { mkdirs() }
         RpgMakerRuntimeEnvironment.registerInFlightImport("mkxp-z", first)
         RpgMakerRuntimeEnvironment.registerInFlightImport("mkxp-z", second)
         try {
-            RpgMakerRuntimeEnvironment.unregisterInFlightImport("mkxp-z", first)
+            RpgMakerRuntimeEnvironment.unregisterInFlightImport("mkxp-z", second)
             assertTrue(
-                "先结束者注销后，另一次导入必须仍在途（否则清除会删掉它的临时目录）",
+                "后登记者注销后，先登记者必须仍在途（否则清除会删掉它的临时目录）",
                 RpgMakerRuntimeEnvironment.isRtpImportInFlight("mkxp-z"),
             )
             assertEquals(
@@ -294,7 +299,7 @@ class RtpImportReplaceSemanticsTest {
                 RpgMakerRuntimeEnvironment.clearRtp("mkxp-z"),
             )
         } finally {
-            RpgMakerRuntimeEnvironment.unregisterInFlightImport("mkxp-z", second)
+            RpgMakerRuntimeEnvironment.unregisterInFlightImport("mkxp-z", first)
         }
         assertFalse(RpgMakerRuntimeEnvironment.isRtpImportInFlight("mkxp-z"))
     }

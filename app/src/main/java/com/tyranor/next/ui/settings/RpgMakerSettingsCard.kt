@@ -82,16 +82,21 @@ internal fun RpgMakerRgssSettingsCard(
     // 并顺手藏掉「清除」入口（首帧固定 false 时它会出现又消失）
     var rtpImported by remember { mutableStateOf(RPGM_RTP_TYPES.associateWith<String, Boolean?> { null }) }
     // 导入在途守卫：导入耗时可到分钟级，期间再次点「导入」会（在修复临时目录前）让两次
-    // 导入互相破坏；现在临时目录已逐次唯一，但并发导入仍是无意义操作，入口直接置灰。
+    // 导入互相破坏；现在临时目录已逐次唯一，但并发导入仍是无意义操作——**同一子类型**的入口
+    // 置灰（其它子类型各有自己的目录，core 允许并行）。
     // 这只是「顺手」的 UI 便利：真正的互斥由 core 的进程级在途登记承担（clearRtp 会拒绝）。
     //
-    // 两个态必须分开（第八轮复审）：本页发起的导入由 [localImportingRtpType] 跟踪（结束时由
-    // runRtpImport 收尾）；**从 core 登记恢复来的**态由 [coreImportingRtpType] 跟踪——它的
-    // 结束时机只有 core 知道（导入在 IO 线程继续跑），必须能被 core 的「无在途」收敛掉，
-    // 否则「长导入期间切走页面再回来」会让按钮一直置灰、也没有完成提示。
-    var localImportingRtpType by remember { mutableStateOf<String?>(null) }
-    var coreImportingRtpType by remember { mutableStateOf<String?>(null) }
-    val importingRtpType = localImportingRtpType ?: coreImportingRtpType
+    // 三条约定（第八轮复审）：
+    //  - 本页发起的导入由 localImportingRtpTypes 跟踪，结束时由 runRtpImport 收尾并给出提示；
+    //  - **从 core 登记恢复来的**态由 coreImportingRtpTypes 跟踪——它的结束时机只有 core 知道
+    //    （导入在 IO 线程继续跑），必须能被 core 的「无在途」收敛掉，否则「长导入期间切走页面
+    //    再回来」会让按钮一直置灰、也没有完成提示；
+    //  - 两个态都是**集合**（core 与 UI 都允许不同子类型并行导入），且恢复态要**排除本页正在
+    //    跟踪的那些**：用单值时只装得下一个子类型——恢复态漏掉的那个永不收敛（状态陈旧、清除
+    //    入口消失、无完成提示），本页发起、又被恢复态重复接管的那个则会与 runRtpImport 各弹
+    //    一次「导入完成」。
+    var localImportingRtpTypes by remember { mutableStateOf(emptySet<String>()) }
+    var coreImportingRtpTypes by remember { mutableStateOf(emptySet<String>()) }
 
     /**
      * 重读全部子类型的状态 + 恢复 core 侧的在途导入登记（页面重建后在途导入仍在跑）。
@@ -103,12 +108,12 @@ internal fun RpgMakerRgssSettingsCard(
             RPGM_RTP_TYPES.associateWith { RpgMakerRuntimeEnvironment.isRtpImported(it) }
         }
         val inFlight = withContext(Dispatchers.IO) {
-            RPGM_RTP_TYPES.firstOrNull { RpgMakerRuntimeEnvironment.isRtpImportInFlight(it) }
+            RPGM_RTP_TYPES.filter { RpgMakerRuntimeEnvironment.isRtpImportInFlight(it) }.toSet()
         }
         rtpImported = states
-        // core 是恢复态的唯一事实源：本页自己的导入记在 localImportingRtpType，
-        // 这里总是直接赋值，导入结束后才能由「无在途」收敛为 null
-        coreImportingRtpType = inFlight
+        // core 是恢复态的唯一事实源，这里总是直接赋值（不保留旧值，否则导入结束后无法收敛为
+        // 空）；但本页自己发起的导入由 runRtpImport 收尾与提示，不重复接管。
+        coreImportingRtpTypes = inFlight - localImportingRtpTypes
     }
 
     // RTP 状态读盘（含中断恢复的文件操作）放 IO 线程：组合期在主线程逐个 stat/rename
@@ -130,22 +135,30 @@ internal fun RpgMakerRgssSettingsCard(
 
     // 从 core 恢复来的「导入中」态必须收敛：导入结束（成功/失败）时 core 会注销登记，而本页
     // 恢复来的标记不会自己消失（旧实现只在本地为 null 时才接受 core 的值，导致按钮一直置灰到
-    // 页面被销毁重建）。这里轮询登记（读 ConcurrentHashMap，不触盘、不走 IO），消失即清态并刷新
-    // 该子类型的状态；只在状态真的翻成「已导入」时提示成功——恢复态拿不到失败原因，不猜。
-    LaunchedEffect(coreImportingRtpType) {
-        val type = coreImportingRtpType ?: return@LaunchedEffect
-        val importedBefore = rtpImported[type]
-        while (RpgMakerRuntimeEnvironment.isRtpImportInFlight(type)) delay(RTP_IN_FLIGHT_POLL_MS)
-        refreshRtp(type)
-        coreImportingRtpType = null
-        if (importedBefore != true && rtpImported[type] == true) {
-            Toast.makeText(ctx, ctx.getString(R.string.engine_settings_rpgm_rtp_imported), Toast.LENGTH_LONG).show()
+    // 页面被销毁重建）。这里轮询登记（读 ConcurrentHashMap，不触盘、不走 IO，也**不加锁**——
+    // importLock 会被提交段的整目录拷贝长时间占住），本批观察到的子类型全部无在途即收敛清态、
+    // 刷新各自状态；只在状态真的翻成「已导入」时提示成功——恢复态拿不到失败原因，不猜。
+    LaunchedEffect(coreImportingRtpTypes) {
+        val watching = coreImportingRtpTypes
+        if (watching.isEmpty()) return@LaunchedEffect
+        val importedBefore = watching.associateWith { rtpImported[it] }
+        while (watching.any { RpgMakerRuntimeEnvironment.isRtpImportInFlight(it) }) {
+            delay(RTP_IN_FLIGHT_POLL_MS)
+        }
+        watching.forEach { refreshRtp(it) }
+        // 只移除本批观察到的：轮询挂起期间 refreshAllRtp 新恢复进来的子类型不能被一并清掉
+        coreImportingRtpTypes = coreImportingRtpTypes - watching
+        watching.forEach { type ->
+            if (importedBefore[type] != true && rtpImported[type] == true) {
+                Toast.makeText(ctx, ctx.getString(R.string.engine_settings_rpgm_rtp_imported), Toast.LENGTH_LONG).show()
+            }
         }
     }
 
     /** 导入在途标记的收尾：无论成功、失败还是被取消，都要把入口重新放开。 */
     suspend fun runRtpImport(type: String, block: suspend () -> RtpImportRejection?) {
-        localImportingRtpType = type
+        // 只增删自己那一个子类型：同页并发导入不同子类型时，先结束者不得把仍在跑的那次放开
+        localImportingRtpTypes = localImportingRtpTypes + type
         try {
             val rejection = withContext(Dispatchers.IO) { block() }
             refreshRtp(type)
@@ -157,7 +170,7 @@ internal fun RpgMakerRgssSettingsCard(
             } ?: ctx.getString(R.string.engine_settings_rpgm_rtp_imported)
             Toast.makeText(ctx, message, Toast.LENGTH_LONG).show()
         } finally {
-            localImportingRtpType = null
+            localImportingRtpTypes = localImportingRtpTypes - type
         }
     }
 
@@ -351,7 +364,7 @@ internal fun RpgMakerRgssSettingsCard(
                     },
                 ),
                 imported = rtpImported[type],
-                importing = importingRtpType == type,
+                importing = type in localImportingRtpTypes || type in coreImportingRtpTypes,
                 onImport = {
                     pendingRtpType = type
                     showRtpSourceDialog = true
