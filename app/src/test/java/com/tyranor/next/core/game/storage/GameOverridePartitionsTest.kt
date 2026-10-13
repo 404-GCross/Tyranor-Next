@@ -52,7 +52,8 @@ class GameOverridePartitionsTest {
         assertEquals(123L, row.updatedAt)
         assertEquals(blob.length(), GameOverridePartitions.assemble(row).length())
         for (key in blob.keys()) {
-            assertEquals(blob.opt(key).toString(), GameOverridePartitions.assemble(row).opt(key).toString())
+            // opt 返回 Any?：显式安全调用（否则 Kotlin 报「nullable receiver 上只允许 ?. / !!.」）
+            assertEquals(blob.opt(key)?.toString(), GameOverridePartitions.assemble(row).opt(key)?.toString())
         }
     }
 
@@ -77,8 +78,8 @@ class GameOverridePartitionsTest {
         assertTrue(touchpad.has(GameOverridePartitions.TOUCH_PAD_CONFIG_KEY))
         assertTrue(touchpad.has(GameOverridePartitions.TOUCH_PAD_PRESETS_KEY))
         // 未识别键兜底归入 tyrano 分区；RPG Maker 会话键显式归入 tyrano 分区
-        assertEquals("keep-me", JSONObject(row.tyranoJson!!).getString("future_engine_key"))
         val tyranoPartition = JSONObject(row.tyranoJson!!)
+        assertEquals("keep-me", tyranoPartition.getString("future_engine_key"))
         assertTrue(tyranoPartition.has(PerGameSettingsStore.F_RPG_LEGACY_RENDERER))
         assertTrue(tyranoPartition.has(PerGameSettingsStore.F_RPG_SAVE_INTEROP))
         assertTrue(tyranoPartition.has(PerGameSettingsStore.F_RPG_MV_VERSION))
