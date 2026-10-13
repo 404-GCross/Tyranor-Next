@@ -224,6 +224,12 @@ android {
       shaders = false
     }
 
+    // 内置引擎字体（MTLc3m.ttf / mincho.ttf，由 engine 模块 xs35-assets 生成目录并入）不得被
+    // AAPT 压缩：xsystem35 对压缩过的字体读取极慢（上游明确要求字体 asset 不压缩）。
+    androidResources {
+      noCompress += listOf("ttf", "otf")
+    }
+
     packaging {
       jniLibs {
         useLegacyPackaging = true

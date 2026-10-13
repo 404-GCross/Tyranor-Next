@@ -467,7 +467,7 @@ private enum class EngineTab { GAL, RPGM, CONSOLE, WEB }
 private fun engineTabOf(engine: EngineType): EngineTab = when (engine) {
     EngineType.RPGMAKER, EngineType.RPG_MV, EngineType.RPG_MZ -> EngineTab.RPGM
     EngineType.KIRIKIRI, EngineType.ONS, EngineType.ARTEMIS, EngineType.SIGLUS,
-    EngineType.REALLIVE, EngineType.AVG32, EngineType.UK2, EngineType.FVP,
+    EngineType.REALLIVE, EngineType.AVG32, EngineType.XSYS35, EngineType.UK2, EngineType.FVP,
     EngineType.RENPY, EngineType.YURIS, EngineType.CATSYSTEM2 -> EngineTab.GAL
     // PC（手动添加，经 Winlator 运行）与主机模拟器同属「主机」分类
     EngineType.PSP, EngineType.NINTENDO_SWITCH, EngineType.PC -> EngineTab.CONSOLE
@@ -496,6 +496,7 @@ private fun engineDescription(engine: EngineType): String = when (engine) {
     EngineType.SIGLUS -> stringResource(R.string.engine_desc_siglus)
     EngineType.REALLIVE -> stringResource(R.string.engine_desc_reallive)
     EngineType.AVG32 -> stringResource(R.string.engine_desc_avg32)
+    EngineType.XSYS35 -> stringResource(R.string.engine_desc_xsys35)
     EngineType.UK2 -> stringResource(R.string.engine_desc_uk2)
     EngineType.FVP -> stringResource(R.string.engine_desc_fvp)
 
@@ -559,6 +560,9 @@ private val builtinDialogEntries: Map<EngineType, List<EngineDialogEntry>> = map
     ),
     EngineType.UK2 to listOf(
         builtinEntry("game-launcher", "game_launcher-xmoezzz"),
+    ),
+    EngineType.XSYS35 to listOf(
+        builtinEntry("xsys35-2.20.0", "xsystem35-2.20.0"),
     ),
     EngineType.FVP to listOf(
         builtinEntry("fvp-rfvp", "rfvp-xmoezzz"),

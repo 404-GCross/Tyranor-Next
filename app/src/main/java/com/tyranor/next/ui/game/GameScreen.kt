@@ -2057,6 +2057,7 @@ internal fun EngineType.coverColor(): Color = when (this) {
     EngineType.SIGLUS -> Color(0xFF00838F)
     EngineType.REALLIVE -> Color(0xFF00695C)
     EngineType.AVG32 -> Color(0xFF8E7CC3)
+    EngineType.XSYS35 -> Color(0xFF8B3A5E)
     EngineType.UK2 -> Color(0xFF4E6E81)
     EngineType.FVP -> Color(0xFFB05A2A)
     EngineType.YURIS -> Color(0xFF558B2F)

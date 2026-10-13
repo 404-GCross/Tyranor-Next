@@ -63,6 +63,16 @@ private fun LaunchResult.Failure.toUserMessage(context: Context): String {
         is LaunchResult.Failure.KrkrMirrorSaveDirFailed ->
             localized.getString(R.string.launch_create_krkr_mirror_save_failed)
 
+        is LaunchResult.Failure.Xs35SavePathNotDirectory ->
+            localized.getString(R.string.launch_error_xs35_save_path_not_directory, path)
+
+        is LaunchResult.Failure.Xs35SaveDirUnavailable ->
+            if (path == null || path.isEmpty()) {
+                localized.getString(R.string.launch_error_xs35_external_unavailable)
+            } else {
+                localized.getString(R.string.launch_error_xs35_save_dir_unavailable, path)
+            }
+
         is LaunchResult.Failure.ExternalModuleFailed -> {
             val moduleName = result.moduleNameRes?.let { localized.getString(it) }
                 ?: result.moduleNameFallback.orEmpty()

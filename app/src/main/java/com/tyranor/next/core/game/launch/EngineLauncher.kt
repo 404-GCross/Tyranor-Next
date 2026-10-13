@@ -35,6 +35,7 @@ import com.core.nativeplugin.NativePluginConstants
 import com.core.rpgmaker.RpgMakerActivity
 import com.core.siglus.SiglusActivity
 import com.core.tyrano.TyranoActivity
+import com.core.xsys35.Xs35Activity
 import com.tyranor.next.core.engine.EngineType
 import com.tyranor.next.core.engine.external.ExternalEmulatorLauncher
 import com.tyranor.next.core.engine.external.ExternalEmulatorRegistry
@@ -46,6 +47,7 @@ import com.tyranor.next.core.engine.plugin.EnginePluginBootstrap
 import com.tyranor.next.core.game.manual.AndroidAppGames
 import com.tyranor.next.core.game.model.GamePathUtils
 import com.tyranor.next.core.game.model.ScanGame
+import com.tyranor.next.core.game.model.Xs35Paths
 import com.tyranor.next.core.game.save.GameSaveException
 import com.tyranor.next.core.game.save.GameSaveManager
 import com.tyranor.next.core.game.save.RpgSaveFormat
@@ -123,6 +125,7 @@ object EngineLauncher {
         EngineType.SIGLUS,
         EngineType.REALLIVE,
         EngineType.AVG32,
+        EngineType.XSYS35,
         EngineType.UK2,
         EngineType.FVP,
         EngineType.RENPY,
@@ -347,6 +350,10 @@ object EngineLauncher {
             } else {
                 ensureKrSaveDir(context, game, path, settings)?.let { return it }
             }
+        }
+        // System35（xsystem35）：独立存档目录缺失时预创建，失败即类型化返回（不回退游戏根）
+        if (game.engine == EngineType.XSYS35) {
+            ensureXs35SaveDir(context, path, settings)?.let { return it }
         }
         // “总是/不再”持久化为全局补丁策略；“本次”不落盘，仅本次按 auto 生效
         if (game.engine == EngineType.ARTEMIS) {
@@ -827,6 +834,8 @@ object EngineLauncher {
             EngineType.AVG32,
             EngineType.UK2 -> buildFramebufferIntent(context, path, game, settings)
 
+            EngineType.XSYS35 -> buildXs35Intent(context, path, game, settings)
+
             EngineType.FVP -> buildFvpIntent(context, path, game, settings)
 
             EngineType.RPGMAKER,
@@ -1032,6 +1041,84 @@ object EngineLauncher {
         if (settings.fvpFont.isNotBlank()) {
             putExtra(LaunchContract.FVP_FONT_PATH, settings.fvpFont)
         }
+    }
+
+    /**
+     * System35（xsystem35）启动：`-gamedir` 指向含场景档的实际游戏目录（普通形态 = 游戏根，
+     * `GAMEDATA/` 形态 = 该子目录），存档目录按「独立存档」生效值解析（与存档镜像同源，
+     * 见 [Xs35Paths.scopedSaveDir] / [Xs35Paths.gameDirSaveDir]）。
+     * 标题回写登记复用 Siglus 协议：宿主写 `xsys35_title.<pathHash>`，库加载时条件导入。
+     */
+    private fun buildXs35Intent(
+        context: Context,
+        path: String,
+        game: ScanGame,
+        settings: ResolvedEngineSettings,
+    ): Intent {
+        val effectiveDir = Xs35Paths.effectiveGameDir(File(path))
+        // ensureXs35SaveDir 已在上游保证独立存档开启时外部存储可用；此处为不可达分支：
+        // 不复用 filesDir 兜底（审核 1-S1/2-S4/3-IMPORTANT-3），由 launch 外层 try/catch 收口为 StartFailed。
+        val saveDir = resolveXs35SaveDir(context, path, settings)
+            ?: throw IllegalStateException("xs35 scoped save dir unavailable after ensure")
+        val pathHash = Integer.toHexString(path.hashCode())
+        // 标题回写登记：宿主按同一 hash 写标题，app 侧导入时需要 uri 与目录名（判断是否用户改过名）
+        context.applicationContext
+            .getSharedPreferences(EnginePrefs.APP_PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putString(EnginePrefs.KEY_XSYS35_URI_PREFIX + pathHash, game.uri)
+            .putString(EnginePrefs.KEY_XSYS35_DEFAULT_TITLE_PREFIX + pathHash, File(path).name)
+            .apply()
+        return Intent(context, Xs35Activity::class.java).apply {
+            putExtra(LaunchContract.PATH, effectiveDir.absolutePath)
+            putExtra(LaunchContract.GAME_PATH, effectiveDir.absolutePath)
+            putExtra(LaunchContract.PROJECT_ROOT, effectiveDir.absolutePath)
+            putExtra(LaunchContract.GAME_DIR, effectiveDir.absolutePath)
+            putExtra(LaunchContract.ROOT_URI, game.uri)
+            putExtra(LaunchContract.LAUNCH_TARGET, game.launchTarget)
+            putExtra(LaunchContract.LAUNCH_MODE, LaunchContract.LAUNCH_MODE_XSYS35)
+            putExtra(LaunchContract.XS35_PATH_HASH, pathHash)
+            putExtra(LaunchContract.XS35_SAVE_DIR, saveDir.absolutePath)
+            putExtra(LaunchContract.XS35_SCOPED_SAVE_DIR, settings.xs35ScopedSaveDir)
+            if (settings.xs35Renderer != EngineSettingsStore.XSYS35_RENDERER_AUTO) {
+                putExtra(LaunchContract.XS35_RENDERER, settings.xs35Renderer)
+            }
+            putExtra(LaunchContract.XS35_INTEGER_SCALE, settings.xs35IntegerScale)
+            putExtra(LaunchContract.XS35_MUTE_UNFOCUS, settings.xs35MuteUnfocus)
+            // 契约保留（对齐 krkrsdl3）：XSys35 宿主朝向由 manifest 的 sensorLandscape 固定，
+            // 不消费该 extra；下发仅为统一启动契约形态。
+            putExtra(LaunchContract.ORIENTATION, 6)
+        }
+    }
+
+    /**
+     * System35 生效存档目录（与 [ensureXs35SaveDir]、`GameSaveManager.resolveSaveLocation` 同源，
+     * 推导只在 [Xs35Paths]）：独立存档开 = 外部存档目录，外部存储不可用返回 null（调用方按
+     * 类型化失败处理，绝不回退游戏根）；关闭 = `<生效游戏目录>/save`。
+     */
+    private fun resolveXs35SaveDir(context: Context, path: String, settings: ResolvedEngineSettings): File? {
+        if (settings.xs35ScopedSaveDir) {
+            val external = context.getExternalFilesDir(null) ?: return null
+            return Xs35Paths.scopedSaveDir(external, path)
+        }
+        return Xs35Paths.gameDirSaveDir(Xs35Paths.effectiveGameDir(File(path)))
+    }
+
+    /**
+     * System35 存档目录预创建（仿 [ensureKrSaveDir]，**不回退游戏根**）：
+     * 独立存档开（默认）= 应用外部存档目录，外部存储不可用即类型化失败（path = null）；
+     * 关闭 = `<生效游戏目录>/save`（`GAMEDATA/` 形态即该子目录内）。
+     */
+    private fun ensureXs35SaveDir(
+        context: Context,
+        path: String,
+        settings: ResolvedEngineSettings,
+    ): LaunchResult.Failure? {
+        val saveDir = resolveXs35SaveDir(context, path, settings)
+            ?: return LaunchResult.Failure.Xs35SaveDirUnavailable(path = null)
+        if (saveDir.isDirectory) return null
+        if (saveDir.exists()) return LaunchResult.Failure.Xs35SavePathNotDirectory(saveDir.absolutePath)
+        if (saveDir.mkdirs() || saveDir.isDirectory) return null
+        return LaunchResult.Failure.Xs35SaveDirUnavailable(saveDir.absolutePath)
     }
 
     /**

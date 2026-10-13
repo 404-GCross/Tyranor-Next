@@ -761,6 +761,10 @@ internal fun EngineSettingsDetailScreen(kind: EngineSettingsKind) {
     var fvpSystemFont by remember { mutableStateOf(EngineSettingsStore.isFvpSystemFont(ctx)) }
     var fvpTextHidpi by remember { mutableStateOf(EngineSettingsStore.isFvpTextHidpi(ctx)) }
     var fvpFont by remember { mutableStateOf(EngineSettingsStore.getFvpFont(ctx)) }
+    var xs35Scoped by remember { mutableStateOf(EngineSettingsStore.isXs35ScopedSaveDir(ctx)) }
+    var xs35Renderer by remember { mutableStateOf(EngineSettingsStore.getXs35Renderer(ctx)) }
+    var xs35IntegerScale by remember { mutableStateOf(EngineSettingsStore.isXs35IntegerScale(ctx)) }
+    var xs35MuteUnfocus by remember { mutableStateOf(EngineSettingsStore.isXs35MuteUnfocus(ctx)) }
     var winlator by remember { mutableStateOf(EngineSettingsStore.loadWinlator(ctx)) }
     var ppssppVersion by remember { mutableStateOf(EngineSettingsStore.getPpssppVersion(ctx)) }
     var webShellPort by remember { mutableStateOf(EngineSettingsStore.getWebShellPort(ctx)) }
@@ -837,6 +841,10 @@ internal fun EngineSettingsDetailScreen(kind: EngineSettingsKind) {
         EngineSettingsStore.setFvpSystemFont(ctx, fvpSystemFont)
         EngineSettingsStore.setFvpTextHidpi(ctx, fvpTextHidpi)
         EngineSettingsStore.setFvpFont(ctx, fvpFont)
+        EngineSettingsStore.setXs35ScopedSaveDir(ctx, xs35Scoped)
+        EngineSettingsStore.setXs35Renderer(ctx, xs35Renderer)
+        EngineSettingsStore.setXs35IntegerScale(ctx, xs35IntegerScale)
+        EngineSettingsStore.setXs35MuteUnfocus(ctx, xs35MuteUnfocus)
         EngineSettingsStore.saveWinlator(ctx, winlator)
         EngineSettingsStore.setPpssppVersion(ctx, ppssppVersion)
         EngineSettingsStore.setWebShellPort(ctx, webShellPort)
@@ -868,7 +876,9 @@ internal fun EngineSettingsDetailScreen(kind: EngineSettingsKind) {
                 krVCursorScale, krMenuOpa, krPatchOverlayMode, krAnime4k,
                 ons, artKernel, artVersion, artRotate, artPatch, artResolution, artSideCut, artSurfaceCache,
                 artFontCache, artPowerSaving, tyExternal, tyScoped, rpgMakerMod, rpgLegacyRenderer, rpgSaveInterop, rpgMvVersion, rpgMzVersion, rpg, renpyVersion, renpy, siglusLanguage, fbNls,
-                fvpNls, fvpSystemFont, fvpTextHidpi, fvpFont, fontLauncher, fvpFontLauncher, winlator, ppssppVersion, webShellPort,
+                fvpNls, fvpSystemFont, fvpTextHidpi, fvpFont,
+                xs35Scoped, xs35Renderer, xs35IntegerScale, xs35MuteUnfocus,
+                fontLauncher, fvpFontLauncher, winlator, ppssppVersion, webShellPort,
                 topInset = innerPadding.calculateTopPadding(),
                 onKrVersion = { krVersion = it },
                 onKrKernel = { krKernel = it },
@@ -915,6 +925,10 @@ internal fun EngineSettingsDetailScreen(kind: EngineSettingsKind) {
                 onFvpTextHidpi = { fvpTextHidpi = it },
                 onFvpFontFollow = { fvpFont = "" },
                 onFvpFontPick = { fvpFontLauncher.launch("*/*") },
+                onXs35Scoped = { xs35Scoped = it },
+                onXs35Renderer = { xs35Renderer = it },
+                onXs35IntegerScale = { xs35IntegerScale = it },
+                onXs35MuteUnfocus = { xs35MuteUnfocus = it },
                 onWinlator = { winlator = it },
                 onPpssppVersion = { ppssppVersion = it },
                 onWebShellPort = { webShellPort = it },
@@ -966,6 +980,7 @@ private fun LazyListPlaceholder(
     renpyVersion: String, renpy: EngineSettingsStore.RenPy, siglusLanguage: String,
     fbNls: String,
     fvpNls: String, fvpSystemFont: Boolean, fvpTextHidpi: Boolean, fvpFont: String,
+    xs35Scoped: Boolean, xs35Renderer: String, xs35IntegerScale: Boolean, xs35MuteUnfocus: Boolean,
     fontLauncher: FontPickerLauncher, fvpFontLauncher: FontPickerLauncher,
     winlator: EngineSettingsStore.Winlator,
     ppssppVersion: String,
@@ -996,6 +1011,10 @@ private fun LazyListPlaceholder(
     onFvpTextHidpi: (Boolean) -> Unit,
     onFvpFontFollow: () -> Unit,
     onFvpFontPick: () -> Unit,
+    onXs35Scoped: (Boolean) -> Unit,
+    onXs35Renderer: (String) -> Unit,
+    onXs35IntegerScale: (Boolean) -> Unit,
+    onXs35MuteUnfocus: (Boolean) -> Unit,
     onWinlator: (EngineSettingsStore.Winlator) -> Unit,
     onPpssppVersion: (String) -> Unit,
     onWebShellPort: (Int) -> Unit,
@@ -1268,6 +1287,38 @@ private fun LazyListPlaceholder(
                 )
                 Text(
                     stringResource(R.string.engine_settings_fvp_note),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MiuixTheme.colorScheme.onBackground,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+            }
+        }
+
+        if (kind == EngineSettingsKind.XSYS35) item {
+            EngineCard(stringResource(R.string.engine_settings_xsys35_title)) {
+                DropdownRow(
+                    stringResource(R.string.engine_settings_xsys35_renderer_title),
+                    xsys35RendererOptions(),
+                    xs35Renderer,
+                    onXs35Renderer,
+                )
+                SwitchPreference(
+                    title = stringResource(R.string.engine_settings_scoped_save_dir),
+                    checked = xs35Scoped,
+                    onCheckedChange = onXs35Scoped,
+                )
+                SwitchPreference(
+                    title = stringResource(R.string.engine_settings_xsys35_integer_scale_title),
+                    checked = xs35IntegerScale,
+                    onCheckedChange = onXs35IntegerScale,
+                )
+                SwitchPreference(
+                    title = stringResource(R.string.engine_settings_xsys35_mute_unfocus_title),
+                    checked = xs35MuteUnfocus,
+                    onCheckedChange = onXs35MuteUnfocus,
+                )
+                Text(
+                    stringResource(R.string.engine_settings_xsys35_note),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MiuixTheme.colorScheme.onBackground,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),

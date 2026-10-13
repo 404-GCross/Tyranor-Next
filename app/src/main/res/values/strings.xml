@@ -151,6 +151,7 @@
     <string name="engine_desc_reallive">RealLive（VisualArt’s 系），Kanon SE/CLANNAD/Little Busters! 等</string>
     <string name="engine_desc_avg32">AVG32（VisualArt’s 早期引擎），Kanon/AIR/ONE 等</string>
     <string name="engine_desc_uk2">UK2（AyPio 早期引擎，PC-98），ソーサーキングダム 等</string>
+    <string name="engine_desc_xsys35">System3.x（xsystem35）</string>
     <string name="engine_desc_unknown">未知引擎</string>
     <string name="engine_desc_psp">PSP 游戏通过外置 PPSSPP 运行</string>
     <string name="engine_desc_yuris">YU-RIS，yscfg.dat 与 .ypf 封包（ysbin/.ymv）游戏，经外置 Winlator 运行</string>
@@ -296,6 +297,15 @@
     <string name="engine_settings_fvp_system_font_summary">使用系统 CJK 字体补足游戏字体缺失的字形（中文汉化推荐开启）</string>
     <string name="engine_settings_fvp_text_hidpi_title">文本高分辨率渲染</string>
     <string name="engine_settings_fvp_text_hidpi_summary">按屏幕缩放栅格化文本，高分屏更清晰</string>
+    <string name="engine_settings_xsys35_title">System35引擎设置</string>
+    <string name="engine_settings_xsys35_renderer_title">渲染后端</string>
+    <string name="engine_settings_xsys35_renderer_auto">自动</string>
+    <string name="engine_settings_xsys35_renderer_opengl">OpenGL</string>
+    <string name="engine_settings_xsys35_renderer_software">软件渲染</string>
+    <string name="engine_settings_xsys35_integer_scale_title">整数倍缩放</string>
+    <string name="engine_settings_xsys35_mute_unfocus_title">切后台静音</string>
+    <string name="engine_settings_xsys35_note">文本为 Shift-JIS；独立存档开启时存档位于应用存档目录，关闭时位于游戏目录 save/</string>
+    <string name="engine_settings_xsys35_uninstall_hint">卸载或删除游戏会清除应用独立存档目录</string>
     <string name="engine_settings_ppsspp_title">PPSSPP引擎设置</string>
     <string name="engine_settings_input_title">输入与手柄</string>
     <string name="engine_settings_input_summary">虚拟按键、按键方案与手柄映射的开关和管理</string>
@@ -555,6 +565,7 @@
     <string name="save_location_ons_scoped">ONS 应用独立存档目录</string>
     <string name="save_location_ons_game_dir">ONS 游戏内存档目录</string>
     <string name="save_error_tyrano_external_unavailable">Tyrano 应用独立存储目录不可用</string>
+    <string name="save_error_xsys35_external_unavailable">外部存储不可用，无法使用独立存档目录</string>
     <string name="save_location_engine_scoped">%1$s 应用独立存档目录</string>
     <string name="save_location_engine_game_dir">%1$s 游戏内存档目录</string>
     <string name="save_location_engine_no_file_interface">%1$s 没有标准文件存档接口</string>
@@ -710,6 +721,9 @@
     <string name="launch_krkr_save_path_not_dir">KRKR 存档路径已存在但不是目录：%1$s</string>
     <string name="launch_create_krkr_scoped_save_failed">无法创建 KRKR 应用独立存档目录：%1$s</string>
     <string name="launch_create_krkr_save_failed">无法创建 KRKR 存档目录：%1$s</string>
+    <string name="launch_error_xs35_save_path_not_directory">存档路径存在但不是目录：%1$s</string>
+    <string name="launch_error_xs35_save_dir_unavailable">无法创建存档目录：%1$s</string>
+    <string name="launch_error_xs35_external_unavailable">外部存储不可用，无法使用独立存档目录</string>
 
     <string name="archive_title">解包 / 封包</string>
     <string name="archive_permission_rationale">需要「所有文件访问」权限以直接读取存储中的封包；未授权时部分目录可能扫描不到或需慢速中转</string>

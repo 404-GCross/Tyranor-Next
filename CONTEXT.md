@@ -5,11 +5,11 @@
 ## 引擎与运行时
 
 **引擎（EngineType）**:
-游戏所属的运行时家族，扫描时按目录特征（脚本/资源文件）判定：KIRIKIRI、ONS、TYRANO、RPG Maker（RGSS 系列）、RPG_MV、RPG_MZ、VN、WebOther、ARTEMIS、SIGLUS、REALLIVE、AVG32、UK2、FVP、RENPY、YURIS、CATSYSTEM2、PC、ANDROID_APP、UNKNOWN。
+游戏所属的运行时家族，扫描时按目录特征（脚本/资源文件）判定：KIRIKIRI、ONS、TYRANO、RPG Maker（RGSS 系列）、RPG_MV、RPG_MZ、VN、WebOther、ARTEMIS、SIGLUS、REALLIVE、AVG32、XSYS35、UK2、FVP、RENPY、YURIS、CATSYSTEM2、PC、ANDROID_APP、UNKNOWN。
 _Avoid_: 游戏类型、格式
 
 **内置引擎**:
-随 App 分发、无需外置安装即可运行的引擎运行时（Kirikiroid2 / krkrsdl3、ONScripter、Artemis、Siglus（siglus_rs Rust 运行时）、RealLive / AVG32 / UK2（siglus_rs game_launcher 软渲染运行时）、FVP（rfvp Rust 运行时）、Tyrano 网页壳）。RPG Maker MV/MZ 由内置 Web 运行环境承载。
+随 App 分发、无需外置安装即可运行的引擎运行时（Kirikiroid2 / krkrsdl3、ONScripter、Artemis、Siglus（siglus_rs Rust 运行时）、RealLive / AVG32 / UK2（siglus_rs game_launcher 软渲染运行时）、FVP（rfvp Rust 运行时）、System35（xsystem35）、Tyrano 网页壳）。RPG Maker MV/MZ 由内置 Web 运行环境承载。
 _Avoid_: 预制引擎、捆绑引擎
 
 **视觉小说引擎组（Framebuffer 引擎）**:
@@ -52,8 +52,8 @@ _Avoid_: 补丁、Hook
 Artemis 启动前对必要文件（system.ini、list_windows、movie 等）进行幂等修补的决策策略：「启动时询问 / 自动 / 关闭」，由共享确认弹窗承载；**默认关闭**（`ART_PATCH_DEFAULT`，避免无弹窗路径下等价于自动补丁）。
 _Avoid_: 自动补丁、提问开关
 
-**Siglus 标题回写（Title Feedback）**:
-Siglus 游戏首次启动成功后，宿主在引擎进程内解析 Gameexe `GAMENAME` 并写入共享 prefs（`siglus_title.<pathHash>`），主 App 在库加载时条件导入为游戏标题；仅当标题仍等于启动前登记的目录名（未被用户改名）时覆盖。引擎进程无法访问 Room，故以 prefs 回写协议承载。
+**标题回写（Title Feedback）**:
+引擎宿主在引擎进程内解析游戏标题并写入共享 prefs（`<engine>_title.<pathHash>`），主 App 在库加载时条件导入为游戏标题；仅当标题仍等于启动前登记的目录名（未被用户改名）时覆盖；Siglus 与 System35 均使用该协议。
 _Avoid_: 自动改名、元数据抓取
 
 ## 游戏库
@@ -101,7 +101,7 @@ _Avoid_: 设置优先级、全局设置
 _Avoid_: 设置合并、覆盖层
 
 **引擎设置种类（EngineSettingsKind）**:
-引擎设置页的分类入口（KRKR / ONS / ARTEMIS / RPG_MAKER / TYRANO / RENPY），各自提供该引擎族专属参数项。
+引擎设置页的分类入口（KRKR / ONS / ARTEMIS / RPG_MAKER / TYRANO / RENPY / SIGLUS / FRAMEBUFFER / FVP / XSYS35 / PPSSPP / WINLATOR），各自提供该引擎族专属参数项。
 _Avoid_: 引擎设置 Tab
 
 **导航样式（Nav Style）**:

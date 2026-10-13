@@ -112,6 +112,12 @@ object PerGameSettingsStore {
     const val F_FVP_TEXT_HIDPI = "fvp_text_hidpi"
     const val F_FVP_FONT = "fvp_font"
 
+    // System35（独立存档/渲染后端/整数倍缩放/失焦静音覆盖；null=跟随全局）
+    const val F_XSYS35_SCOPED_SAVE_DIR = "xsys35_scoped_save_dir"
+    const val F_XSYS35_RENDERER = "xsys35_renderer"
+    const val F_XSYS35_INTEGER_SCALE = "xsys35_integer_scale"
+    const val F_XSYS35_MUTE_UNFOCUS = "xsys35_mute_unfocus"
+
     // Winlator 外置启动（null=跟随全局；字符串 "" = 显式不下发该参数）
     const val F_WINLATOR_CONTAINER_ID = "winlator_container_id"
     const val F_WINLATOR_CONTAINER_NAME = "winlator_container_name"

@@ -37,6 +37,18 @@ object EnginePrefs {
     /** Siglus 启动登记：`siglus_default_title.<pathHash>` → 目录名（判断标题是否被用户改过）。 */
     const val KEY_SIGLUS_DEFAULT_TITLE_PREFIX = "siglus_default_title."
 
+    /**
+     * System35（xsystem35）标题回写键前缀（`xsys35_title.<pathHash>`）：宿主捕获 native
+     * `setTitle` 后写入，app 侧库刷新时条件导入（仅覆盖仍等于目录名的自动标题）。
+     */
+    const val KEY_XSYS35_TITLE_PREFIX = "xsys35_title."
+
+    /** System35 启动登记：`xsys35_uri.<pathHash>` → 游戏 uri（app 侧启动前写入，标题回写定位用）。 */
+    const val KEY_XSYS35_URI_PREFIX = "xsys35_uri."
+
+    /** System35 启动登记：`xsys35_default_title.<pathHash>` → 目录名（判断标题是否被用户改过）。 */
+    const val KEY_XSYS35_DEFAULT_TITLE_PREFIX = "xsys35_default_title."
+
     const val KEY_NATIVE_PLUGIN_KIRIKIROID2_ENABLED = "native_plugin.kirikiroid2.enabled"
     const val KEY_NATIVE_PLUGIN_KIRIKIROID2_INSTALLED = "native_plugin.kirikiroid2.installed"
     const val KEY_NATIVE_PLUGIN_KIRIKIROID2_VERSION = "native_plugin.kirikiroid2.version"

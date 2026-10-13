@@ -36,6 +36,9 @@
     <string name="engine_fvp_missing_game_dir">FVP failed to start: the game directory is missing</string>
     <string name="engine_fvp_init_failed">Failed to initialize the FVP engine</string>
     <string name="engine_fvp_back_again_to_exit">Press back again to exit the game</string>
+    <string name="engine_xsys35_missing_game_dir">System35 failed to start: the game directory is missing</string>
+    <string name="engine_xsys35_init_failed">Failed to initialize the System35 engine: no scenario file (S*.ALD) found</string>
+    <string name="engine_xsys35_back_again_to_exit">Press back again to exit the game</string>
     <string name="engine_fb_missing_game_dir">Launch failed: game directory is missing</string>
     <string name="engine_fb_init_failed">Engine initialization failed</string>
     <string name="engine_fb_back_again_to_exit">Press back again to exit the game</string>

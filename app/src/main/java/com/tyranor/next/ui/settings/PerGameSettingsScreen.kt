@@ -40,6 +40,7 @@ import com.tyranor.next.core.engine.external.ExternalEmulatorRegistry
 import com.tyranor.next.core.engine.external.RpgMakerRuntimeEnvironment
 import com.tyranor.next.core.game.launch.EngineLauncher
 import com.tyranor.next.core.game.model.ScanGame
+import com.tyranor.next.core.game.save.GameSaveManager
 import com.tyranor.next.core.input.InputRemapRepository
 import com.tyranor.next.core.settings.EngineSettingsStore
 import com.tyranor.next.core.settings.PerGameSettingsStore
@@ -111,6 +112,12 @@ fun PerGameSettingsScreen(game: ScanGame) {
     var ppssppVersion by remember { mutableStateOf(PerGameSettingsStore.getStr(ctx, gid, PerGameSettingsStore.F_PPSSPP_VERSION)) }
     var webShellPort by remember { mutableStateOf(PerGameSettingsStore.getStr(ctx, gid, PerGameSettingsStore.F_WEB_SHELL_PORT)) }
     var fvpFont by remember { mutableStateOf(PerGameSettingsStore.getStr(ctx, gid, PerGameSettingsStore.F_FVP_FONT)) }
+    var xs35Scoped by remember(gid) { mutableStateOf(PerGameSettingsStore.getBool(ctx, gid, PerGameSettingsStore.F_XSYS35_SCOPED_SAVE_DIR)) }
+    var xs35Renderer by remember(gid) { mutableStateOf(PerGameSettingsStore.getStr(ctx, gid, PerGameSettingsStore.F_XSYS35_RENDERER)) }
+    var xs35IntegerScale by remember(gid) { mutableStateOf(PerGameSettingsStore.getBool(ctx, gid, PerGameSettingsStore.F_XSYS35_INTEGER_SCALE)) }
+    var xs35MuteUnfocus by remember(gid) { mutableStateOf(PerGameSettingsStore.getBool(ctx, gid, PerGameSettingsStore.F_XSYS35_MUTE_UNFOCUS)) }
+    // System35 生效存档路径：与 GameSaveManager.resolveSaveLocation 同源（IO 读取，避免组合期磁盘/DB 阻塞）
+    var xs35SaveLocation by remember(gid) { mutableStateOf<GameSaveManager.SaveLocation?>(null) }
     var winlatorContainerId by remember { mutableStateOf(PerGameSettingsStore.getStr(ctx, gid, PerGameSettingsStore.F_WINLATOR_CONTAINER_ID)) }
     var winlatorContainerName by remember { mutableStateOf(PerGameSettingsStore.getStr(ctx, gid, PerGameSettingsStore.F_WINLATOR_CONTAINER_NAME)) }
     var winlatorGraphicsDriver by remember { mutableStateOf(PerGameSettingsStore.getStr(ctx, gid, PerGameSettingsStore.F_WINLATOR_GRAPHICS_DRIVER)) }
@@ -208,6 +215,14 @@ fun PerGameSettingsScreen(game: ScanGame) {
             inputProfileLoadFailed = true
         }
     }
+    // System35 生效存档路径展示：resolveSaveLocation 内含游戏目录解析与三级设置合并
+    // （磁盘 + DB 读），挂起在 IO 线程取结果，避免组合期阻塞
+    LaunchedEffect(gid) {
+        if (game.engine != EngineType.XSYS35) return@LaunchedEffect
+        xs35SaveLocation = withContext(Dispatchers.IO) {
+            GameSaveManager(ctx).resolveSaveLocation(game)
+        }
+    }
     var rpgmOverride by remember(gid) {
         mutableStateOf(PerGameSettingsStore.toRpgMakerOverride(PerGameSettingsStore.load(ctx, gid)))
     }
@@ -282,6 +297,10 @@ fun PerGameSettingsScreen(game: ScanGame) {
     val globalFvpSystemFont = EngineSettingsStore.isFvpSystemFont(ctx)
     val globalFvpTextHidpi = EngineSettingsStore.isFvpTextHidpi(ctx)
     val globalFvpFont = EngineSettingsStore.getFvpFont(ctx)
+    val globalXs35Scoped = EngineSettingsStore.isXs35ScopedSaveDir(ctx)
+    val globalXs35Renderer = EngineSettingsStore.getXs35Renderer(ctx)
+    val globalXs35IntegerScale = EngineSettingsStore.isXs35IntegerScale(ctx)
+    val globalXs35MuteUnfocus = EngineSettingsStore.isXs35MuteUnfocus(ctx)
     val globalWinlator = remember { EngineSettingsStore.loadWinlator(ctx) }
     val globalPpssppVersion = EngineSettingsStore.getPpssppVersion(ctx)
     val globalWebShellPort = EngineSettingsStore.getWebShellPort(ctx)
@@ -315,6 +334,7 @@ fun PerGameSettingsScreen(game: ScanGame) {
     val siglusLanguageMap = siglusLanguageOptionsMap()
     val fbNlsMap = fbNlsOptionsMap()
     val fvpNlsMap = fvpNlsOptionsMap()
+    val xs35RendererMap = xsys35RendererOptionsMap()
     val artPatchMap = artPatchOptionsMap()
     val artResolutionMap = artResolutionOptionsMap()
     val artToggleMap = artToggleOptionsMap()
@@ -382,6 +402,15 @@ fun PerGameSettingsScreen(game: ScanGame) {
         PerGameSettingsStore.setStr(ctx, gid, PerGameSettingsStore.F_PPSSPP_VERSION, ppssppVersion)
         PerGameSettingsStore.setStr(ctx, gid, PerGameSettingsStore.F_WEB_SHELL_PORT, webShellPort)
         PerGameSettingsStore.setStr(ctx, gid, PerGameSettingsStore.F_FVP_FONT, fvpFont)
+        PerGameSettingsStore.setBool(ctx, gid, PerGameSettingsStore.F_XSYS35_SCOPED_SAVE_DIR, xs35Scoped)
+        PerGameSettingsStore.setStr(
+            ctx,
+            gid,
+            PerGameSettingsStore.F_XSYS35_RENDERER,
+            xs35Renderer?.takeIf { it in EngineSettingsStore.XSYS35_RENDERER_VALUES },
+        )
+        PerGameSettingsStore.setBool(ctx, gid, PerGameSettingsStore.F_XSYS35_INTEGER_SCALE, xs35IntegerScale)
+        PerGameSettingsStore.setBool(ctx, gid, PerGameSettingsStore.F_XSYS35_MUTE_UNFOCUS, xs35MuteUnfocus)
         PerGameSettingsStore.setStr(ctx, gid, PerGameSettingsStore.F_WINLATOR_CONTAINER_ID, winlatorContainerId)
         PerGameSettingsStore.setStr(ctx, gid, PerGameSettingsStore.F_WINLATOR_CONTAINER_NAME, winlatorContainerName)
         PerGameSettingsStore.setStr(ctx, gid, PerGameSettingsStore.F_WINLATOR_GRAPHICS_DRIVER, winlatorGraphicsDriver)
@@ -472,6 +501,14 @@ fun PerGameSettingsScreen(game: ScanGame) {
                     trailing = {
                         TopBarIcon(painterResource(R.drawable.ic_save), stringResource(R.string.common_save), MiuixTheme.colorScheme.primary) {
                             save()
+                            // 存档路径展示与实际生效设置同源：保存后按新值重解一次（磁盘 + DB 读，走 IO）
+                            if (game.engine == EngineType.XSYS35) {
+                                scope.launch {
+                                    xs35SaveLocation = withContext(Dispatchers.IO) {
+                                        GameSaveManager(ctx).resolveSaveLocation(game)
+                                    }
+                                }
+                            }
                             android.widget.Toast.makeText(ctx, perGameSettingsSavedMessage, android.widget.Toast.LENGTH_SHORT).show()
                         }
                     },
@@ -756,6 +793,43 @@ fun PerGameSettingsScreen(game: ScanGame) {
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
                             )
+                        }
+                    }
+                    EngineType.XSYS35 -> item {
+                        SectionCard(stringResource(R.string.engine_settings_xsys35_title)) {
+                            OverrideSwitch(stringResource(R.string.engine_settings_scoped_save_dir), globalXs35Scoped, xs35Scoped) { xs35Scoped = it }
+                            OverrideChoice(stringResource(R.string.engine_settings_xsys35_renderer_title), xs35RendererMap, globalXs35Renderer, xs35Renderer) { xs35Renderer = it }
+                            OverrideSwitch(stringResource(R.string.engine_settings_xsys35_integer_scale_title), globalXs35IntegerScale, xs35IntegerScale) { xs35IntegerScale = it }
+                            OverrideSwitch(stringResource(R.string.engine_settings_xsys35_mute_unfocus_title), globalXs35MuteUnfocus, xs35MuteUnfocus) { xs35MuteUnfocus = it }
+                            Text(
+                                stringResource(R.string.engine_settings_xsys35_note),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+                            )
+                            Text(
+                                stringResource(R.string.engine_settings_xsys35_uninstall_hint),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+                            )
+                            // 当前生效存档路径（与存档管理同源）：独立存档 = 应用外部存档目录，关闭 = 游戏目录 save/
+                            xs35SaveLocation?.let { location ->
+                                Text(
+                                    location.description,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+                                )
+                                location.directory?.let { dir ->
+                                    Text(
+                                        dir.absolutePath,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+                                    )
+                                }
+                            }
                         }
                     }
                     EngineType.RPGMAKER -> item {

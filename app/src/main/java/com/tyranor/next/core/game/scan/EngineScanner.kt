@@ -54,6 +54,15 @@ object EngineScanner {
     /** UK2 MES 文件头（`<< UK2 TEXT Ver1.00 >>`）。 */
     private val UK2_MES_MAGIC = "<< UK2 TEXT Ver1.00 >>".toByteArray(Charsets.US_ASCII)
 
+    /** System3.x（xsystem35）场景/图形档 `*.ALD` 的最小文件名长度（`SA.ALD` 起）。 */
+    private const val XS35_ALD_MIN_LENGTH = 6
+
+    /** System3.x 辅助特征（根目录或 `GAMEDATA/` 内的 System39 配置文件）。 */
+    private val XS35_SUPPORT_EXACT_NAMES = setOf("system39.ain", "system39.ini")
+
+    /** System3.x 辅助特征扩展名（`.wai` / `.bgi` / `.alk`）。 */
+    private val XS35_SUPPORT_EXTENSIONS = listOf(".wai", ".bgi", ".alk")
+
     /** RealLive `SEEN.TXT` 场景头尺寸（`0x1d0`，AVG2000 为 `0x1cc`）。 */
     private val REALLIVE_HEADER_SIZES = intArrayOf(0x1d0, 0x1cc)
 
@@ -735,6 +744,9 @@ object EngineScanner {
         var hasMkxpZRubyRuntime = false
         var hasFvpScript = false
         var hasFvpPack = false
+        var hasAldScript = false
+        var aldCount = 0
+        var hasXs35Support = false
         var hasUk2Cfg = false
         var hasSeenSceneAvg32 = false
         var hasSeenSceneReallive = false
@@ -764,6 +776,21 @@ object EngineScanner {
                         val childName = nameOf(child).lowercase(Locale.ROOT)
                         if (childName.endsWith(".ypf")) hasYpf = true
                         if (childName.endsWith(".ymv")) hasYmv = true
+                    }
+                }
+                if (rel.isEmpty() && lower == "gamedata") {
+                    // System3.x（xsystem35）CD 镜像解出形态（`<根>/GAMEDATA/SA.ALD`）：只为 XS35
+                    // 特征扫描（.ALD / System39.* / .wai / .bgi / .alk），不进入通用目录白名单，
+                    // 避免把包内文件暴露给其它引擎的检测规则（与 pac 分支同策略）。
+                    // 要求 rel.isEmpty():仅认根目录的直接子目录，`data/gamedata/` 等嵌套同名目录不贡献特征
+                    childrenOf(entry).forEach { child ->
+                        if (isDirectory(child)) return@forEach
+                        val childName = nameOf(child).lowercase(Locale.ROOT)
+                        if (childName.endsWith(".ald") && childName.length >= XS35_ALD_MIN_LENGTH) {
+                            hasAldScript = true
+                            aldCount++
+                        }
+                        if (isXs35SupportName(childName)) hasXs35Support = true
                     }
                 }
                 if (lower in ENGINE_SEARCH_DIRECTORIES) {
@@ -844,6 +871,12 @@ object EngineScanner {
                 // FVP（rfvp）：根目录脚本（原版 *.hcb / 汉化 *.bch）+ 资源包特征
                 rel.isEmpty() && (lower.endsWith(".hcb") || lower.endsWith(".bch")) -> hasFvpScript = true
                 rel.isEmpty() && lower in FVP_PACK_NAMES -> hasFvpPack = true
+                // System3.x（xsystem35）：根目录级 ALD 与辅助特征（GAMEDATA/ 子目录见 collect 专用分支）
+                rel.isEmpty() && lower.endsWith(".ald") && lower.length >= XS35_ALD_MIN_LENGTH -> {
+                    hasAldScript = true
+                    aldCount++
+                }
+                rel.isEmpty() && isXs35SupportName(lower) -> hasXs35Support = true
             }
         }
         children.forEach { collect(it, "") }
@@ -923,6 +956,20 @@ object EngineScanner {
         if (cs2Score >= CS2_MIN_SCORE) {
             return Detection(EngineType.CATSYSTEM2, cs2Score, LAUNCH_TARGET_GAME_DIR)
         }
+        // System3.x（xsystem35）：场景/图形档 *.ALD 为硬特征，System39.*/.wai/.bgi/.alk 为辅助。
+        // 判定置于 CS2 之后、ARTEMIS 之前（即所有既有 native 引擎之后）：既有引擎优先，
+        // 防止「既有引擎特征 + 杂散 ALD」被抢判为 XSYS35；XSYS35 真实目录不含既有引擎特征，
+        // 召回不受影响。仅含非 S 前缀 ALD 的目录（如只有 GA.ALD，无法启动）会被低分识别为
+        // XSYS35，由宿主启动预检（场景档 S*.ALD / adisk.ald 检查，见 Xs35Activity）兜底拦下。
+        if (hasAldScript && hasXs35Support) {
+            return Detection(EngineType.XSYS35, 96, LAUNCH_TARGET_GAME_DIR)
+        }
+        if (hasAldScript && aldCount >= 2) {
+            return Detection(EngineType.XSYS35, 90, LAUNCH_TARGET_GAME_DIR)
+        }
+        if (hasAldScript) {
+            return Detection(EngineType.XSYS35, 80, LAUNCH_TARGET_GAME_DIR)
+        }
         if ((hasSystemIni && hasFirstIet) || hasRootPfs || hasPatchPfs || hasAnyPfs || (hasBootIni && hasObbLikeFile)) {
             return Detection(
                 EngineType.ARTEMIS,
@@ -993,6 +1040,10 @@ object EngineScanner {
         if (head == null || head.size < UK2_MES_MAGIC.size) return false
         return UK2_MES_MAGIC.indices.all { head[it] == UK2_MES_MAGIC[it] }
     }
+
+    /** System3.x（xsystem35）辅助特征文件名判定（调用方传 lowercase 名称）。 */
+    private fun isXs35SupportName(lowerName: String): Boolean =
+        lowerName in XS35_SUPPORT_EXACT_NAMES || XS35_SUPPORT_EXTENSIONS.any(lowerName::endsWith)
 
     /**
      * 区分共享 `SEEN.TXT` 文件名的 AVG32 与 RealLive：

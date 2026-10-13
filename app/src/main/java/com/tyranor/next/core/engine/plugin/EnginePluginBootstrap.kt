@@ -87,6 +87,7 @@ object EnginePluginBootstrap {
             EngineType.SIGLUS,
             EngineType.REALLIVE,
             EngineType.AVG32,
+            EngineType.XSYS35,
             EngineType.UK2,
             EngineType.FVP,
             EngineType.YURIS,

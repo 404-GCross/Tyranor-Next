@@ -153,7 +153,8 @@ fun MainScreen(modifier: Modifier = Modifier) {
     withContext(Dispatchers.IO) { AppSettingsStore.initFloatingNavPosition(context) }
   }
   LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
-    libraryViewModel.refreshFromStorage()
+    // 库刷新（含 xsys35 标题回写的前台补导入，见 MainLibraryViewModel.onForeground）
+    libraryViewModel.onForeground()
     // 存档互通前台兜底：对已退出会话的待回写游戏补一次 Tyranor→标准同步
     // （引擎退出后 500ms 强杀、无回调，故在应用回到前台时补齐）。
     interactScope.launch {

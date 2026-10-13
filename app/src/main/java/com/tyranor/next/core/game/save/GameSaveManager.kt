@@ -9,6 +9,7 @@ import com.tyranor.next.core.engine.EngineType
 import com.tyranor.next.core.game.manual.AndroidAppGames
 import com.tyranor.next.core.game.model.GamePathUtils
 import com.tyranor.next.core.game.model.ScanGame
+import com.tyranor.next.core.game.model.Xs35Paths
 import com.tyranor.next.core.i18n.AppLocaleController
 import com.tyranor.next.core.settings.EngineSettingsResolver
 import com.tyranor.next.core.settings.EngineSettingsStore
@@ -141,6 +142,25 @@ class GameSaveManager(private val context: Context) {
                 text(R.string.save_location_engine_game_dir, game.engine.displayName),
                 true,
             )
+            // System35（xsystem35）：独立存档开（默认）→ 应用外部存档目录；关闭 → `<生效游戏目录>/save`。
+            // 目录推导与启动侧 ensureXs35SaveDir / XS35_SAVE_DIR 共用 Xs35Paths（单一实现，禁止两侧各自推导）。
+            EngineType.XSYS35 -> {
+                if (settings.xs35ScopedSaveDir) {
+                    val external = appContext.getExternalFilesDir(null)
+                        ?: return SaveLocation(null, text(R.string.save_error_xsys35_external_unavailable), false)
+                    SaveLocation(
+                        Xs35Paths.scopedSaveDir(external, root),
+                        text(R.string.save_location_engine_scoped, game.engine.displayName),
+                        true,
+                    )
+                } else {
+                    SaveLocation(
+                        Xs35Paths.gameDirSaveDir(Xs35Paths.effectiveGameDir(File(root))),
+                        text(R.string.save_location_engine_game_dir, game.engine.displayName),
+                        true,
+                    )
+                }
+            }
             // YU-RIS：存档固定在游戏目录 save/（经 Winlator 运行但落盘在游戏目录，可纳入统一存档管理）
             EngineType.YURIS -> SaveLocation(
                 File(root, "save"),
@@ -334,6 +354,12 @@ class GameSaveManager(private val context: Context) {
                 EngineType.ONS -> {
                     val external = appContext.getExternalFilesDir(null) ?: return
                     listOf(File(File(external, "save"), File(root).name))
+                }
+                // System35（xsystem35）：独立存档目录在应用外部存储；独立存档关闭时存档在
+                // 游戏目录内，按规范不触碰（不清理游戏目录内文件）。
+                EngineType.XSYS35 -> {
+                    val external = appContext.getExternalFilesDir(null) ?: return
+                    listOf(Xs35Paths.scopedSaveDir(external, root))
                 }
                 EngineType.TYRANO,
                 EngineType.RPG_MV,

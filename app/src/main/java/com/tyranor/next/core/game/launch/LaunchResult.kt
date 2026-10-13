@@ -58,6 +58,12 @@ sealed interface LaunchResult {
         /** KRKR 可移动存储镜像内部的 savedata 目录创建失败。 */
         data class KrkrMirrorSaveDirFailed(val path: String) : Failure
 
+        /** System35 存档路径存在但不是目录。 */
+        data class Xs35SavePathNotDirectory(val path: String) : Failure
+
+        /** System35 存档目录创建失败；[path] 为 null 表示外部存储不可用（独立存档无法落点）。 */
+        data class Xs35SaveDirUnavailable(val path: String?) : Failure
+
         /** 外置 APK 引擎模块启动失败；携带模块层类型化错误（文案由 UI 映射）。 */
         data class ExternalModuleFailed(val result: ExternalEngineLaunchResult) : Failure
 

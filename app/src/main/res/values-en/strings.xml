@@ -151,6 +151,7 @@
     <string name="engine_desc_reallive">RealLive (VisualArt’s). Kanon SE / CLANNAD / Little Busters! and more</string>
     <string name="engine_desc_avg32">AVG32 (VisualArt’s early engine). Kanon / AIR / ONE and more</string>
     <string name="engine_desc_uk2">UK2 (AyPio early PC-98 engine). Sorcer Kingdom and more</string>
+    <string name="engine_desc_xsys35">System3.x (xsystem35)</string>
     <string name="engine_desc_unknown">Unknown engine</string>
     <string name="engine_desc_psp">PSP games run through the external PPSSPP</string>
     <string name="engine_desc_yuris">YU-RIS (yscfg.dat with .ypf packages, ysbin/.ymv), runs via external Winlator</string>
@@ -296,6 +297,15 @@
     <string name="engine_settings_fvp_system_font_summary">Use system CJK fonts for glyphs missing from game fonts (recommended for Chinese patches)</string>
     <string name="engine_settings_fvp_text_hidpi_title">HiDPI text rendering</string>
     <string name="engine_settings_fvp_text_hidpi_summary">Rasterize text at the screen scale for sharper text on high-DPI displays</string>
+    <string name="engine_settings_xsys35_title">System35 engine settings</string>
+    <string name="engine_settings_xsys35_renderer_title">Renderer</string>
+    <string name="engine_settings_xsys35_renderer_auto">Auto</string>
+    <string name="engine_settings_xsys35_renderer_opengl">OpenGL</string>
+    <string name="engine_settings_xsys35_renderer_software">Software</string>
+    <string name="engine_settings_xsys35_integer_scale_title">Integer scaling</string>
+    <string name="engine_settings_xsys35_mute_unfocus_title">Mute when unfocused</string>
+    <string name="engine_settings_xsys35_note">Text is Shift-JIS; saves live in the app save dir when scoped saves are on, otherwise in the game\'s save/</string>
+    <string name="engine_settings_xsys35_uninstall_hint">Uninstalling or removing the game clears its scoped save directory</string>
     <string name="engine_settings_ppsspp_title">PPSSPP engine settings</string>
     <string name="engine_settings_input_title">Input &amp; gamepad</string>
     <string name="engine_settings_input_summary">Switches and management for the virtual pad, key profiles and gamepad mapping</string>
@@ -555,6 +565,7 @@
     <string name="save_location_ons_scoped">ONS app-specific save directory</string>
     <string name="save_location_ons_game_dir">ONS in-game save directory</string>
     <string name="save_error_tyrano_external_unavailable">Tyrano app-specific storage is unavailable</string>
+    <string name="save_error_xsys35_external_unavailable">External storage unavailable; cannot use the scoped save directory</string>
     <string name="save_location_engine_scoped">%1$s app-specific save directory</string>
     <string name="save_location_engine_game_dir">%1$s in-game save directory</string>
     <string name="save_location_engine_no_file_interface">%1$s does not expose a standard file-based save interface</string>
@@ -710,6 +721,9 @@
     <string name="launch_krkr_save_path_not_dir">KRKR save path exists but is not a directory: %1$s</string>
     <string name="launch_create_krkr_scoped_save_failed">Unable to create the KRKR app-specific save directory: %1$s</string>
     <string name="launch_create_krkr_save_failed">Unable to create the KRKR save directory: %1$s</string>
+    <string name="launch_error_xs35_save_path_not_directory">Save path exists but is not a directory: %1$s</string>
+    <string name="launch_error_xs35_save_dir_unavailable">Cannot create save directory: %1$s</string>
+    <string name="launch_error_xs35_external_unavailable">External storage unavailable; cannot use the scoped save directory</string>
 
     <string name="archive_title">Unpack / Pack</string>
     <string name="archive_permission_rationale">“All files access” is required to read archives from storage directly; without it some folders cannot be scanned or fall back to slow transfers</string>

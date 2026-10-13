@@ -36,6 +36,9 @@
     <string name="engine_fvp_missing_game_dir">FVP の起動に失敗しました：ゲームディレクトリがありません</string>
     <string name="engine_fvp_init_failed">FVP エンジンの初期化に失敗しました</string>
     <string name="engine_fvp_back_again_to_exit">もう一度戻るキーを押すとゲームを終了します</string>
+    <string name="engine_xsys35_missing_game_dir">System35 の起動に失敗しました：ゲームディレクトリがありません</string>
+    <string name="engine_xsys35_init_failed">System35 エンジンの初期化に失敗しました：シナリオファイル（S*.ALD）が見つかりません</string>
+    <string name="engine_xsys35_back_again_to_exit">もう一度戻るキーを押すとゲームを終了します</string>
     <string name="engine_fb_missing_game_dir">起動失敗：ゲームディレクトリがありません</string>
     <string name="engine_fb_init_failed">エンジンの初期化に失敗しました</string>
     <string name="engine_fb_back_again_to_exit">もう一度戻るキーを押すとゲームを終了します</string>

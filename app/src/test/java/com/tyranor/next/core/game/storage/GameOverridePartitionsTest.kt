@@ -216,6 +216,34 @@ class GameOverridePartitionsTest {
     }
 
     @Test
+    fun system35KeysArePartitionedIntoTyrano() {
+        val pairs = listOf(
+            GameOverridePartitions.KEY_XSYS35_SCOPED_SAVE_DIR to PerGameSettingsStore.F_XSYS35_SCOPED_SAVE_DIR,
+            GameOverridePartitions.KEY_XSYS35_RENDERER to PerGameSettingsStore.F_XSYS35_RENDERER,
+            GameOverridePartitions.KEY_XSYS35_INTEGER_SCALE to PerGameSettingsStore.F_XSYS35_INTEGER_SCALE,
+            GameOverridePartitions.KEY_XSYS35_MUTE_UNFOCUS to PerGameSettingsStore.F_XSYS35_MUTE_UNFOCUS,
+        )
+        pairs.forEach { (partitionKey, perGameKey) ->
+            assertEquals(perGameKey, partitionKey)
+            assertTrue("System35 分区缺少字段 $perGameKey", perGameKey in GameOverridePartitions.TYRANO_KEYS)
+        }
+
+        val blob = JSONObject()
+            .put(PerGameSettingsStore.F_XSYS35_SCOPED_SAVE_DIR, false)
+            .put(PerGameSettingsStore.F_XSYS35_RENDERER, "software")
+            .put(PerGameSettingsStore.F_XSYS35_INTEGER_SCALE, true)
+            .put(PerGameSettingsStore.F_XSYS35_MUTE_UNFOCUS, true)
+
+        val row = GameOverridePartitions.split("/games/xsys35", blob, 1L)
+        val tyranoPartition = JSONObject(row.tyranoJson!!)
+        for (key in blob.keys()) {
+            assertTrue("System35 键 $key 未落入 tyrano 分区", tyranoPartition.has(key))
+            assertEquals(blob.opt(key)?.toString(), GameOverridePartitions.assemble(row).opt(key)?.toString())
+        }
+        assertEquals(blob.length(), GameOverridePartitions.assemble(row).length())
+    }
+
+    @Test
     fun renPyModuleKeysArePartitionedIntoRenpy() {
         val pairs = listOf(
             GameOverridePartitions.KEY_RENPY_CHEATS to PerGameSettingsStore.F_RENPY_CHEATS,

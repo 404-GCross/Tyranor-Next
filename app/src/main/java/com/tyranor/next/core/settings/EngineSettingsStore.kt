@@ -67,6 +67,12 @@ object EngineSettingsStore {
     const val KEY_FVP_TEXT_HIDPI = "fvp_text_hidpi"
     const val KEY_FVP_FONT = "fvp_font"
 
+    // System35（xsystem35）应用级默认（独立存档 / 渲染后端 / 整数倍缩放 / 失焦静音）
+    const val KEY_XSYS35_SCOPED_SAVE_DIR = "xsys35_scoped_save_dir"
+    const val KEY_XSYS35_RENDERER = "xsys35_renderer"
+    const val KEY_XSYS35_INTEGER_SCALE = "xsys35_integer_scale"
+    const val KEY_XSYS35_MUTE_UNFOCUS = "xsys35_mute_unfocus"
+
     // Winlator 外置启动（YU-RIS / CatSystem2 / PC 经 Winlator 跳转时的下发参数）
     const val KEY_WINLATOR_CONTAINER_ID = "winlator_container_id"
     const val KEY_WINLATOR_CONTAINER_NAME = "winlator_container_name"
@@ -286,6 +292,16 @@ object EngineSettingsStore {
         FVP_NLS_SJIS,
         FVP_NLS_GBK,
         FVP_NLS_UTF8,
+    )
+
+    // System35 渲染后端取值（auto 不传 -renderer，交由 SDL 自动探测；opengl = GLES2，software 兜底）
+    const val XSYS35_RENDERER_AUTO = "auto"
+    const val XSYS35_RENDERER_OPENGL = "opengl"
+    const val XSYS35_RENDERER_SOFTWARE = "software"
+    val XSYS35_RENDERER_VALUES: Set<String> = linkedSetOf(
+        XSYS35_RENDERER_AUTO,
+        XSYS35_RENDERER_OPENGL,
+        XSYS35_RENDERER_SOFTWARE,
     )
 
     // Winlator 外置启动取值域（空串 = 不下发该参数，跟随容器/快捷方式配置）
@@ -711,6 +727,24 @@ object EngineSettingsStore {
     fun setFvpFont(c: Context, v: String?) =
         prefs(c).edit().putString(KEY_FVP_FONT, normalizeFvpFont(v)).apply()
     fun normalizeFvpFont(v: String?): String = v?.trim().orEmpty()
+
+    // ---------- System35（xsystem35） ----------
+    fun isXs35ScopedSaveDir(c: Context): Boolean =
+        prefs(c).getBoolean(KEY_XSYS35_SCOPED_SAVE_DIR, true)
+    fun setXs35ScopedSaveDir(c: Context, b: Boolean) =
+        prefs(c).edit().putBoolean(KEY_XSYS35_SCOPED_SAVE_DIR, b).apply()
+    fun getXs35Renderer(c: Context): String =
+        normalizeXs35Renderer(prefs(c).getString(KEY_XSYS35_RENDERER, XSYS35_RENDERER_AUTO))
+    fun setXs35Renderer(c: Context, v: String) =
+        prefs(c).edit().putString(KEY_XSYS35_RENDERER, normalizeXs35Renderer(v)).apply()
+    fun normalizeXs35Renderer(v: String?): String =
+        v?.trim()?.lowercase()?.takeIf { it in XSYS35_RENDERER_VALUES } ?: XSYS35_RENDERER_AUTO
+    fun isXs35IntegerScale(c: Context): Boolean = prefs(c).getBoolean(KEY_XSYS35_INTEGER_SCALE, false)
+    fun setXs35IntegerScale(c: Context, b: Boolean) =
+        prefs(c).edit().putBoolean(KEY_XSYS35_INTEGER_SCALE, b).apply()
+    fun isXs35MuteUnfocus(c: Context): Boolean = prefs(c).getBoolean(KEY_XSYS35_MUTE_UNFOCUS, false)
+    fun setXs35MuteUnfocus(c: Context, b: Boolean) =
+        prefs(c).edit().putBoolean(KEY_XSYS35_MUTE_UNFOCUS, b).apply()
 
     // ---------- Winlator 外置启动 ----------
 

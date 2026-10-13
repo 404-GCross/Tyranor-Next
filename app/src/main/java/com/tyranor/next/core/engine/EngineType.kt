@@ -20,6 +20,7 @@ enum class EngineType(val displayName: String, val abbr: String, val isManual: B
     SIGLUS("Siglus", "SIG"),
     REALLIVE("RealLive", "RY"),
     AVG32("AVG32", "AVG"),
+    XSYS35("System35", "S3X"),
     UK2("UK2", "UK"),
     FVP("FVP", "FVP"),
     RENPY("Ren'Py", "RPY"),
