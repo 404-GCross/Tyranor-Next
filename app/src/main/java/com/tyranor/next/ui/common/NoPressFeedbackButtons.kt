@@ -37,13 +37,15 @@ fun NoRippleTextButton(
     text: String,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    /** 可用态文字色；破坏性动作（删除/清除）传 `MaterialTheme.colorScheme.error`。 */
+    contentColor: Color = MaterialTheme.colorScheme.primary,
     onClick: () -> Unit,
 ) {
     Text(
         text = text,
         style = MaterialTheme.typography.bodyMedium,
         color = if (enabled) {
-            MaterialTheme.colorScheme.primary
+            contentColor
         } else {
             MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
         },

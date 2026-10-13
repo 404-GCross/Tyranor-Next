@@ -11,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.node.DelegatableNode
 import androidx.compose.ui.unit.dp
 import com.tyranor.next.theme.AppComponentShape
@@ -32,18 +33,23 @@ object NoIndication : IndicationNodeFactory {
 @Composable
 fun DialogTextButton(
     text: String,
+    modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    /** 可用态文字色；破坏性动作（删除/清除）传 `MaterialTheme.colorScheme.error`。 */
+    contentColor: Color = MaterialTheme.colorScheme.primary,
     onClick: () -> Unit,
 ) {
     Text(
         text = text,
-        style = MaterialTheme.typography.labelLarge,
+        // 两档排版：按钮文字属 bodyMedium（AGENTS.md「页面内容文字尺寸规范」），
+        // 不用 Material 默认的 labelLarge
+        style = MaterialTheme.typography.bodyMedium,
         color = if (enabled) {
-            MaterialTheme.colorScheme.primary
+            contentColor
         } else {
             MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
         },
-        modifier = Modifier
+        modifier = modifier
             .clip(AppComponentShape)
             .clickable(
                 enabled = enabled,

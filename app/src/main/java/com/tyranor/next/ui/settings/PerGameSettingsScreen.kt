@@ -18,8 +18,8 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,6 +40,7 @@ import com.tyranor.next.core.engine.external.ExternalEmulatorRegistry
 import com.tyranor.next.core.engine.external.RpgMakerRuntimeEnvironment
 import com.tyranor.next.core.game.launch.EngineLauncher
 import com.tyranor.next.core.game.model.ScanGame
+import com.tyranor.next.core.input.InputRemapRepository
 import com.tyranor.next.core.settings.EngineSettingsStore
 import com.tyranor.next.core.settings.PerGameSettingsStore
 import com.tyranor.next.core.settings.RenPyOverride
@@ -59,6 +60,7 @@ import com.tyranor.next.ui.common.AppNavItem
 import com.tyranor.next.ui.common.AppSearchField
 import com.tyranor.next.ui.common.AppTopBar
 import com.tyranor.next.ui.common.TopBarIcon
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -153,6 +155,59 @@ fun PerGameSettingsScreen(game: ScanGame) {
     }
     var rpgMvVersion by remember { mutableStateOf(PerGameSettingsStore.getStr(ctx, gid, PerGameSettingsStore.F_RPG_MV_VERSION)) }
     var rpgMzVersion by remember { mutableStateOf(PerGameSettingsStore.getStr(ctx, gid, PerGameSettingsStore.F_RPG_MZ_VERSION)) }
+    // 输入重映射：虚拟按键 / 手柄映射（null=跟随全局）
+    var inputPadEnabled by remember {
+        mutableStateOf(PerGameSettingsStore.getBool(ctx, gid, PerGameSettingsStore.F_INPUT_PAD_ENABLED))
+    }
+    var inputGamepadEnabled by remember {
+        mutableStateOf(PerGameSettingsStore.getBool(ctx, gid, PerGameSettingsStore.F_INPUT_GAMEPAD_ENABLED))
+    }
+    // 「跟随全局」的展示值必须按本游戏引擎取：未显式设置时 MV/MZ 默认开、其余默认关，
+    // 否则这个标签会与游戏内实际是否出现按键层相反
+    val inputGlobalPad = remember(gid) {
+        EngineSettingsStore.isInputPadEnabled(
+            ctx,
+            default = InputRemapRepository.engineDefaultsPadEnabled(game.engine),
+        )
+    }
+    val inputGlobalGamepad = remember { EngineSettingsStore.isInputGamepadEnabled(ctx) }
+    // 按键方案的单游戏覆盖：旧布局迁移会把结果写成**按游戏的方案**并写入该覆盖，若这里没有
+    // 入口，用户既改不回「跟随全局」，也改不了这个游戏的方案——设置页的全局选择对它无效，
+    // 页面显示会与实际生效的方案相反。
+    //
+    // 覆盖值与方案列表**一起在 IO 读取**（第八轮复审）：
+    //  - `PerGameSettingsStore` 是阻塞 DB 读（`GameOverridesRepository.loadRowBlocking`），组合期
+    //    同步读取会卡首帧；
+    //  - 两者必须同时就绪：覆盖已知而列表还空时，下拉只会显示「跟随全局」，误点即静默清掉覆盖
+    //    （旧实现就是选择时立即落盘，用户无从察觉）。就绪前该行禁用并显示「加载中…」。
+    var inputProfileOverride by remember(gid) { mutableStateOf<String?>(null) }
+    var inputProfiles by remember(gid) {
+        mutableStateOf(emptyList<InputRemapRepository.ProfileSummary>())
+    }
+    var inputProfileReady by remember(gid) { mutableStateOf(false) }
+    var inputProfileLoadFailed by remember(gid) { mutableStateOf(false) }
+    // 是否改过该行：只有改过才在保存时落盘（第八轮复审）。用脏标记而不是「就绪才写」：
+    // 未就绪不可能脏，天然挡住「还没读出来就把既有覆盖清成跟随全局」；也不会把页面的过期快照
+    // 盖到别处刚写入的值上（游戏启动时的旧布局迁移会写同一个覆盖）。
+    var inputProfileDirty by remember(gid) { mutableStateOf(false) }
+    val inputGlobalProfile = remember(gid) { InputRemapRepository.globalProfileId(ctx) }
+    LaunchedEffect(gid) {
+        // 读失败必须收敛（第八轮复审）：`inputProfileReady` 若只有成功出口，该行会永久停在
+        // 「加载中…」，用户既不知情也没法改；异常本身也不该穿出组合（DB 打开/查询失败）
+        try {
+            val loaded = withContext(Dispatchers.IO) {
+                InputRemapRepository.listProfileSummaries(ctx) to
+                    InputRemapRepository.gameProfileIdOverride(ctx, gid)
+            }
+            inputProfiles = loaded.first
+            inputProfileOverride = loaded.second
+            inputProfileReady = true
+        } catch (ce: CancellationException) {
+            throw ce
+        } catch (_: Throwable) {
+            inputProfileLoadFailed = true
+        }
+    }
     var rpgmOverride by remember(gid) {
         mutableStateOf(PerGameSettingsStore.toRpgMakerOverride(PerGameSettingsStore.load(ctx, gid)))
     }
@@ -367,6 +422,14 @@ fun PerGameSettingsScreen(game: ScanGame) {
         )
         PerGameSettingsStore.setStr(ctx, gid, PerGameSettingsStore.F_RPG_MV_VERSION, rpgMvVersion)
         PerGameSettingsStore.setStr(ctx, gid, PerGameSettingsStore.F_RPG_MZ_VERSION, rpgMzVersion)
+        PerGameSettingsStore.setBool(ctx, gid, PerGameSettingsStore.F_INPUT_PAD_ENABLED, inputPadEnabled)
+        PerGameSettingsStore.setBool(ctx, gid, PerGameSettingsStore.F_INPUT_GAMEPAD_ENABLED, inputGamepadEnabled)
+        // 按键方案覆盖只在用户真的改过这一行时落盘（脏标记）。无条件写会把本页的过期快照
+        // 盖到别处刚写入的值上（启动迁移会写同一个覆盖），就绪前写则会把既有覆盖清成跟随全局。
+        if (inputProfileDirty) {
+            InputRemapRepository.setGameProfileIdOverride(ctx, gid, inputProfileOverride)
+            inputProfileDirty = false
+        }
         PerGameSettingsStore.setBool(ctx, gid, PerGameSettingsStore.F_RPG_USE_RUBY18, rpgm.useRuby18)
         PerGameSettingsStore.setBool(ctx, gid, PerGameSettingsStore.F_RPG_SMOOTH_SCALING, rpgm.smoothScaling)
         PerGameSettingsStore.setBool(ctx, gid, PerGameSettingsStore.F_RPG_VSYNC, rpgm.vsync)
@@ -802,6 +865,28 @@ fun PerGameSettingsScreen(game: ScanGame) {
                             OverrideSwitch(stringResource(R.string.engine_settings_game_modifier), globalRpgMakerMod, rpgMakerMod) { rpgMakerMod = it }
                             OverrideSwitch(stringResource(R.string.engine_settings_legacy_renderer), globalRpgLegacyRenderer, rpgLegacyRenderer) { rpgLegacyRenderer = it }
                             OverrideSwitch(stringResource(R.string.engine_settings_save_interop), globalRpgSaveInterop, rpgSaveInterop) { rpgSaveInterop = it }
+                            // 输入重映射：虚拟按键 + 手柄映射（逐游戏跟随全局或单独开关）
+                            OverrideSwitch(
+                                stringResource(R.string.engine_settings_input_pad_title),
+                                inputGlobalPad,
+                                inputPadEnabled,
+                            ) { inputPadEnabled = it }
+                            OverrideSwitch(
+                                stringResource(R.string.engine_settings_input_gamepad_title),
+                                inputGlobalGamepad,
+                                inputGamepadEnabled,
+                            ) { inputGamepadEnabled = it }
+                            InputProfileOverrideRow(
+                                profiles = inputProfiles,
+                                globalId = inputGlobalProfile,
+                                overrideId = inputProfileOverride,
+                                ready = inputProfileReady,
+                                failed = inputProfileLoadFailed,
+                                onSet = { id ->
+                                    inputProfileOverride = id
+                                    inputProfileDirty = true
+                                },
+                            )
                         }
                     }
                     EngineType.TYRANO,
@@ -819,6 +904,28 @@ fun PerGameSettingsScreen(game: ScanGame) {
                             if (game.engine !in setOf(EngineType.VN, EngineType.WEB_OTHER)) {
                                 OverrideSwitch(stringResource(R.string.engine_settings_scoped_save_dir), globalTyScoped, tyScoped) { tyScoped = it }
                             }
+                            // 输入重映射：Web 系共享（虚拟按键 + 手柄映射），逐游戏可跟随全局或单独开关
+                            OverrideSwitch(
+                                stringResource(R.string.engine_settings_input_pad_title),
+                                inputGlobalPad,
+                                inputPadEnabled,
+                            ) { inputPadEnabled = it }
+                            OverrideSwitch(
+                                stringResource(R.string.engine_settings_input_gamepad_title),
+                                inputGlobalGamepad,
+                                inputGamepadEnabled,
+                            ) { inputGamepadEnabled = it }
+                            InputProfileOverrideRow(
+                                profiles = inputProfiles,
+                                globalId = inputGlobalProfile,
+                                overrideId = inputProfileOverride,
+                                ready = inputProfileReady,
+                                failed = inputProfileLoadFailed,
+                                onSet = { id ->
+                                    inputProfileOverride = id
+                                    inputProfileDirty = true
+                                },
+                            )
                             if (game.engine in setOf(EngineType.TYRANO, EngineType.VN, EngineType.WEB_OTHER)) {
                                 OverrideText(
                                     label = stringResource(R.string.engine_settings_web_shell_port_title),
@@ -981,7 +1088,10 @@ fun PerGameSettingsScreen(game: ScanGame) {
             },
             text = { Text(message, style = MaterialTheme.typography.bodyMedium) },
             confirmButton = {
-                TextButton(onClick = { artPatchResult = null }) { Text(stringResource(R.string.common_confirm)) }
+                DialogTextButton(
+                    text = stringResource(R.string.common_confirm),
+                    onClick = { artPatchResult = null },
+                )
             },
         )
     }
@@ -1004,7 +1114,60 @@ private fun SectionCard(title: String, content: @Composable () -> Unit) {
     }
 }
 
-/** 覆盖版下拉行：Miuix OverlayDropdownPreference，选项首位为“跟随全局”。 */
+/**
+ * 按键方案的单游戏覆盖行（首位「跟随全局」）。
+ *
+ * 单独包一层是因为选项值/展示名要过 [profileDisplayName]：内置默认与迁移主布局存的是
+ * 语言中立占位名（Default），直接显示会把占位名暴露给用户。
+ *
+ * 选择**只改本地状态**，与同页其它覆盖项一致，随顶栏「保存」落盘（此前是选择即写盘，
+ * 与「保存」按钮的语义相反，返回/取消也回滚不了）；是否落盘由调用方的脏标记决定。
+ *
+ * @param ready 方案列表与覆盖值是否已读完。未就绪时该行禁用（显示「加载中…」）——此前的空列表
+ *   会让 `index` 回退到 0，把有覆盖的显示成「跟随全局」，而下拉里只有这一项，误点即清掉覆盖。
+ * @param failed 读取失败（方案文件/DB 异常）：显示「加载失败」并保持禁用，不用「加载中…」冒充正常态。
+ */
+@Composable
+private fun InputProfileOverrideRow(
+    profiles: List<InputRemapRepository.ProfileSummary>,
+    globalId: String,
+    overrideId: String?,
+    ready: Boolean,
+    failed: Boolean,
+    onSet: (String?) -> Unit,
+) {
+    OverrideChoice(
+        label = stringResource(R.string.engine_settings_input_profile_title),
+        options = profiles.associate { it.id to profileDisplayName(it) },
+        global = globalId,
+        override = overrideId,
+        emptyLabel = stringResource(R.string.input_settings_profile_default),
+        // 未就绪 → 只显示对应标签且**真禁用**（`OverlayDropdownPreference` 有 `enabled` 参数，
+        // 同款用法见 AppSettingsActivity 的「玻璃风格下不可用」项）
+        notReadyLabel = when {
+            ready -> null
+            failed -> stringResource(R.string.input_settings_profile_load_failed)
+            else -> stringResource(R.string.common_loading)
+        },
+        // 覆盖引用的方案文件被删（悬空引用）时显式标注：此时 engine 实际回落到内置默认，
+        // 显示成「跟随全局」会与生效值不符，用户也无从判断该覆盖为什么没效果
+        missingLabel = overrideId
+            ?.takeIf { id -> profiles.none { it.id == id } }
+            ?.let { stringResource(R.string.input_settings_profile_missing) },
+        onSet = onSet,
+    )
+}
+
+/**
+ * 覆盖版下拉行：Miuix OverlayDropdownPreference，选项首位为“跟随全局”。
+ *
+ * @param notReadyLabel 非空表示数据尚未就绪（加载中/加载失败）：只显示该标签、`enabled = false`
+ *   且不响应任何选择。**此前**空选项时 `index` 会回退到 0（把有覆盖的显示成「跟随全局」），
+ *   下拉里也只有这一项，误点就会把真实覆盖清成跟随全局（第八轮复审）。
+ * @param missingLabel 非空且 [override] 不在 [options] 里（悬空引用，如方案文件被删）时，把它
+ *   显式列成一项并选中：此时 engine 实际回落到内置默认，显示成「跟随全局」与生效值不符。
+ *   选中该占位项不产生任何写入；[notReadyLabel] 非空时本参数不生效（加载态下还读不出覆盖）。
+ */
 @Composable
 private fun OverrideChoice(
     label: String,
@@ -1012,18 +1175,48 @@ private fun OverrideChoice(
     global: String,
     override: String?,
     emptyLabel: String = stringResource(R.string.engine_settings_builtin_font),
+    notReadyLabel: String? = null,
+    missingLabel: String? = null,
     onSet: (String?) -> Unit,
 ) {
-    val following = override == null
-    val effValue = override ?: global
+    if (notReadyLabel != null) {
+        OverlayDropdownPreference(
+            title = label,
+            items = listOf(notReadyLabel),
+            selectedIndex = 0,
+            enabled = false,
+            onSelectedIndexChange = { },
+        )
+        return
+    }
     val keys = options.keys.toList()
-    val labels = listOf(stringResource(R.string.engine_settings_follow_global_with_value, labelOf(effValue, options, emptyLabel))) + keys.map { options[it] ?: it }
-    val index = if (following) 0 else (keys.indexOf(override).takeIf { it >= 0 } ?: -1) + 1
+    val dangling = override != null && override !in options
+    // 悬空引用的首项取**真实的全局值**：此时 override 已不在 options 里，labelOf 查不到映射会
+    // 回显原始方案 id（第八轮复审）——用户读不懂的内部标识，且它早已不是选中项
+    val followValue = if (dangling) global else override ?: global
+    val labels = buildList {
+        add(stringResource(R.string.engine_settings_follow_global_with_value, labelOf(followValue, options, emptyLabel)))
+        addAll(keys.map { options[it] ?: it })
+        if (dangling && missingLabel != null) add(missingLabel)
+    }
+    val index = when {
+        override == null -> 0
+        // 占位项固定追加在末尾，用 lastIndex 而不是裸写 keys.size + 1
+        dangling -> if (missingLabel != null) labels.lastIndex else 0
+        else -> keys.indexOf(override) + 1
+    }
     OverlayDropdownPreference(
         title = label,
         items = labels,
         selectedIndex = index,
-        onSelectedIndexChange = { i -> onSet(if (i == 0) null else keys[i - 1]) },
+        onSelectedIndexChange = { i ->
+            if (i == 0) {
+                onSet(null)
+            } else {
+                // 占位项（悬空引用）与越界下标都不写入
+                keys.getOrNull(i - 1)?.let(onSet)
+            }
+        },
     )
 }
 
@@ -1103,7 +1296,10 @@ private fun OverrideFontPreference(
                 }
             },
             confirmButton = {
-                TextButton(onClick = { open = false }) { Text(stringResource(R.string.common_cancel)) }
+                DialogTextButton(
+                    text = stringResource(R.string.common_cancel),
+                    onClick = { open = false },
+                )
             },
         )
     }

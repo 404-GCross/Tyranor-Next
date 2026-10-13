@@ -40,7 +40,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -84,6 +83,7 @@ import com.tyranor.next.ui.common.AppAlertDialog
 import com.tyranor.next.ui.common.AppSearchField
 import com.tyranor.next.ui.common.AppTopBar
 import com.tyranor.next.ui.common.BottomInsetSpacer
+import com.tyranor.next.ui.common.ByteFormats
 import com.tyranor.next.ui.common.DialogTextButton
 import com.tyranor.next.ui.common.NoIndication
 import com.tyranor.next.ui.common.TopBarIcon
@@ -122,14 +122,8 @@ private sealed interface UpdateDownloadPhase {
     data class Failed(val message: String) : UpdateDownloadPhase
 }
 
-/** 更新下载进度文案的字节格式化（APK 体积通常在 MB 级）。 */
-private fun formatUpdateBytes(bytes: Long): String {
-    return if (bytes >= 1024L * 1024) {
-        String.format(Locale.US, "%.1f MB", bytes / (1024.0 * 1024.0))
-    } else {
-        String.format(Locale.US, "%.0f KB", bytes / 1024.0)
-    }
-}
+/** 更新下载进度文案的字节格式化（统一走 [ByteFormats]：二进制单位 + 有效量级精度）。 */
+private fun formatUpdateBytes(bytes: Long): String = ByteFormats.formatBinarySize(bytes)
 
 /** 设置页：只展示各引擎全局设置入口，具体设置内容由独立 Activity 承载。列表项采用 Miuix Card + Preference 体系。 */
 @Composable
@@ -329,13 +323,21 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                     }
                 }
                 item {
-                    // 工具入口：引擎设置（解包 / 封包入口已迁至侧边栏「妙妙工具」面板）
+                    // 工具入口：引擎设置与输入重映射合入同一卡片（解包 / 封包入口已迁至侧边栏「妙妙工具」面板）
                     MiuixCard(modifier = Modifier.fillMaxWidth().glassShadow().glassBorder(), cornerRadius = AppComponentCornerRadius) {
                         Column(Modifier.padding(vertical = 4.dp)) {
                             ArrowPreference(
                                 title = stringResource(R.string.settings_engine_settings),
                                 startAction = { SettingsItemIcon(R.drawable.ic_engine_manage) },
                                 onClick = { startActivityWithPageTransition(ctx, EngineSettingsMenuActivity.createIntent(ctx)) },
+                            )
+                            ArrowPreference(
+                                title = stringResource(R.string.engine_settings_input_title),
+                                // 入口摘要须覆盖整页能力（虚拟按键 + 按键方案 + 手柄映射），
+                                // 不能只写虚拟按键的开关说明
+                                summary = stringResource(R.string.engine_settings_input_summary),
+                                startAction = { SettingsItemIcon(R.drawable.ic_settings_engine) },
+                                onClick = { startActivityWithPageTransition(ctx, InputSettingsActivity.createIntent(ctx)) },
                             )
                         }
                     }
@@ -424,29 +426,34 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
                             )
-                            TextButton(
+                            DialogTextButton(
+                                text = stringResource(R.string.common_delete),
+                                contentColor = MaterialTheme.colorScheme.error,
                                 onClick = {
                                     GameLibraryFacade.removeRootAndGames(ctx, android.net.Uri.parse(dir))
                                     scanDirs = GameLibraryFacade.loadRoots(ctx)
                                 },
-                            ) {
-                                Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error)
-                            }
+                            )
                         }
                     }
                 }
             },
             confirmButton = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    TextButton(
+                    DialogTextButton(
+                        text = stringResource(R.string.settings_input_path),
+                        modifier = Modifier.padding(end = 8.dp),
                         onClick = { showPathDialog = true },
+                    )
+                    DialogTextButton(
+                        text = stringResource(R.string.settings_add_dir),
                         modifier = Modifier.padding(end = 8.dp),
-                    ) { Text(stringResource(R.string.settings_input_path)) }
-                    TextButton(
                         onClick = { dirPicker.launch(null) },
-                        modifier = Modifier.padding(end = 8.dp),
-                    ) { Text(stringResource(R.string.settings_add_dir)) }
-                    TextButton(onClick = { showScanDirs = false }) { Text(stringResource(R.string.settings_done)) }
+                    )
+                    DialogTextButton(
+                        text = stringResource(R.string.settings_done),
+                        onClick = { showScanDirs = false },
+                    )
                 }
             },
         )
@@ -496,16 +503,18 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
             },
             confirmButton = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    TextButton(
-                        onClick = savePath,
+                    DialogTextButton(
+                        text = stringResource(R.string.common_confirm),
                         modifier = Modifier.padding(end = 8.dp),
-                    ) { Text(stringResource(R.string.common_confirm), style = MaterialTheme.typography.bodyMedium) }
-                    TextButton(
+                        onClick = savePath,
+                    )
+                    DialogTextButton(
+                        text = stringResource(R.string.common_cancel),
                         onClick = {
                             showPathDialog = false
                             pathInput = ""
                         },
-                    ) { Text(stringResource(R.string.common_cancel), style = MaterialTheme.typography.bodyMedium) }
+                    )
                 }
             },
         )
@@ -520,18 +529,31 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    AppNavItem(stringResource(R.string.settings_qq_group), leadingIcon = R.drawable.ic_group_qq, containerColor = DialogItemSurface) {
+                    AppNavItem(
+                        stringResource(R.string.settings_qq_group),
+                        leadingIcon = R.drawable.ic_group_qq,
+                        containerColor = DialogItemSurface,
+                        indication = null,
+                    ) {
                         showGroupDialog = false
                         ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://qm.qq.com/q/M9JH8A9Yys")))
                     }
-                    AppNavItem(stringResource(R.string.settings_telegram_channel), leadingIcon = R.drawable.ic_group_telegram, containerColor = DialogItemSurface) {
+                    AppNavItem(
+                        stringResource(R.string.settings_telegram_channel),
+                        leadingIcon = R.drawable.ic_group_telegram,
+                        containerColor = DialogItemSurface,
+                        indication = null,
+                    ) {
                         showGroupDialog = false
                         ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/tyranornext")))
                     }
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showGroupDialog = false }) { Text(stringResource(R.string.common_cancel)) }
+                DialogTextButton(
+                    text = stringResource(R.string.common_cancel),
+                    onClick = { showGroupDialog = false },
+                )
             },
         )
     }
@@ -648,23 +670,38 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                     null -> Unit
                     is UpdateDownloadPhase.Downloading -> Unit
                     is UpdateDownloadPhase.Completed, is UpdateDownloadPhase.Failed -> {
-                        TextButton(onClick = { closeUpdateDialog() }) { Text(stringResource(R.string.common_cancel)) }
+                        DialogTextButton(
+                            text = stringResource(R.string.common_cancel),
+                            onClick = { closeUpdateDialog() },
+                        )
                     }
                 }
             },
             confirmButton = {
                 when (downloadPhase) {
                     null -> {
-                        TextButton(onClick = { closeUpdateDialog() }) { Text(stringResource(R.string.common_cancel)) }
+                        DialogTextButton(
+                            text = stringResource(R.string.common_cancel),
+                            onClick = { closeUpdateDialog() },
+                        )
                     }
                     is UpdateDownloadPhase.Downloading -> {
-                        TextButton(onClick = { closeUpdateDialog() }) { Text(stringResource(R.string.update_download_cancel)) }
+                        DialogTextButton(
+                            text = stringResource(R.string.update_download_cancel),
+                            onClick = { closeUpdateDialog() },
+                        )
                     }
                     is UpdateDownloadPhase.Completed -> {
-                        TextButton(onClick = { installUpdateApk(downloadPhase.apkFile) }) { Text(stringResource(R.string.update_install)) }
+                        DialogTextButton(
+                            text = stringResource(R.string.update_install),
+                            onClick = { installUpdateApk(downloadPhase.apkFile) },
+                        )
                     }
                     is UpdateDownloadPhase.Failed -> {
-                        TextButton(onClick = { activeCandidate?.let { startApkDownload(it) } }) { Text(stringResource(R.string.update_retry)) }
+                        DialogTextButton(
+                            text = stringResource(R.string.update_retry),
+                            onClick = { activeCandidate?.let { startApkDownload(it) } },
+                        )
                     }
                 }
             },
