@@ -319,6 +319,7 @@
     <string name="input_settings_auto_keep_toggle">Keep pressed (press again to release)</string>
     <string name="input_settings_choose_keys">Choose output keys</string>
     <string name="input_settings_profiles_title">Key profiles</string>
+    <string name="input_settings_profile_missing">Layout missing (stale reference)</string>
     <string name="input_settings_profile_default">Default profile</string>
     <string name="input_settings_profile_default_migrated">Default profile (migrated)</string>
     <string name="input_settings_profile_new">New profile</string>

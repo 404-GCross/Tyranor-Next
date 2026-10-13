@@ -173,15 +173,26 @@ fun PerGameSettingsScreen(game: ScanGame) {
     // 按键方案的单游戏覆盖：旧布局迁移会把结果写成**按游戏的方案**并写入该覆盖，若这里没有
     // 入口，用户既改不回「跟随全局」，也改不了这个游戏的方案——设置页的全局选择对它无效，
     // 页面显示会与实际生效的方案相反。
-    var inputProfileOverride by remember(gid) {
-        mutableStateOf(InputRemapRepository.gameProfileIdOverride(ctx, gid))
-    }
+    //
+    // 覆盖值与方案列表**一起在 IO 读取**（第八轮复审）：
+    //  - `PerGameSettingsStore` 是阻塞 DB 读（`GameOverridesRepository.loadRowBlocking`），组合期
+    //    同步读取会卡首帧；
+    //  - 两者必须同时就绪：覆盖已知而列表还空时，下拉只会显示「跟随全局」，误点即静默清掉覆盖
+    //    （旧实现就是选择时立即落盘，用户无从察觉）。就绪前该行禁用并显示「加载中…」。
+    var inputProfileOverride by remember(gid) { mutableStateOf<String?>(null) }
     var inputProfiles by remember(gid) {
         mutableStateOf(emptyList<InputRemapRepository.ProfileSummary>())
     }
+    var inputProfileReady by remember(gid) { mutableStateOf(false) }
     val inputGlobalProfile = remember(gid) { InputRemapRepository.globalProfileId(ctx) }
     LaunchedEffect(gid) {
-        inputProfiles = withContext(Dispatchers.IO) { InputRemapRepository.listProfileSummaries(ctx) }
+        val loaded = withContext(Dispatchers.IO) {
+            InputRemapRepository.listProfileSummaries(ctx) to
+                InputRemapRepository.gameProfileIdOverride(ctx, gid)
+        }
+        inputProfiles = loaded.first
+        inputProfileOverride = loaded.second
+        inputProfileReady = true
     }
     var rpgmOverride by remember(gid) {
         mutableStateOf(PerGameSettingsStore.toRpgMakerOverride(PerGameSettingsStore.load(ctx, gid)))
@@ -399,6 +410,11 @@ fun PerGameSettingsScreen(game: ScanGame) {
         PerGameSettingsStore.setStr(ctx, gid, PerGameSettingsStore.F_RPG_MZ_VERSION, rpgMzVersion)
         PerGameSettingsStore.setBool(ctx, gid, PerGameSettingsStore.F_INPUT_PAD_ENABLED, inputPadEnabled)
         PerGameSettingsStore.setBool(ctx, gid, PerGameSettingsStore.F_INPUT_GAMEPAD_ENABLED, inputGamepadEnabled)
+        // 按键方案覆盖随「保存」提交（与上面两个开关一致）。就绪前不写：此时 inputProfileOverride
+        // 还是初值 null，写下去会把尚未读出的既有覆盖当成「跟随全局」清掉。
+        if (inputProfileReady) {
+            InputRemapRepository.setGameProfileIdOverride(ctx, gid, inputProfileOverride)
+        }
         PerGameSettingsStore.setBool(ctx, gid, PerGameSettingsStore.F_RPG_USE_RUBY18, rpgm.useRuby18)
         PerGameSettingsStore.setBool(ctx, gid, PerGameSettingsStore.F_RPG_SMOOTH_SCALING, rpgm.smoothScaling)
         PerGameSettingsStore.setBool(ctx, gid, PerGameSettingsStore.F_RPG_VSYNC, rpgm.vsync)
@@ -849,10 +865,10 @@ fun PerGameSettingsScreen(game: ScanGame) {
                                 profiles = inputProfiles,
                                 globalId = inputGlobalProfile,
                                 overrideId = inputProfileOverride,
-                                onSet = { id ->
-                                    inputProfileOverride = id
-                                    InputRemapRepository.setGameProfileIdOverride(ctx, gid, id)
-                                },
+                                ready = inputProfileReady,
+                                // 只改本地状态：与同页开关一致，随顶栏「保存」落盘（此前是选择即写盘，
+                                // 与「保存」按钮的语义相反，返回/取消也回滚不了）
+                                onSet = { id -> inputProfileOverride = id },
                             )
                         }
                     }
@@ -886,10 +902,10 @@ fun PerGameSettingsScreen(game: ScanGame) {
                                 profiles = inputProfiles,
                                 globalId = inputGlobalProfile,
                                 overrideId = inputProfileOverride,
-                                onSet = { id ->
-                                    inputProfileOverride = id
-                                    InputRemapRepository.setGameProfileIdOverride(ctx, gid, id)
-                                },
+                                ready = inputProfileReady,
+                                // 只改本地状态：与同页开关一致，随顶栏「保存」落盘（此前是选择即写盘，
+                                // 与「保存」按钮的语义相反，返回/取消也回滚不了）
+                                onSet = { id -> inputProfileOverride = id },
                             )
                             if (game.engine in setOf(EngineType.TYRANO, EngineType.VN, EngineType.WEB_OTHER)) {
                                 OverrideText(
@@ -1084,12 +1100,16 @@ private fun SectionCard(title: String, content: @Composable () -> Unit) {
  *
  * 单独包一层是因为选项值/展示名要过 [profileDisplayName]：内置默认与迁移主布局存的是
  * 语言中立占位名（Default），直接显示会把占位名暴露给用户。
+ *
+ * @param ready 方案列表与覆盖值是否已读完。未就绪时该行禁用（显示「加载中…」）——此前的空列表
+ *   会让 `index` 回退到 0，把有覆盖的显示成「跟随全局」，而下拉里只有这一项，误点即清掉覆盖。
  */
 @Composable
 private fun InputProfileOverrideRow(
     profiles: List<InputRemapRepository.ProfileSummary>,
     globalId: String,
     overrideId: String?,
+    ready: Boolean,
     onSet: (String?) -> Unit,
 ) {
     OverrideChoice(
@@ -1098,11 +1118,28 @@ private fun InputProfileOverrideRow(
         global = globalId,
         override = overrideId,
         emptyLabel = stringResource(R.string.input_settings_profile_default),
+        // 未就绪 → 只显示「加载中…」且不响应选择（OverlayDropdownPreference 无 enabled 参数，
+        // 由 OverrideChoice 内部把选择回调置空实现「禁用」）
+        loadingLabel = if (ready) null else stringResource(R.string.common_loading),
+        // 覆盖引用的方案文件被删（悬空引用）时显式标注：此时 engine 实际回落到内置默认，
+        // 显示成「跟随全局」会与生效值不符，用户也无从判断该覆盖为什么没效果
+        missingLabel = overrideId
+            ?.takeIf { id -> profiles.none { it.id == id } }
+            ?.let { stringResource(R.string.input_settings_profile_missing) },
         onSet = onSet,
     )
 }
 
-/** 覆盖版下拉行：Miuix OverlayDropdownPreference，选项首位为“跟随全局”。 */
+/**
+ * 覆盖版下拉行：Miuix OverlayDropdownPreference，选项首位为“跟随全局”。
+ *
+ * @param loadingLabel 非空表示数据尚未就绪：只显示该标签且**不响应任何选择**。空选项时 `index`
+ *   会回退到 0（把有覆盖的显示成「跟随全局」），下拉里也只有这一项，误点就会把真实覆盖清成
+ *   跟随全局（第八轮复审）。
+ * @param missingLabel 非空且 [override] 不在 [options] 里（悬空引用，如方案文件被删）时，把它
+ *   显式列成一项并选中：此时 engine 实际回落到内置默认，显示成「跟随全局」与生效值不符。
+ *   选中该占位项不产生任何写入。
+ */
 @Composable
 private fun OverrideChoice(
     label: String,
@@ -1110,18 +1147,43 @@ private fun OverrideChoice(
     global: String,
     override: String?,
     emptyLabel: String = stringResource(R.string.engine_settings_builtin_font),
+    loadingLabel: String? = null,
+    missingLabel: String? = null,
     onSet: (String?) -> Unit,
 ) {
-    val following = override == null
-    val effValue = override ?: global
+    if (loadingLabel != null) {
+        OverlayDropdownPreference(
+            title = label,
+            items = listOf(loadingLabel),
+            selectedIndex = 0,
+            onSelectedIndexChange = { },
+        )
+        return
+    }
     val keys = options.keys.toList()
-    val labels = listOf(stringResource(R.string.engine_settings_follow_global_with_value, labelOf(effValue, options, emptyLabel))) + keys.map { options[it] ?: it }
-    val index = if (following) 0 else (keys.indexOf(override).takeIf { it >= 0 } ?: -1) + 1
+    val dangling = override != null && override !in options
+    val labels = buildList {
+        add(stringResource(R.string.engine_settings_follow_global_with_value, labelOf(override ?: global, options, emptyLabel)))
+        addAll(keys.map { options[it] ?: it })
+        if (dangling && missingLabel != null) add(missingLabel)
+    }
+    val index = when {
+        override == null -> 0
+        dangling -> if (missingLabel != null) keys.size + 1 else 0
+        else -> keys.indexOf(override) + 1
+    }
     OverlayDropdownPreference(
         title = label,
         items = labels,
         selectedIndex = index,
-        onSelectedIndexChange = { i -> onSet(if (i == 0) null else keys[i - 1]) },
+        onSelectedIndexChange = { i ->
+            if (i == 0) {
+                onSet(null)
+            } else {
+                // 占位项（悬空引用）与越界下标都不写入
+                keys.getOrNull(i - 1)?.let(onSet)
+            }
+        },
     )
 }
 

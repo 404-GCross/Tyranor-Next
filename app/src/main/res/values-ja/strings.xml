@@ -319,6 +319,7 @@
     <string name="input_settings_auto_keep_toggle">押しっぱなし（もう一度で解除）</string>
     <string name="input_settings_choose_keys">出力キーを選択</string>
     <string name="input_settings_profiles_title">キー配置</string>
+    <string name="input_settings_profile_missing">配置が見つかりません（参照が無効）</string>
     <string name="input_settings_profile_default">デフォルト配置</string>
     <string name="input_settings_profile_default_migrated">デフォルト配置（移行）</string>
     <string name="input_settings_profile_new">新規配置</string>
