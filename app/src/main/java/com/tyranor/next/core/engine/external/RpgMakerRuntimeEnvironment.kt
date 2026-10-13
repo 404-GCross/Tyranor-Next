@@ -108,13 +108,25 @@ object RpgMakerRuntimeEnvironment {
     private val importLock = Any()
 
     /**
-     * 在途导入登记：`gameType → 该次导入的临时目录`（进程级，跨设置页重建存活）。
+     * 在途导入登记：`rtpDirName(gameType) → 该子类型下所有在途导入的临时目录`（进程级，
+     * 跨设置页重建存活）。
      *
      * 用途见 [clearRtp]：清除必须能识别「同子类型有导入正在写」，否则会删掉别人的临时目录，
      * 让那次导入以残缺内容提交。导入结束（成功/失败/异常）在 `finally` 里注销。
+     *
+     * 三条约定（第八轮复审修正）：
+     *  - **键按 [rtpDirName] 归一**：与目录名同源。否则同一子类型的两种拼写（大小写/前后空白）
+     *    各登记一份，而 `clearRtp` 只认其中一种，等于没有互斥。
+     *  - **值是集合而非单个 File**：同子类型允许两次导入并发（UI 置灰只是便利，可被页面重建绕过）。
+     *    单个 File 会被后一次登记覆盖，先结束者注销后前一次就「无登记」，清除便能删掉它正在写的目录。
+     *  - **登记/注销与 [clearRtp] 的检查互斥**（[importLock]）：登记在锁内、且早于临时目录的
+     *    `mkdirs`，因此「清除通过检查 → 删除所有临时目录」与「导入登记 → 建目录」不可能交错；
+     *    长耗时的解压仍在锁外，不会把清除阻塞住。
+     *
      * `internal` 仅为单测可注入（生产只由 zip/目录两条导入路径写入）。
      */
-    internal val inFlightImports = java.util.concurrent.ConcurrentHashMap<String, File>()
+    internal val inFlightImports =
+        java.util.concurrent.ConcurrentHashMap<String, MutableSet<File>>()
 
     // 用户挑选的 RTP 包解压上限。数值与 NativePluginInstaller.unzipSafely **不同**
     // （那边是 32 条目 / 512MiB 总量，面向内置插件包）：RTP 是整包素材，条目数与总量
@@ -254,12 +266,16 @@ object RpgMakerRuntimeEnvironment {
      *
      * **与在途导入的互斥由本类承担**（[inFlightImports] 进程级登记），不依赖 UI 的按钮置灰：
      * 后者可被「退出/重建设置页」「导入 A 期间又导入 B」绕过，而这里删掉别人正在写的临时
-     * 目录会让那次导入以残缺内容提交。同子类型在途时直接返回
-     * [RtpClearResult.IMPORT_IN_FLIGHT]；正因如此，走到清理临时目录这一步时同目录内不可能有
-     * 在途导入，残留只可能是崩溃留下的半成品，可以全清。
+     * 目录会让那次导入以残缺内容提交。同子类型（含大小写/空白变体，键按 [rtpDirName] 归一）
+     * 有登记时直接返回 [RtpClearResult.IMPORT_IN_FLIGHT]。
+     *
+     * 互斥是**完整**的：登记在 [importLock] 内、且早于导入侧的 `mkdirs`（见
+     * [registerInFlightImport]），所以本方法的「查登记 → 按 `Long.MAX_VALUE` 清空临时目录」
+     * 与「另一次导入登记 → 建临时目录」不可能交错。正因如此，走到清理临时目录这一步时同目录内
+     * 不可能有在途导入，残留只可能是崩溃留下的半成品，可以全清。
      */
     fun clearRtp(gameType: String): RtpClearResult = synchronized(importLock) {
-        if (inFlightImports.containsKey(gameType)) return@synchronized RtpClearResult.IMPORT_IN_FLIGHT
+        if (hasInFlightImport(gameType)) return@synchronized RtpClearResult.IMPORT_IN_FLIGHT
         val root = rtpDir(gameType)
         val appDir = File(root, "app")
         val backup = File(root, IMPORT_BACKUP_DIR)
@@ -277,7 +293,46 @@ object RpgMakerRuntimeEnvironment {
      * 供 UI 恢复「导入中」态：Composable 里的在途标记会随页面重建丢失，而导入在 IO 线程
      * 继续跑（阻塞式文件 IO 不响应协程取消）。
      */
-    fun isRtpImportInFlight(gameType: String): Boolean = inFlightImports.containsKey(gameType)
+    fun isRtpImportInFlight(gameType: String): Boolean = hasInFlightImport(gameType)
+
+    /** 在途判定（键按 [rtpDirName] 归一；[clearRtp] 在 [importLock] 内复用本判定）。 */
+    private fun hasInFlightImport(gameType: String): Boolean =
+        inFlightImports[inFlightKey(gameType)]?.isNotEmpty() == true
+
+    /** 在途登记键：与 [rtpDir] 的目录名同源，保证同一子类型的任意拼写命中同一条登记。 */
+    private fun inFlightKey(gameType: String): String = rtpDirName(gameType)
+
+    /**
+     * 登记一次在途导入（**锁内**，与 [clearRtp] 的「查登记 → 清临时目录」互斥）。
+     *
+     * 调用方必须在登记**之后**再创建临时目录：这样「清除已清完全部临时目录」与「导入建目录」
+     * 不可能交错——要么清除先跑完（此时目录尚未创建，不会被删），要么清除看到本登记而拒绝。
+     * `internal` 供单测注入。
+     */
+    internal fun registerInFlightImport(gameType: String, temp: File) {
+        synchronized(importLock) {
+            inFlightImports.getOrPut(inFlightKey(gameType)) { newInFlightSet() }.add(temp)
+        }
+    }
+
+    /**
+     * 注销一次在途导入（**锁内**）。
+     *
+     * 只在集合为空时摘除键：同子类型两次导入并发时，先结束者的注销不得把仍在途的那次
+     * 一并清掉（否则清除会删掉它正在写的目录）。`internal` 供单测注入。
+     */
+    internal fun unregisterInFlightImport(gameType: String, temp: File) {
+        synchronized(importLock) {
+            val key = inFlightKey(gameType)
+            val set = inFlightImports[key] ?: return@synchronized
+            set.remove(temp)
+            if (set.isEmpty()) inFlightImports.remove(key, set)
+        }
+    }
+
+    /** 并发集合：登记/注销在锁内，但 [isRtpImportInFlight] 会被 UI 线程无锁读取。 */
+    private fun newInFlightSet(): MutableSet<File> =
+        java.util.concurrent.ConcurrentHashMap.newKeySet()
 
     /**
      * 分配本次导入专用的临时目录（`<parent>/.import_tmp.<盐><序号>`）。
@@ -329,8 +384,9 @@ object RpgMakerRuntimeEnvironment {
             // 本次导入专属临时目录（并发导入各写各的，不共用固定名）
             val temp = newImportTempDir(parent)
             created = temp
-            // 登记在途：清除（clearRtp）据此拒绝，避免删掉正在写入的临时目录
-            inFlightImports[gameType] = temp
+            // 登记在途：清除（clearRtp）据此拒绝，避免删掉正在写入的临时目录。
+            // 登记在锁内且早于下面的 mkdirs（见 registerInFlightImport）
+            registerInFlightImport(gameType, temp)
             deleteStaleImportTemps(parent, keep = temp)
             temp.deleteRecursively()
             if (!temp.mkdirs()) return RtpImportRejection.IoFailed(temp.name)
@@ -346,7 +402,7 @@ object RpgMakerRuntimeEnvironment {
             // 都按类型化失败返回（本方法是 core 门面，调用方只按返回值分支）
             RtpImportRejection.IoFailed(created?.name ?: IMPORT_TEMP_DIR)
         } finally {
-            created?.let { inFlightImports.remove(gameType, it) }
+            created?.let { unregisterInFlightImport(gameType, it) }
             created?.deleteRecursively()
         }
     }
@@ -366,8 +422,9 @@ object RpgMakerRuntimeEnvironment {
             // 本次导入专属临时目录（并发导入各写各的，不共用固定名）
             val temp = newImportTempDir(parent)
             created = temp
-            // 登记在途：清除（clearRtp）据此拒绝，避免删掉正在写入的临时目录
-            inFlightImports[gameType] = temp
+            // 登记在途：清除（clearRtp）据此拒绝，避免删掉正在写入的临时目录。
+            // 登记在锁内且早于下面的 mkdirs（见 registerInFlightImport）
+            registerInFlightImport(gameType, temp)
             deleteStaleImportTemps(parent, keep = temp)
             temp.deleteRecursively()
             if (!temp.mkdirs()) return RtpImportRejection.IoFailed(temp.name)
@@ -378,7 +435,7 @@ object RpgMakerRuntimeEnvironment {
         } catch (_: Throwable) {
             RtpImportRejection.IoFailed(created?.name ?: IMPORT_TEMP_DIR)
         } finally {
-            created?.let { inFlightImports.remove(gameType, it) }
+            created?.let { unregisterInFlightImport(gameType, it) }
             created?.deleteRecursively()
         }
     }

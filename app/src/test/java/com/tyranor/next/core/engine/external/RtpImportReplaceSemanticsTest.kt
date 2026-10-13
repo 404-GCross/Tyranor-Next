@@ -250,8 +250,12 @@ class RtpImportReplaceSemanticsTest {
         // 「清除」与「导入」的互斥不能只靠 UI 按钮置灰：退出/重建设置页会丢掉那个标记，
         // 而导入在 IO 线程继续跑（阻塞文件 IO 不响应协程取消）。此时若清除把在途临时目录
         // 删掉，导入会拿残缺内容继续提交（半成品装成 app 并删掉备份）——必须由 core 拒绝。
-        val inFlightTemp = RpgMakerRuntimeEnvironment.newImportTempDir(temporaryFolder.newFolder("inflight"))
-        RpgMakerRuntimeEnvironment.inFlightImports["rpgmvx"] = inFlightTemp
+        val parent = temporaryFolder.newFolder("RPGVX")
+        val inFlightTemp = RpgMakerRuntimeEnvironment.newImportTempDir(parent).apply { mkdirs() }
+        val otherParent = temporaryFolder.newFolder("RPGXP")
+        val otherTemp = RpgMakerRuntimeEnvironment.newImportTempDir(otherParent).apply { mkdirs() }
+        RpgMakerRuntimeEnvironment.registerInFlightImport("rpgmvx", inFlightTemp)
+        RpgMakerRuntimeEnvironment.registerInFlightImport("rpgmxp", otherTemp)
         try {
             assertTrue(RpgMakerRuntimeEnvironment.isRtpImportInFlight("rpgmvx"))
             assertEquals(
@@ -259,11 +263,63 @@ class RtpImportReplaceSemanticsTest {
                 RpgMakerRuntimeEnvironment.RtpClearResult.IMPORT_IN_FLIGHT,
                 RpgMakerRuntimeEnvironment.clearRtp("rpgmvx"),
             )
-            assertFalse("被拒绝的清除不得动别的子类型登记", RpgMakerRuntimeEnvironment.isRtpImportInFlight("rpgmxp"))
+            assertTrue("被拒绝的清除不得删掉在途临时目录", inFlightTemp.isDirectory)
+            // 另一子类型的登记必须仍然在列（非恒真断言：这条登记确实写过）
+            assertTrue("被拒绝的清除不得动别的子类型登记", RpgMakerRuntimeEnvironment.isRtpImportInFlight("rpgmxp"))
         } finally {
-            RpgMakerRuntimeEnvironment.inFlightImports.remove("rpgmvx")
+            RpgMakerRuntimeEnvironment.unregisterInFlightImport("rpgmvx", inFlightTemp)
+            RpgMakerRuntimeEnvironment.unregisterInFlightImport("rpgmxp", otherTemp)
         }
         assertFalse("导入结束后登记必须注销", RpgMakerRuntimeEnvironment.isRtpImportInFlight("rpgmvx"))
+        assertFalse("注销后键集合为空必须摘除", RpgMakerRuntimeEnvironment.inFlightImports.containsKey("RPGXP"))
+    }
+
+    @Test
+    fun sameSubtypeConcurrentImportsKeepIndependentRegistrations() {
+        // 同子类型两次导入并发（UI 置灰可被页面重建绕过）：登记必须是集合，否则后登记覆盖先登记，
+        // 先结束者的注销会让仍在途的那次「无登记」，清除便能删掉它正在写的目录
+        val parent = temporaryFolder.newFolder("concurrent")
+        val first = RpgMakerRuntimeEnvironment.newImportTempDir(parent).apply { mkdirs() }
+        val second = RpgMakerRuntimeEnvironment.newImportTempDir(parent).apply { mkdirs() }
+        RpgMakerRuntimeEnvironment.registerInFlightImport("mkxp-z", first)
+        RpgMakerRuntimeEnvironment.registerInFlightImport("mkxp-z", second)
+        try {
+            RpgMakerRuntimeEnvironment.unregisterInFlightImport("mkxp-z", first)
+            assertTrue(
+                "先结束者注销后，另一次导入必须仍在途（否则清除会删掉它的临时目录）",
+                RpgMakerRuntimeEnvironment.isRtpImportInFlight("mkxp-z"),
+            )
+            assertEquals(
+                RpgMakerRuntimeEnvironment.RtpClearResult.IMPORT_IN_FLIGHT,
+                RpgMakerRuntimeEnvironment.clearRtp("mkxp-z"),
+            )
+        } finally {
+            RpgMakerRuntimeEnvironment.unregisterInFlightImport("mkxp-z", second)
+        }
+        assertFalse(RpgMakerRuntimeEnvironment.isRtpImportInFlight("mkxp-z"))
+    }
+
+    @Test
+    fun inFlightRegistrationIsKeyedByNormalizedDirectoryName() {
+        // 登记键必须与目录名同源（子类型拼写的大小写/前后空白归一）：否则 UI 用 " RPGMVX "、
+        // core 其它入口用 "rpgmvx" 时各登记一份，clearRtp 只认其中一种 —— 等于没有互斥
+        // （清除会删掉另一次导入的临时目录）。
+        // 注意拼写变体指**子类型**本身（rpgmvx / RPGMVX / " rpgmvx "），不是目录名（RPGVX）——
+        // rtpDirName 只认子类型名，目录名再传进来会落到兜底分支。
+        val parent = temporaryFolder.newFolder("normalized")
+        val temp = RpgMakerRuntimeEnvironment.newImportTempDir(parent).apply { mkdirs() }
+        RpgMakerRuntimeEnvironment.registerInFlightImport(" RPGMVX ", temp)
+        try {
+            assertTrue("大小写/空白变体必须命中同一条登记", RpgMakerRuntimeEnvironment.isRtpImportInFlight("rpgmvx"))
+            assertEquals(
+                "同一子类型的另一种拼写也必须被拒绝清除",
+                RpgMakerRuntimeEnvironment.RtpClearResult.IMPORT_IN_FLIGHT,
+                RpgMakerRuntimeEnvironment.clearRtp("RpgMvx"),
+            )
+        } finally {
+            RpgMakerRuntimeEnvironment.unregisterInFlightImport("rpgmvx", temp)
+        }
+        assertFalse(RpgMakerRuntimeEnvironment.isRtpImportInFlight("rpgmvx"))
     }
 
     @Test
