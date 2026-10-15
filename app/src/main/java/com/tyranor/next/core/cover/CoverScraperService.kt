@@ -124,7 +124,7 @@ object CoverScraperService {
     }
 
     /**
-     * 二级候选：部分来源（未萌 NextMoe）一个作品有多张封面，按一级候选 [work] 拉取其全部封面。
+     * 二级候选：部分来源（未萌 NextMoe）一个作品有多张封面，按一级候选 [work] 拉取其可获取的封面（单页上限 100）。
      * 不支持二级的来源返回空列表（见 [supportsCoverDrillDown]）；来源有效性与启用态校验与一级一致。
      */
     fun searchWorkCovers(

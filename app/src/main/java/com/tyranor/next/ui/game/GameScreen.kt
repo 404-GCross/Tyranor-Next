@@ -1342,7 +1342,7 @@ private fun CoverSearchDialog(
     var candidates by rememberSaveable(source, game.uri, stateSaver = CoverSearchCandidatesSaver) {
         mutableStateOf(emptyList<CoverSearchCandidate>())
     }
-    // 二级（未萌 NextMoe）：作品 → 该作品全部封面；其它来源恒为 null
+    // 二级（未萌 NextMoe）：作品 → 该作品可获取的封面；其它来源恒为 null
     var drillDownWork by remember(source, game.uri) { mutableStateOf<CoverSearchCandidate?>(null) }
     var workCovers by remember(source, game.uri) { mutableStateOf(emptyList<CoverSearchCandidate>()) }
     var loadingCovers by remember(source, game.uri) { mutableStateOf(false) }
@@ -1402,7 +1402,7 @@ private fun CoverSearchDialog(
         }
     }
 
-    // 二级：拉取所选作品的全部封面（只有支持「一作品多封面」的来源会走到这里）
+    // 二级：拉取所选作品可获取的封面（只有支持「一作品多封面」的来源会走到这里）
     fun openWork(work: CoverSearchCandidate) {
         if (loadingCovers || binding) return
         // 上一个二级请求让位：其 finally 不再回写 loading 态（见下方 isActive 守卫）

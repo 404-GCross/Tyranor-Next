@@ -151,7 +151,7 @@ _Avoid_: 下载封面、封面更新
 _Avoid_: 选封面、替换
 
 **两级封面选择（Cover Drill-down）**:
-部分来源（未萌NextMoe）一个作品有多张封面时，先在作品候选列表选中作品、再从其全部封面中挑选的流程（CoverScraperService.searchWorkCovers）；不支持该流程的来源点选候选即直接绑定。
+部分来源（未萌NextMoe）一个作品有多张封面时，先在作品候选列表选中作品、再从可获取的封面中挑选的流程；不支持该流程的来源点选候选即直接绑定。
 _Avoid_: 二段选择、多图选择
 
 **封面缓存（CoverImageCache / CoverThumbnailLoader）**:

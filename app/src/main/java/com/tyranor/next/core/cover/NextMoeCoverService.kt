@@ -66,7 +66,7 @@ internal object NextMoeCoverService {
     }
 
     /**
-     * 二级候选：某作品的**全部**封面（NextMoe 一个作品常有多张：main / pkgfront / pkgback / dig…）。
+     * 二级候选：某作品**可获取的**封面（NextMoe 一个作品常有多张：main / pkgfront / pkgback / dig…）。
      * 元数据继承自一级作品候选，绑定后与一级选择行为一致。只拉单页（上限 100，超出不翻页）。
      */
     fun listCovers(parent: CoverSearchCandidate, limit: Int): List<CoverSearchCandidate> {
