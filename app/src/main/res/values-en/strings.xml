@@ -5,6 +5,7 @@
     <string name="common_cancel">Cancel</string>
     <string name="common_delete">Delete</string>
     <string name="common_save">Save</string>
+    <string name="common_back">Back</string>
     <string name="common_close">Close</string>
     <string name="common_loading">Loading…</string>
     <string name="common_enabled">On</string>
@@ -233,7 +234,6 @@
     <string name="game_select_cover_source">Select cover source</string>
     <string name="game_cover_download_failed">Cover download failed</string>
     <string name="game_cover_no_match">No matching results found</string>
-    <string name="game_cover_search_failed">Cover search failed</string>
     <string name="game_cover_search_title">Search %1$s covers</string>
     <string name="game_cover_searching">Searching covers…</string>
     <string name="game_cover_binding">Applying cover…</string>
@@ -248,6 +248,7 @@
     <string name="game_cover_source_bangumi_summary">Search Bangumi entry covers</string>
     <string name="game_cover_source_steam_summary">Search Steam store portrait covers</string>
     <string name="game_cover_source_vndb_summary">Search VNDB covers</string>
+    <string name="game_cover_source_nextmoe_summary">Search NextMoe covers</string>
     <string name="game_cover_source_generic_summary">Search this source</string>
     <string name="game_launch_file_empty">No xp3 or exe files found in this folder</string>
 
@@ -510,6 +511,7 @@
 
     <string name="cover_source_local">Local cover</string>
     <string name="cover_source_custom">Custom cover</string>
+    <string name="cover_source_nextmoe">未萌NextMoe</string>
     <string name="cover_batch_result">Cover scraping finished: updated %1$d, skipped %2$d, failed %3$d</string>
     <string name="cover_only_missing_title">Only process games missing covers</string>
     <string name="cover_only_missing_summary">Avoid overwriting covers set manually by the user</string>
@@ -529,6 +531,9 @@
     <string name="cover_bangumi_summary">No login required. Used to supplement Bangumi entry covers</string>
     <string name="cover_steam_summary">No login required. Used as a supplemental store-cover source</string>
     <string name="cover_vndb_summary">No login required. Stable fallback source</string>
+    <string name="cover_nextmoe_summary">No login required. Cover data from Kungal Forum</string>
+    <string name="cover_multi_cover_title">Choose a cover for %1$s</string>
+    <string name="cover_nextmoe_attribution">Cover data from NextMoe (Kungal Forum)</string>
 
     <string name="save_operation_failed">Operation failed</string>
     <string name="save_exported_count">Exported %1$d save files</string>
@@ -612,16 +617,16 @@
     <string name="auth_hikarinagi_id_token_parse_failed">Failed to parse Hikarinagi ID token</string>
 
     <string name="cover_scrape_cancelled">Batch cover scraping was cancelled</string>
-    <string name="cover_scrape_failed">Batch cover scraping failed</string>
     <string name="cover_error_invalid_source">Invalid cover source</string>
     <string name="cover_error_source_disabled">This cover source is disabled in settings</string>
-    <string name="cover_error_search_network">Cover search failed. Check your network connection</string>
-    <string name="cover_hikarinagi_votes">%1$d votes</string>
+    <string name="cover_error_unknown">Cover fetch failed</string>
     <string name="cover_error_hikarinagi_network">Hikarinagi search failed. Check your network connection</string>
     <string name="cover_error_hikarinagi_retry">Hikarinagi search failed. Please try again later</string>
     <string name="cover_error_bangumi_network">Bangumi search failed. Check your network connection</string>
     <string name="cover_error_steam_network">Steam search failed. Check your network connection</string>
     <string name="cover_error_vndb_network">VNDB search failed. Check your network connection</string>
+    <string name="cover_error_nextmoe_network">NextMoe search failed. Check your network connection</string>
+    <string name="cover_error_nextmoe_rate_limited">NextMoe is receiving too many requests. Please try again later</string>
     <string name="cover_scrape_done">Cover scraping finished: updated %1$d, skipped %2$d, failed %3$d</string>
 
     <string name="external_engine_resolve_dir_failed">Unable to resolve the real path for the %1$s game directory, so the external engine module cannot start</string>

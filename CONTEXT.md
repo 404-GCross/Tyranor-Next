@@ -139,7 +139,7 @@ _Avoid_: 版本列表（与弹窗条目混淆时）
 ## 封面
 
 **封面来源（Cover Source）**:
-获取封面的数据源（VNDB / Hikarinagi / Bangumi / Steam / Local / Custom），可自定义顺序；Hikarinagi 需 OAuth Client ID。
+获取封面的数据源（VNDB / 未萌NextMoe / Hikarinagi / Bangumi / Steam / Local / Custom），可自定义顺序；Hikarinagi 需 OAuth Client ID，未萌NextMoe 匿名无登录。
 _Avoid_: 图源、壁纸源
 
 **封面抓取（Cover Scraping）**:
@@ -147,8 +147,12 @@ _Avoid_: 图源、壁纸源
 _Avoid_: 下载封面、封面更新
 
 **手动绑定（Bind Candidate）**:
-用户从候选封面中选择并落库单游戏封面的动作；VNDB 候选同时携带 vndbId / metadataTitle。
+用户从候选封面中选择并落库单游戏封面的动作；VNDB 候选同时携带 vndbId / metadataTitle（未萌NextMoe 候选命中 VNDB ref 时同样携带）。
 _Avoid_: 选封面、替换
+
+**两级封面选择（Cover Drill-down）**:
+部分来源（未萌NextMoe）一个作品有多张封面时，先在作品候选列表选中作品、再从可获取的封面中挑选的流程；不支持该流程的来源点选候选即直接绑定。
+_Avoid_: 二段选择、多图选择
 
 **封面缓存（CoverImageCache / CoverThumbnailLoader）**:
 封面缩略图的内存 + 磁盘持久化缓存与受限并发解码器；滚动感知解码配合批量回填避免滑动卡顿。
