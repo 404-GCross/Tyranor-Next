@@ -793,4 +793,15 @@
     <string name="android_add_duplicate">This app is already in the library</string>
     <string name="android_add_already_added">In library</string>
     <string name="game_cover_flow_caption">%1$s - %2$s</string>
+    <string name="ethornell_settings_title">Ethornell / BGI settings</string>
+    <string name="ethornell_error_session_busy">Ethornell is running another game, or its session is starting or closing. Exit the current game before trying again.</string>
+    <string name="engine_desc_ethornell">Built-in ethornell-rs reimplementation. Compatibility depends on the game version; Windows plugins are unsupported.</string>
+    <string name="ethornell_nls_title">Graphics text encoding</string>
+    <string name="ethornell_font_title">Custom font</string>
+    <string name="ethornell_font_default">Use engine font fallback</string>
+    <string name="ethornell_settings_note">Encoding affects graphics text only, not resource names. Restart the game after changes. User data is app-private; save management is not yet available.</string>
+    <string name="ethornell_error_root">Cannot read the game directory. Select an accessible local directory and grant access again.</string>
+    <string name="ethornell_error_bootstrap">No supported system.arc index with an ipl._bp bootstrap was found.</string>
+    <string name="ethornell_error_font">Invalid or unreadable font. Import a TTF, TTC, OTF or OTC font again.</string>
+    <string name="ethornell_error_userdata">Cannot create private Ethornell user data. Check available storage space.</string>
 </resources>

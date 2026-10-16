@@ -48,7 +48,6 @@ import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.material3.Button
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -562,10 +561,11 @@ private fun GameLibraryContent(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = 8.dp),
                         )
-                        Button(
+                        com.tyranor.next.ui.common.NoRippleButton(
+                            text = stringResource(R.string.game_add_folder),
                             onClick = { dirPickerLaunch() },
                             modifier = Modifier.padding(top = 16.dp),
-                        ) { Text(stringResource(R.string.game_add_folder)) }
+                        )
                     }
                 }
                 else -> {
@@ -2208,6 +2208,7 @@ internal fun EngineType.coverColor(): Color = when (this) {
     EngineType.XSYS35 -> Color(0xFF8B3A5E)
     EngineType.UK2 -> Color(0xFF4E6E81)
     EngineType.FVP -> Color(0xFFB05A2A)
+    EngineType.ETHORNELL -> com.tyranor.next.theme.EthornellCoverColor
     EngineType.YURIS -> Color(0xFF558B2F)
     EngineType.CATSYSTEM2 -> Color(0xFF6D4C41)
     EngineType.PC -> Color(0xFF455A64)
@@ -2223,6 +2224,8 @@ internal fun shouldShowSaveManagement(engine: EngineType): Boolean =
     // 手动添加的类型（PC / 安卓游戏）无统一存档接口，显式排除。
     engine == EngineType.YURIS ||
         (!engine.isManual &&
+            (engine != EngineType.ETHORNELL ||
+                com.tyranor.next.core.game.save.EthornellSaveCapability.available) &&
             !ExternalEngineModuleRegistry.isExternalEngine(engine) &&
             ExternalEmulatorRegistry.forEngine(engine) == null)
 
