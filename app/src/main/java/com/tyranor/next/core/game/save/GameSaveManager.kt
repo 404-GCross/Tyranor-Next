@@ -12,6 +12,7 @@ import com.tyranor.next.core.game.model.EthornellPaths
 import com.tyranor.next.core.game.model.GamePathUtils
 import com.tyranor.next.core.game.model.ScanGame
 import com.tyranor.next.core.game.model.Xs35Paths
+import com.tyranor.next.core.game.model.Xs4Paths
 import com.tyranor.next.core.i18n.AppLocaleController
 import com.tyranor.next.core.settings.EngineSettingsResolver
 import com.tyranor.next.core.settings.EngineSettingsStore
@@ -180,6 +181,26 @@ class GameSaveManager(private val context: Context) {
                 } else {
                     SaveLocation(
                         Xs35Paths.gameDirSaveDir(Xs35Paths.effectiveGameDir(File(root))),
+                        text(R.string.save_location_engine_game_dir, game.engine.displayName),
+                        true,
+                    )
+                }
+            }
+            // System4（xsystem4）：独立存档开（默认）→ 应用外部存档目录；关闭 → `<游戏根>/<SaveFolder>`（经校验）。
+            // 目录推导与启动侧 ensureXs4SaveDir / XS4_SAVE_DIR 共用 Xs4Paths（单一实现）。
+            // 关闭分支读取 ini，本函数须在 IO 线程调用（与 XSYS35 同约束）。
+            EngineType.XSYS4 -> {
+                if (settings.xs4ScopedSaveDir) {
+                    val external = appContext.getExternalFilesDir(null)
+                        ?: return SaveLocation(null, text(R.string.save_error_xsys4_external_unavailable), false)
+                    SaveLocation(
+                        Xs4Paths.scopedSaveDir(external, root),
+                        text(R.string.save_location_engine_scoped, game.engine.displayName),
+                        true,
+                    )
+                } else {
+                    SaveLocation(
+                        Xs4Paths.gameDirSaveDir(File(root)),
                         text(R.string.save_location_engine_game_dir, game.engine.displayName),
                         true,
                     )
@@ -431,6 +452,11 @@ class GameSaveManager(private val context: Context) {
                 EngineType.XSYS35 -> {
                     val external = appContext.getExternalFilesDir(null) ?: return
                     listOf(Xs35Paths.scopedSaveDir(external, root))
+                }
+                // System4：仅清理独立存档目录（游戏根 SaveFolder 位于游戏目录内，按规范不触碰）
+                EngineType.XSYS4 -> {
+                    val external = appContext.getExternalFilesDir(null) ?: return
+                    listOf(Xs4Paths.scopedSaveDir(external, root))
                 }
                 EngineType.TYRANO,
                 EngineType.RPG_MV,

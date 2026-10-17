@@ -21,6 +21,9 @@ object AppSettingsStore {
     const val KEY_TONE_SWITCH = "tone_switch"
     const val KEY_GAME_SORT = "game_sort"
 
+    /** System4 一次性定点重检测迁移标志（纠正旧库中被误判为 XSYS35 的 System4 游戏）。 */
+    private const val KEY_MIGRATION_XSYS4_RESCAN_DONE = "migration_xsys4_rescan_done"
+
     /** 首页样式：原生（最近打开/快捷启动）/ 网页 / 分类仓库。 */
     const val KEY_HOME_STYLE = "home_style"
 
@@ -257,6 +260,14 @@ object AppSettingsStore {
 
     private fun prefs(context: Context) =
         context.applicationContext.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
+
+    /** System4 一次性定点重检测迁移：读取标志。 */
+    fun isXs4RescanMigrationDone(c: Context): Boolean =
+        prefs(c).getBoolean(KEY_MIGRATION_XSYS4_RESCAN_DONE, false)
+
+    /** 同步写（commit）：迁移在 IO 线程执行，标志落盘后才视为完成。 */
+    fun markXs4RescanMigrationDone(c: Context): Boolean =
+        prefs(c).edit().putBoolean(KEY_MIGRATION_XSYS4_RESCAN_DONE, true).commit()
 
     /** 当前主题色 HEX（#RRGGBB）。 */
     fun getThemeColorHex(c: Context): String =

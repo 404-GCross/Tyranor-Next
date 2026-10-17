@@ -195,11 +195,18 @@ internal object CoverImageCache {
 
     private fun coverCacheDir(context: Context, persistent: Boolean = true): File =
         if (persistent) {
-            File(context.applicationContext.filesDir, "covers_remote")
+            persistentCoverDir(context)
         } else {
             File(context.applicationContext.cacheDir, "covers_preview")
         }
 }
+
+/**
+ * 持久封面目录（`filesDir/covers_remote`）：在线封面、自定义封面与 XSYS4 图标缓存共用。
+ * [CoverImageCache.deleteCachedCover] 只在此目录内删除，凡写入此处的封面都由它统一回收。
+ */
+internal fun persistentCoverDir(context: Context): File =
+    File(context.applicationContext.filesDir, "covers_remote")
 
 internal fun cleanTitle(s: String): String {
     val localizedEditionWords = listOf(

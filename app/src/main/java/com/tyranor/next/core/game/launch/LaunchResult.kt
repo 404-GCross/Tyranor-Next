@@ -67,6 +67,18 @@ sealed interface LaunchResult {
         /** System35 存档目录创建失败；[path] 为 null 表示外部存储不可用（独立存档无法落点）。 */
         data class Xs35SaveDirUnavailable(val path: String?) : Failure
 
+        /** System4 存档路径存在但不是目录。 */
+        data class Xs4SavePathNotDirectory(val path: String) : Failure
+
+        /** System4 存档目录创建失败；[path] 为 null 表示外部存储不可用（独立存档无法落点）。 */
+        data class Xs4SaveDirUnavailable(val path: String?) : Failure
+
+        /** System4 游戏根目录缺少入口 ini（System40.ini / AliceStart.ini，大小写不敏感）。 */
+        data object Xs4IniMissing : Failure
+
+        /** 设备不支持 OpenGL ES 3.0（System4 引擎的渲染要求）。 */
+        data object Xs4Gles3Required : Failure
+
         /** 外置 APK 引擎模块启动失败；携带模块层类型化错误（文案由 UI 映射）。 */
         data class ExternalModuleFailed(val result: ExternalEngineLaunchResult) : Failure
 

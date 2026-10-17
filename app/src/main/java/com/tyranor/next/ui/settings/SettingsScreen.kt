@@ -761,6 +761,12 @@ internal fun EngineSettingsDetailScreen(kind: EngineSettingsKind) {
     var xs35Renderer by remember { mutableStateOf(EngineSettingsStore.getXs35Renderer(ctx)) }
     var xs35IntegerScale by remember { mutableStateOf(EngineSettingsStore.isXs35IntegerScale(ctx)) }
     var xs35MuteUnfocus by remember { mutableStateOf(EngineSettingsStore.isXs35MuteUnfocus(ctx)) }
+    var xs4Scoped by remember { mutableStateOf(EngineSettingsStore.isXs4ScopedSaveDir(ctx)) }
+    var xs4Encoding by remember { mutableStateOf(EngineSettingsStore.getXs4Encoding(ctx)) }
+    var xs4FontGothic by remember { mutableStateOf(EngineSettingsStore.getXs4FontGothicPath(ctx)) }
+    var xs4FontMincho by remember { mutableStateOf(EngineSettingsStore.getXs4FontMinchoPath(ctx)) }
+    var xs4Joypad by remember { mutableStateOf(EngineSettingsStore.getXs4Joypad(ctx)) }
+    var xs4MsgskipDelay by remember { mutableStateOf(EngineSettingsStore.getXs4MsgskipDelay(ctx)) }
     var winlator by remember { mutableStateOf(EngineSettingsStore.loadWinlator(ctx)) }
     var ppssppVersion by remember { mutableStateOf(EngineSettingsStore.getPpssppVersion(ctx)) }
     var webShellPort by remember { mutableStateOf(EngineSettingsStore.getWebShellPort(ctx)) }
@@ -785,6 +791,40 @@ internal fun EngineSettingsDetailScreen(kind: EngineSettingsKind) {
                 try {
                     val path = FontImport.importToPrivate(ctx, uri)
                     if (path != null) fvpFont = path else {
+                        android.widget.Toast.makeText(
+                            ctx,
+                            ctx.getString(R.string.engine_settings_fvp_font_import_failed),
+                            android.widget.Toast.LENGTH_SHORT,
+                        ).show()
+                    }
+                } finally { importingFont = false }
+            }
+        }
+    }
+    val xs4GothicFontLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null && !importingFont) {
+            importingFont = true
+            fontImportScope.launch {
+                try {
+                    val path = FontImport.importToPrivate(ctx, uri)
+                    if (path != null) xs4FontGothic = path else {
+                        android.widget.Toast.makeText(
+                            ctx,
+                            ctx.getString(R.string.engine_settings_fvp_font_import_failed),
+                            android.widget.Toast.LENGTH_SHORT,
+                        ).show()
+                    }
+                } finally { importingFont = false }
+            }
+        }
+    }
+    val xs4MinchoFontLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null && !importingFont) {
+            importingFont = true
+            fontImportScope.launch {
+                try {
+                    val path = FontImport.importToPrivate(ctx, uri)
+                    if (path != null) xs4FontMincho = path else {
                         android.widget.Toast.makeText(
                             ctx,
                             ctx.getString(R.string.engine_settings_fvp_font_import_failed),
@@ -849,6 +889,12 @@ internal fun EngineSettingsDetailScreen(kind: EngineSettingsKind) {
         EngineSettingsStore.setXs35Renderer(ctx, xs35Renderer)
         EngineSettingsStore.setXs35IntegerScale(ctx, xs35IntegerScale)
         EngineSettingsStore.setXs35MuteUnfocus(ctx, xs35MuteUnfocus)
+        EngineSettingsStore.setXs4ScopedSaveDir(ctx, xs4Scoped)
+        EngineSettingsStore.setXs4Encoding(ctx, xs4Encoding)
+        EngineSettingsStore.setXs4FontGothicPath(ctx, xs4FontGothic)
+        EngineSettingsStore.setXs4FontMinchoPath(ctx, xs4FontMincho)
+        EngineSettingsStore.setXs4Joypad(ctx, xs4Joypad)
+        EngineSettingsStore.setXs4MsgskipDelay(ctx, xs4MsgskipDelay)
         EngineSettingsStore.saveWinlator(ctx, winlator)
         EngineSettingsStore.setPpssppVersion(ctx, ppssppVersion)
         EngineSettingsStore.setWebShellPort(ctx, webShellPort)
@@ -882,7 +928,9 @@ internal fun EngineSettingsDetailScreen(kind: EngineSettingsKind) {
                 artFontCache, artPowerSaving, tyExternal, tyScoped, rpgMakerMod, rpgLegacyRenderer, rpgSaveInterop, rpgMvVersion, rpgMzVersion, rpg, renpyVersion, renpy, siglusLanguage, fbNls,
                 fvpNls, fvpSystemFont, fvpTextHidpi, fvpFont,
                 xs35Scoped, xs35Renderer, xs35IntegerScale, xs35MuteUnfocus,
-                fontLauncher, fvpFontLauncher, winlator, ppssppVersion, webShellPort,
+                xs4Scoped, xs4Encoding, xs4FontGothic, xs4FontMincho, xs4Joypad, xs4MsgskipDelay,
+                fontLauncher, fvpFontLauncher, xs4GothicFontLauncher, xs4MinchoFontLauncher,
+                winlator, ppssppVersion, webShellPort,
                 topInset = innerPadding.calculateTopPadding(),
                 onKrVersion = { krVersion = it },
                 onKrKernel = { krKernel = it },
@@ -933,6 +981,14 @@ internal fun EngineSettingsDetailScreen(kind: EngineSettingsKind) {
                 onXs35Renderer = { xs35Renderer = it },
                 onXs35IntegerScale = { xs35IntegerScale = it },
                 onXs35MuteUnfocus = { xs35MuteUnfocus = it },
+                onXs4Scoped = { xs4Scoped = it },
+                onXs4Encoding = { xs4Encoding = it },
+                onXs4FontGothicFollow = { xs4FontGothic = "" },
+                onXs4FontGothicPick = { xs4GothicFontLauncher.launch("*/*") },
+                onXs4FontMinchoFollow = { xs4FontMincho = "" },
+                onXs4FontMinchoPick = { xs4MinchoFontLauncher.launch("*/*") },
+                onXs4Joypad = { xs4Joypad = it },
+                onXs4MsgskipDelay = { xs4MsgskipDelay = it },
                 onWinlator = { winlator = it },
                 onPpssppVersion = { ppssppVersion = it },
                 onWebShellPort = { webShellPort = it },
@@ -985,7 +1041,10 @@ private fun LazyListPlaceholder(
     fbNls: String,
     fvpNls: String, fvpSystemFont: Boolean, fvpTextHidpi: Boolean, fvpFont: String,
     xs35Scoped: Boolean, xs35Renderer: String, xs35IntegerScale: Boolean, xs35MuteUnfocus: Boolean,
+    xs4Scoped: Boolean, xs4Encoding: String, xs4FontGothic: String, xs4FontMincho: String,
+    xs4Joypad: String, xs4MsgskipDelay: Int,
     fontLauncher: FontPickerLauncher, fvpFontLauncher: FontPickerLauncher,
+    xs4GothicFontLauncher: FontPickerLauncher, xs4MinchoFontLauncher: FontPickerLauncher,
     winlator: EngineSettingsStore.Winlator,
     ppssppVersion: String,
     webShellPort: Int,
@@ -1019,6 +1078,14 @@ private fun LazyListPlaceholder(
     onXs35Renderer: (String) -> Unit,
     onXs35IntegerScale: (Boolean) -> Unit,
     onXs35MuteUnfocus: (Boolean) -> Unit,
+    onXs4Scoped: (Boolean) -> Unit,
+    onXs4Encoding: (String) -> Unit,
+    onXs4FontGothicFollow: () -> Unit,
+    onXs4FontGothicPick: () -> Unit,
+    onXs4FontMinchoFollow: () -> Unit,
+    onXs4FontMinchoPick: () -> Unit,
+    onXs4Joypad: (String) -> Unit,
+    onXs4MsgskipDelay: (Int) -> Unit,
     onWinlator: (EngineSettingsStore.Winlator) -> Unit,
     onPpssppVersion: (String) -> Unit,
     onWebShellPort: (Int) -> Unit,
@@ -1323,6 +1390,66 @@ private fun LazyListPlaceholder(
                 )
                 Text(
                     stringResource(R.string.engine_settings_xsys35_note),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MiuixTheme.colorScheme.onBackground,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+            }
+        }
+
+        if (kind == EngineSettingsKind.XSYS4) item {
+            EngineCard(stringResource(R.string.engine_settings_xsys4_title)) {
+                SwitchPreference(
+                    title = stringResource(R.string.engine_settings_scoped_save_dir),
+                    checked = xs4Scoped,
+                    onCheckedChange = onXs4Scoped,
+                )
+                DropdownRow(
+                    stringResource(R.string.engine_settings_xsys4_encoding_title),
+                    xsys4EncodingOptions(),
+                    xs4Encoding,
+                    onXs4Encoding,
+                )
+                FontPreference(
+                    label = stringResource(R.string.engine_settings_xsys4_font_gothic_title),
+                    value = xs4FontGothic.ifBlank { stringResource(R.string.engine_settings_builtin_font) },
+                    followLabel = stringResource(R.string.engine_settings_use_builtin_font),
+                    onFollow = onXs4FontGothicFollow,
+                    onPick = onXs4FontGothicPick,
+                )
+                FontPreference(
+                    label = stringResource(R.string.engine_settings_xsys4_font_mincho_title),
+                    value = xs4FontMincho.ifBlank { stringResource(R.string.engine_settings_builtin_font) },
+                    followLabel = stringResource(R.string.engine_settings_use_builtin_font),
+                    onFollow = onXs4FontMinchoFollow,
+                    onPick = onXs4FontMinchoPick,
+                )
+                Text(
+                    stringResource(R.string.engine_settings_xsys4_font_hint),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MiuixTheme.colorScheme.onBackground,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+                DropdownRow(
+                    stringResource(R.string.engine_settings_xsys4_joypad_title),
+                    xsys4JoypadOptions(),
+                    xs4Joypad,
+                    onXs4Joypad,
+                )
+                DropdownRow(
+                    stringResource(R.string.engine_settings_xsys4_msgskip_title),
+                    xsys4MsgskipOptions(),
+                    xs4MsgskipDelay.toString(),
+                    { onXs4MsgskipDelay(it.toIntOrNull() ?: EngineSettingsStore.XSYS4_MSGSKIP_DELAY_DEFAULT) },
+                )
+                Text(
+                    stringResource(R.string.engine_settings_xsys4_note),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MiuixTheme.colorScheme.onBackground,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+                Text(
+                    stringResource(R.string.engine_settings_xsys4_compat_hint),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MiuixTheme.colorScheme.onBackground,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),

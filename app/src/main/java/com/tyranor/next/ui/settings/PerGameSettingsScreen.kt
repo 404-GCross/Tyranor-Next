@@ -119,8 +119,14 @@ fun PerGameSettingsScreen(game: ScanGame) {
     var xs35Renderer by remember(gid) { mutableStateOf(PerGameSettingsStore.getStr(ctx, gid, PerGameSettingsStore.F_XSYS35_RENDERER)) }
     var xs35IntegerScale by remember(gid) { mutableStateOf(PerGameSettingsStore.getBool(ctx, gid, PerGameSettingsStore.F_XSYS35_INTEGER_SCALE)) }
     var xs35MuteUnfocus by remember(gid) { mutableStateOf(PerGameSettingsStore.getBool(ctx, gid, PerGameSettingsStore.F_XSYS35_MUTE_UNFOCUS)) }
-    // System35 生效存档路径：与 GameSaveManager.resolveSaveLocation 同源（IO 读取，避免组合期磁盘/DB 阻塞）
-    var xs35SaveLocation by remember(gid) { mutableStateOf<GameSaveManager.SaveLocation?>(null) }
+    var xs4Scoped by remember(gid) { mutableStateOf(PerGameSettingsStore.getBool(ctx, gid, PerGameSettingsStore.F_XSYS4_SCOPED_SAVE_DIR)) }
+    var xs4Encoding by remember(gid) { mutableStateOf(PerGameSettingsStore.getStr(ctx, gid, PerGameSettingsStore.F_XSYS4_ENCODING)) }
+    var xs4FontGothic by remember(gid) { mutableStateOf(PerGameSettingsStore.getStr(ctx, gid, PerGameSettingsStore.F_XSYS4_FONT_GOTHIC_PATH)) }
+    var xs4FontMincho by remember(gid) { mutableStateOf(PerGameSettingsStore.getStr(ctx, gid, PerGameSettingsStore.F_XSYS4_FONT_MINCHO_PATH)) }
+    var xs4Joypad by remember(gid) { mutableStateOf(PerGameSettingsStore.getStr(ctx, gid, PerGameSettingsStore.F_XSYS4_JOYPAD)) }
+    var xs4Msgskip by remember(gid) { mutableStateOf(PerGameSettingsStore.getStr(ctx, gid, PerGameSettingsStore.F_XSYS4_MSGSKIP_DELAY)) }
+    // System35 / System4 生效存档路径：与 GameSaveManager.resolveSaveLocation 同源（IO 读取，避免组合期磁盘/DB 阻塞）
+    var saveLocation by remember(gid) { mutableStateOf<GameSaveManager.SaveLocation?>(null) }
     var winlatorContainerId by remember { mutableStateOf(PerGameSettingsStore.getStr(ctx, gid, PerGameSettingsStore.F_WINLATOR_CONTAINER_ID)) }
     var winlatorContainerName by remember { mutableStateOf(PerGameSettingsStore.getStr(ctx, gid, PerGameSettingsStore.F_WINLATOR_CONTAINER_NAME)) }
     var winlatorGraphicsDriver by remember { mutableStateOf(PerGameSettingsStore.getStr(ctx, gid, PerGameSettingsStore.F_WINLATOR_GRAPHICS_DRIVER)) }
@@ -218,11 +224,11 @@ fun PerGameSettingsScreen(game: ScanGame) {
             inputProfileLoadFailed = true
         }
     }
-    // System35 生效存档路径展示：resolveSaveLocation 内含游戏目录解析与三级设置合并
+    // System35 / System4 生效存档路径展示：resolveSaveLocation 内含游戏目录解析与三级设置合并
     // （磁盘 + DB 读），挂起在 IO 线程取结果，避免组合期阻塞
     LaunchedEffect(gid) {
-        if (game.engine != EngineType.XSYS35) return@LaunchedEffect
-        xs35SaveLocation = withContext(Dispatchers.IO) {
+        if (game.engine != EngineType.XSYS35 && game.engine != EngineType.XSYS4) return@LaunchedEffect
+        saveLocation = withContext(Dispatchers.IO) {
             GameSaveManager(ctx).resolveSaveLocation(game)
         }
     }
@@ -268,6 +274,40 @@ fun PerGameSettingsScreen(game: ScanGame) {
                 try {
                     val path = FontImport.importToPrivate(ctx, uri)
                     if (path != null) ethornellFont = path else android.widget.Toast.makeText(ctx, R.string.ethornell_error_font, android.widget.Toast.LENGTH_SHORT).show()
+                } finally { importingFont = false }
+            }
+        }
+    }
+    val xs4GothicFontLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null && !importingFont) {
+            importingFont = true
+            scope.launch {
+                try {
+                    val path = FontImport.importToPrivate(ctx, uri)
+                    if (path != null) xs4FontGothic = path else {
+                        android.widget.Toast.makeText(
+                            ctx,
+                            ctx.getString(R.string.engine_settings_fvp_font_import_failed),
+                            android.widget.Toast.LENGTH_SHORT,
+                        ).show()
+                    }
+                } finally { importingFont = false }
+            }
+        }
+    }
+    val xs4MinchoFontLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null && !importingFont) {
+            importingFont = true
+            scope.launch {
+                try {
+                    val path = FontImport.importToPrivate(ctx, uri)
+                    if (path != null) xs4FontMincho = path else {
+                        android.widget.Toast.makeText(
+                            ctx,
+                            ctx.getString(R.string.engine_settings_fvp_font_import_failed),
+                            android.widget.Toast.LENGTH_SHORT,
+                        ).show()
+                    }
                 } finally { importingFont = false }
             }
         }
@@ -324,6 +364,12 @@ fun PerGameSettingsScreen(game: ScanGame) {
     val globalXs35Renderer = EngineSettingsStore.getXs35Renderer(ctx)
     val globalXs35IntegerScale = EngineSettingsStore.isXs35IntegerScale(ctx)
     val globalXs35MuteUnfocus = EngineSettingsStore.isXs35MuteUnfocus(ctx)
+    val globalXs4Scoped = EngineSettingsStore.isXs4ScopedSaveDir(ctx)
+    val globalXs4Encoding = EngineSettingsStore.getXs4Encoding(ctx)
+    val globalXs4FontGothic = EngineSettingsStore.getXs4FontGothicPath(ctx)
+    val globalXs4FontMincho = EngineSettingsStore.getXs4FontMinchoPath(ctx)
+    val globalXs4Joypad = EngineSettingsStore.getXs4Joypad(ctx)
+    val globalXs4Msgskip = EngineSettingsStore.getXs4MsgskipDelay(ctx)
     val globalWinlator = remember { EngineSettingsStore.loadWinlator(ctx) }
     val globalPpssppVersion = EngineSettingsStore.getPpssppVersion(ctx)
     val globalWebShellPort = EngineSettingsStore.getWebShellPort(ctx)
@@ -358,6 +404,9 @@ fun PerGameSettingsScreen(game: ScanGame) {
     val fbNlsMap = fbNlsOptionsMap()
     val fvpNlsMap = fvpNlsOptionsMap()
     val xs35RendererMap = xsys35RendererOptionsMap()
+    val xs4EncodingMap = xsys4EncodingOptionsMap()
+    val xs4JoypadMap = xsys4JoypadOptionsMap()
+    val xs4MsgskipMap = xsys4MsgskipOptionsMap()
     val artPatchMap = artPatchOptionsMap()
     val artResolutionMap = artResolutionOptionsMap()
     val artToggleMap = artToggleOptionsMap()
@@ -436,6 +485,27 @@ fun PerGameSettingsScreen(game: ScanGame) {
         )
         PerGameSettingsStore.setBool(ctx, gid, PerGameSettingsStore.F_XSYS35_INTEGER_SCALE, xs35IntegerScale)
         PerGameSettingsStore.setBool(ctx, gid, PerGameSettingsStore.F_XSYS35_MUTE_UNFOCUS, xs35MuteUnfocus)
+        PerGameSettingsStore.setBool(ctx, gid, PerGameSettingsStore.F_XSYS4_SCOPED_SAVE_DIR, xs4Scoped)
+        PerGameSettingsStore.setStr(
+            ctx,
+            gid,
+            PerGameSettingsStore.F_XSYS4_ENCODING,
+            xs4Encoding?.takeIf { it in EngineSettingsStore.XSYS4_ENCODING_VALUES },
+        )
+        PerGameSettingsStore.setStr(ctx, gid, PerGameSettingsStore.F_XSYS4_FONT_GOTHIC_PATH, xs4FontGothic)
+        PerGameSettingsStore.setStr(ctx, gid, PerGameSettingsStore.F_XSYS4_FONT_MINCHO_PATH, xs4FontMincho)
+        PerGameSettingsStore.setStr(
+            ctx,
+            gid,
+            PerGameSettingsStore.F_XSYS4_JOYPAD,
+            xs4Joypad?.takeIf { it in EngineSettingsStore.XSYS4_JOYPAD_VALUES },
+        )
+        PerGameSettingsStore.setStr(
+            ctx,
+            gid,
+            PerGameSettingsStore.F_XSYS4_MSGSKIP_DELAY,
+            xs4Msgskip?.toIntOrNull()?.takeIf { it in EngineSettingsStore.XSYS4_MSGSKIP_DELAY_VALUES }?.toString(),
+        )
         PerGameSettingsStore.setStr(ctx, gid, PerGameSettingsStore.F_WINLATOR_CONTAINER_ID, winlatorContainerId)
         PerGameSettingsStore.setStr(ctx, gid, PerGameSettingsStore.F_WINLATOR_CONTAINER_NAME, winlatorContainerName)
         PerGameSettingsStore.setStr(ctx, gid, PerGameSettingsStore.F_WINLATOR_GRAPHICS_DRIVER, winlatorGraphicsDriver)
@@ -527,9 +597,9 @@ fun PerGameSettingsScreen(game: ScanGame) {
                         TopBarIcon(painterResource(R.drawable.ic_save), stringResource(R.string.common_save), MiuixTheme.colorScheme.primary) {
                             save()
                             // 存档路径展示与实际生效设置同源：保存后按新值重解一次（磁盘 + DB 读，走 IO）
-                            if (game.engine == EngineType.XSYS35) {
+                            if (game.engine == EngineType.XSYS35 || game.engine == EngineType.XSYS4) {
                                 scope.launch {
-                                    xs35SaveLocation = withContext(Dispatchers.IO) {
+                                    saveLocation = withContext(Dispatchers.IO) {
                                         GameSaveManager(ctx).resolveSaveLocation(game)
                                     }
                                 }
@@ -854,7 +924,68 @@ fun PerGameSettingsScreen(game: ScanGame) {
                                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
                             )
                             // 当前生效存档路径（与存档管理同源）：独立存档 = 应用外部存档目录，关闭 = 游戏目录 save/
-                            xs35SaveLocation?.let { location ->
+                            saveLocation?.let { location ->
+                                Text(
+                                    location.description,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+                                )
+                                location.directory?.let { dir ->
+                                    Text(
+                                        dir.absolutePath,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    EngineType.XSYS4 -> item {
+                        SectionCard(stringResource(R.string.engine_settings_xsys4_title)) {
+                            OverrideSwitch(stringResource(R.string.engine_settings_scoped_save_dir), globalXs4Scoped, xs4Scoped) { xs4Scoped = it }
+                            OverrideChoice(stringResource(R.string.engine_settings_xsys4_encoding_title), xs4EncodingMap, globalXs4Encoding, xs4Encoding) { xs4Encoding = it }
+                            OverrideFontPreference(
+                                label = stringResource(R.string.engine_settings_xsys4_font_gothic_title),
+                                globalValue = globalXs4FontGothic,
+                                override = xs4FontGothic,
+                                followGameDefaultLabel = stringResource(R.string.engine_settings_use_builtin_font),
+                                onSet = { xs4FontGothic = it },
+                                onPick = { if (!importingFont) xs4GothicFontLauncher.launch("*/*") },
+                                enabled = !importingFont,
+                            )
+                            OverrideFontPreference(
+                                label = stringResource(R.string.engine_settings_xsys4_font_mincho_title),
+                                globalValue = globalXs4FontMincho,
+                                override = xs4FontMincho,
+                                followGameDefaultLabel = stringResource(R.string.engine_settings_use_builtin_font),
+                                onSet = { xs4FontMincho = it },
+                                onPick = { if (!importingFont) xs4MinchoFontLauncher.launch("*/*") },
+                                enabled = !importingFont,
+                            )
+                            OverrideChoice(stringResource(R.string.engine_settings_xsys4_joypad_title), xs4JoypadMap, globalXs4Joypad, xs4Joypad) { xs4Joypad = it }
+                            OverrideChoice(stringResource(R.string.engine_settings_xsys4_msgskip_title), xs4MsgskipMap, globalXs4Msgskip.toString(), xs4Msgskip) { xs4Msgskip = it }
+                            Text(
+                                stringResource(R.string.engine_settings_xsys4_note),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+                            )
+                            Text(
+                                stringResource(R.string.engine_settings_xsys4_uninstall_hint),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+                            )
+                            Text(
+                                stringResource(R.string.engine_settings_xsys4_compat_hint),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+                            )
+                            // 当前生效存档路径（与存档管理同源）：独立存档 = 应用外部存档目录，关闭 = 游戏根 SaveFolder
+                            saveLocation?.let { location ->
                                 Text(
                                     location.description,
                                     style = MaterialTheme.typography.bodyMedium,

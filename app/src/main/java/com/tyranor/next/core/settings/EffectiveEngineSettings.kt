@@ -170,6 +170,13 @@ object EffectiveEngineSettings {
         override?.trim()?.toIntOrNull()?.takeIf { it in 1..65535 } ?: global
 
     /**
+     * System4 跳字延迟三级合并：单游戏覆盖值命中预设时优先，否则回退全局（全局再经预设归一）。
+     */
+    fun resolveXs4MsgskipDelay(override: String?, global: Int): Int =
+        override?.trim()?.toIntOrNull()?.takeIf { it in EngineSettingsStore.XSYS4_MSGSKIP_DELAY_VALUES }
+            ?: EngineSettingsStore.normalizeXs4MsgskipDelay(global)
+
+    /**
      * Winlator 外置启动全局设置 + 单游戏覆盖合并。
      *
      * 覆盖字段带值即生效（""=显式不下发该参数，跟随容器配置）；字符串字段仍走各自的

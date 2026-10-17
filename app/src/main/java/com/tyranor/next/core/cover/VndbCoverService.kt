@@ -67,7 +67,7 @@ object VndbCoverService {
 
     /** 将用户从相册选择的图片保存为该游戏的自定义封面，返回更新后的游戏（失败返回 null）。 */
     fun saveCustomCover(context: Context, game: ScanGame, pickedUri: Uri): ScanGame? {
-        val dir = File(context.filesDir, "covers_remote")
+        val dir = persistentCoverDir(context)
         if (!dir.exists() && !dir.mkdirs()) return null
         val ext = when (context.contentResolver.getType(pickedUri)?.lowercase()?.substringAfterLast('/')) {
             "png" -> "png"

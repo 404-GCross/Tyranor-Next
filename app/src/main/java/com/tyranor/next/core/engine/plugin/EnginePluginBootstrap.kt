@@ -88,6 +88,7 @@ object EnginePluginBootstrap {
             EngineType.REALLIVE,
             EngineType.AVG32,
             EngineType.XSYS35,
+            EngineType.XSYS4,
             EngineType.UK2,
             EngineType.FVP,
             EngineType.ETHORNELL,

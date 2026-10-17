@@ -329,7 +329,8 @@ section 后 `cmp` 通过），文件体积 1 692 320 / 1 476 240 / 201 408 B 也
    （`grep -rn 'org_libsdl_app\|org/libsdl/app' <build-dir>/third_party/SDL2/src/`）后修正 patch；
 5. 重跑 `scripts/sync-app32-java.sh`（必要时先 `--check` 看差异）；
 6. 按 §5 重新构建、strip、入库，并更新 §6 的体积 / SHA-256 / readelf 记录；
-7. 真机验收见方案 §7.2。
+7. **反向回归 System4**：`libSDL2x.so` 同时被 System4 的 `libxsystem4.so` 依赖（见 `engine/xsystem4/BUILD.md`）；升级 SDL2 或改动其导出符号（含 `org_libsdl_app32` JNI 前缀）后，必须回归 System4 的启动、触控与音频链路（`docs/System4-xsystem4-引擎接入方案.md` §7.2-13/14）；
+8. 真机验收见方案 §7.2。
 
 ---
 
@@ -359,6 +360,8 @@ Gradle 同步任务）：
 
 - `MTLc3m.ttf` 1 924 864 B（SHA-256 `b9e87fd7e4e5112b7bcc8c3486c19a23379e4520b36b5c049ecfd40731556a51`）
 - `mincho.ttf` 4 775 296 B（SHA-256 `a57a34b464325bce7cb2bb6bbcf7ef81c2c5eea7897cbd8acbfbdc2eb8ad695c`）
+
+> **跨引擎共用**：`MTLc3m.ttf` / `mincho.ttf` 同时是 System4（xsystem4）的默认字体映射（日文版 gothic / mincho）；`DroidSansFallback.ttf` 被 ONS 与 System4（GBK 版）共用。修改或替换任一字体，须同步回归 System35、System4 与 ONS。
 
 `app/build.gradle.kts` 另有 `androidResources { noCompress += listOf("ttf", "otf") }`：
 字体 asset 若被 AAPT 压缩，xsystem35 读取会极慢（上游明确要求）。

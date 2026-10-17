@@ -243,8 +243,9 @@ android {
       shaders = false
     }
 
-    // 内置引擎字体（MTLc3m.ttf / mincho.ttf，由 engine 模块 xs35-assets 生成目录并入）不得被
-    // AAPT 压缩：xsystem35 对压缩过的字体读取极慢（上游明确要求字体 asset 不压缩）。
+    // 内置引擎字体（MTLc3m.ttf / mincho.ttf / DroidSansFallback.ttf，直接位于 engine/src/main/assets）不得被
+    // AAPT 压缩：xsystem35 对压缩过的字体读取极慢（上游明确要求字体 asset 不压缩）；xsystem4 以 SDL_LoadFile 整文件读入内存，同样不压缩。
+    // 这些字体由 System35、System4 与 ONS 共用，替换字体文件须同步检查三者。
     androidResources {
       noCompress += listOf("ttf", "otf")
     }

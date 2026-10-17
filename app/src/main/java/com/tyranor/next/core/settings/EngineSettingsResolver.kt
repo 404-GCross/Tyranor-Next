@@ -219,6 +219,34 @@ object EngineSettingsResolver {
                 bool(PerGameSettingsStore.F_XSYS35_MUTE_UNFOCUS),
                 EngineSettingsStore.isXs35MuteUnfocus(app),
             ),
+            xs4ScopedSaveDir = EffectiveEngineSettings.resolveBool(
+                bool(PerGameSettingsStore.F_XSYS4_SCOPED_SAVE_DIR),
+                EngineSettingsStore.isXs4ScopedSaveDir(app),
+            ),
+            xs4Encoding = EffectiveEngineSettings.resolveAllowed(
+                str(PerGameSettingsStore.F_XSYS4_ENCODING),
+                EngineSettingsStore.getXs4Encoding(app),
+                EngineSettingsStore.XSYS4_ENCODING_VALUES,
+                EngineSettingsStore.XSYS4_ENCODING_SJIS,
+            ),
+            xs4FontGothicPath = EffectiveEngineSettings.resolve(
+                str(PerGameSettingsStore.F_XSYS4_FONT_GOTHIC_PATH),
+                EngineSettingsStore.getXs4FontGothicPath(app),
+            ),
+            xs4FontMinchoPath = EffectiveEngineSettings.resolve(
+                str(PerGameSettingsStore.F_XSYS4_FONT_MINCHO_PATH),
+                EngineSettingsStore.getXs4FontMinchoPath(app),
+            ),
+            xs4Joypad = EffectiveEngineSettings.resolveAllowed(
+                str(PerGameSettingsStore.F_XSYS4_JOYPAD),
+                EngineSettingsStore.getXs4Joypad(app),
+                EngineSettingsStore.XSYS4_JOYPAD_VALUES,
+                EngineSettingsStore.XSYS4_JOYPAD_AUTO,
+            ),
+            xs4MsgskipDelay = EffectiveEngineSettings.resolveXs4MsgskipDelay(
+                str(PerGameSettingsStore.F_XSYS4_MSGSKIP_DELAY),
+                EngineSettingsStore.getXs4MsgskipDelay(app),
+            ),
             rpg = EffectiveEngineSettings.mergeRpgMaker(
                 EngineSettingsStore.loadRpgMaker(app),
                 PerGameSettingsStore.toRpgMakerOverride(override),
@@ -304,6 +332,18 @@ data class ResolvedEngineSettings(
     val xs35IntegerScale: Boolean,
     /** System35 生效失焦静音开关（`-mute_on_unfocus`）。 */
     val xs35MuteUnfocus: Boolean,
+    /** System4 生效「独立存档」开关（默认开；目录 = `<外部存储>/save/<safeSaveName>`，关闭 = 游戏根 `SaveFolder`）。 */
+    val xs4ScopedSaveDir: Boolean,
+    /** System4 生效文本编码（sjis / gbk；映射为 `--encoding`）。 */
+    val xs4Encoding: String,
+    /** System4 生效自定义 gothic 字体绝对路径（空 = 用 engine 侧内置映射；非空仍需启动前校验存在）。 */
+    val xs4FontGothicPath: String,
+    /** System4 生效自定义 mincho 字体绝对路径（语义同 [xs4FontGothicPath]）。 */
+    val xs4FontMinchoPath: String,
+    /** System4 生效手柄（auto 不下发；on / off 映射为 `--joypad`）。 */
+    val xs4Joypad: String,
+    /** System4 生效跳字延迟毫秒（0 = 引擎默认，不下发）。 */
+    val xs4MsgskipDelay: Int,
     /** RPG Maker RGSS 外置模块生效配置（三级合并结果，启动时经 settings extra 下发）。 */
     val rpg: EngineSettingsStore.RpgMaker,
     /** Ren'Py 外置模块生效配置（三级合并结果，启动时经 settings extra 下发）。 */

@@ -10,6 +10,8 @@
 #
 #   完整背景、产物校验与许可说明见 `engine/xsystem35/BUILD.md`。
 #
+#   反向声明：`libSDL2x.so` 同时被 System4（`libxsystem4.so`）依赖，升级 SDL2 或改动导出符号须回归 System4（见 BUILD.md §7）。
+#
 # 步骤（幂等可重跑）
 #   1) 依赖下载：SDL2 2.32.10 / freetype 2.14.3 / SDL2_mixer 2.8.0 / libwebp 1.5.0，
 #      下载到 `<build-dir>/downloads/`，逐个 SHA1 校验（失败即退出）；
@@ -86,7 +88,7 @@ DEP_SHA1=(
 )
 
 usage() {
-    sed -n '2,48p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+    sed -n '2,50p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
 }
 
 # 默认值

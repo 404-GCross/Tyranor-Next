@@ -36,6 +36,7 @@ import com.core.rpgmaker.RpgMakerActivity
 import com.core.siglus.SiglusActivity
 import com.core.tyrano.TyranoActivity
 import com.core.xsys35.Xs35Activity
+import com.core.xsys4.Xs4Activity
 import com.tyranor.next.core.engine.EngineType
 import com.tyranor.next.core.engine.external.ExternalEmulatorLauncher
 import com.tyranor.next.core.engine.external.ExternalEmulatorRegistry
@@ -49,6 +50,7 @@ import com.tyranor.next.core.game.model.GamePathUtils
 import com.tyranor.next.core.game.model.EthornellPaths
 import com.tyranor.next.core.game.model.ScanGame
 import com.tyranor.next.core.game.model.Xs35Paths
+import com.tyranor.next.core.game.model.Xs4Paths
 import com.tyranor.next.core.game.save.GameSaveException
 import com.tyranor.next.core.game.save.GameSaveManager
 import com.tyranor.next.core.game.save.RpgSaveFormat
@@ -127,6 +129,7 @@ object EngineLauncher {
         EngineType.REALLIVE,
         EngineType.AVG32,
         EngineType.XSYS35,
+        EngineType.XSYS4,
         EngineType.UK2,
         EngineType.FVP,
         EngineType.ETHORNELL,
@@ -389,6 +392,11 @@ object EngineLauncher {
         // System35（xsystem35）：独立存档目录缺失时预创建，失败即类型化返回（不回退游戏根）
         if (game.engine == EngineType.XSYS35) {
             ensureXs35SaveDir(context, path, settings)?.let { return it }
+        }
+        // System4（xsystem4）：预检（入口 ini / GLES 3.0）先于存档目录副作用；同款预创建，不回退游戏根
+        if (game.engine == EngineType.XSYS4) {
+            preflightXs4(context, path)?.let { return it }
+            ensureXs4SaveDir(context, path, settings)?.let { return it }
         }
         // “总是/不再”持久化为全局补丁策略；“本次”不落盘，仅本次按 auto 生效
         if (game.engine == EngineType.ARTEMIS) {
@@ -874,6 +882,8 @@ object EngineLauncher {
 
             EngineType.XSYS35 -> buildXs35Intent(context, path, game, settings)
 
+            EngineType.XSYS4 -> buildXs4Intent(context, path, game, settings)
+
             EngineType.FVP -> buildFvpIntent(context, path, game, settings)
             EngineType.ETHORNELL -> buildEthornellIntent(context, path, game, settings)
 
@@ -1233,6 +1243,90 @@ object EngineLauncher {
         if (saveDir.exists()) return LaunchResult.Failure.Xs35SavePathNotDirectory(saveDir.absolutePath)
         if (saveDir.mkdirs() || saveDir.isDirectory) return null
         return LaunchResult.Failure.Xs35SaveDirUnavailable(saveDir.absolutePath)
+    }
+
+    /**
+     * System4（xsystem4）启动：游戏根经 PATH 系列下发，入口 ini 由宿主大小写不敏感解析（见 `Xs4Paths.resolveIniFile`）；
+     * 存档目录按「独立存档」生效值解析（与存档镜像同源，推导只在 [Xs4Paths]）；
+     * 字体仅下发用户设置且存在的绝对路径，内置映射（按编码）由 engine 侧 `Xs4Fonts` 负责。
+     */
+    private fun buildXs4Intent(
+        context: Context,
+        path: String,
+        game: ScanGame,
+        settings: ResolvedEngineSettings,
+    ): Intent {
+        // ensureXs4SaveDir 已在上游保证独立存档开启时外部存储可用；此处为不可达分支：
+        // 不复用游戏根兜底，由 launch 外层 try/catch 收口为 StartFailed。
+        val saveDir = resolveXs4SaveDir(context, path, settings)
+            ?: throw IllegalStateException("xs4 scoped save dir unavailable after ensure")
+        return Intent(context, Xs4Activity::class.java).apply {
+            putExtra(LaunchContract.PATH, path)
+            putExtra(LaunchContract.GAME_PATH, path)
+            putExtra(LaunchContract.PROJECT_ROOT, path)
+            putExtra(LaunchContract.GAME_DIR, path)
+            putExtra(LaunchContract.ROOT_URI, game.uri)
+            putExtra(LaunchContract.LAUNCH_TARGET, game.launchTarget)
+            putExtra(LaunchContract.LAUNCH_MODE, LaunchContract.LAUNCH_MODE_XSYS4)
+            putExtra(LaunchContract.XS4_SAVE_DIR, saveDir.absolutePath)
+            putExtra(LaunchContract.XS4_SCOPED_SAVE_DIR, settings.xs4ScopedSaveDir)
+            putExtra(LaunchContract.XS4_ENCODING, settings.xs4Encoding)
+            xs4CustomFontPath(settings.xs4FontGothicPath)?.let { putExtra(LaunchContract.XS4_FONT_GOTHIC_PATH, it) }
+            xs4CustomFontPath(settings.xs4FontMinchoPath)?.let { putExtra(LaunchContract.XS4_FONT_MINCHO_PATH, it) }
+            if (settings.xs4Joypad != EngineSettingsStore.XSYS4_JOYPAD_AUTO) {
+                putExtra(LaunchContract.XS4_JOYPAD, settings.xs4Joypad)
+            }
+            if (settings.xs4MsgskipDelay > 0) {
+                putExtra(LaunchContract.XS4_MSGSKIP_DELAY, settings.xs4MsgskipDelay)
+            }
+            // 契约保留（对齐 System35）：朝向由 manifest 的 sensorLandscape 固定，不消费该 extra。
+            putExtra(LaunchContract.ORIENTATION, 6)
+        }
+    }
+
+    /** System4 自定义字体：仅用户设置了路径且文件存在时下发；否则宿主回落内置映射。 */
+    private fun xs4CustomFontPath(raw: String): String? =
+        raw.takeIf { it.isNotBlank() && File(it).isFile }
+
+    /**
+     * System4 生效存档目录（与 [ensureXs4SaveDir]、`GameSaveManager.resolveSaveLocation` 同源，
+     * 推导只在 [Xs4Paths]）：独立存档开 = 外部存档目录，外部存储不可用返回 null（调用方按
+     * 类型化失败处理，绝不回退游戏根）；关闭 = `<游戏根>/<SaveFolder>`。
+     */
+    private fun resolveXs4SaveDir(context: Context, path: String, settings: ResolvedEngineSettings): File? {
+        if (settings.xs4ScopedSaveDir) {
+            val external = context.getExternalFilesDir(null) ?: return null
+            return Xs4Paths.scopedSaveDir(external, path)
+        }
+        return Xs4Paths.gameDirSaveDir(File(path))
+    }
+
+    /** System4 启动预检（IO 线程）：入口 ini 大小写不敏感查找 + GLES 3.0；判定见 [Xs4Preflight]。 */
+    private fun preflightXs4(context: Context, path: String): LaunchResult.Failure? {
+        val reqGlEsVersion = context.getSystemService(ActivityManager::class.java)
+            ?.deviceConfigurationInfo?.reqGlEsVersion
+        return Xs4Preflight.check(
+            iniFound = Xs4Paths.resolveIniFile(File(path)) != null,
+            reqGlEsVersion = reqGlEsVersion,
+        )
+    }
+
+    /**
+     * System4 存档目录预创建（仿 [ensureXs35SaveDir]，**不回退游戏根**）：
+     * 独立存档开（默认）= 应用外部存档目录，外部存储不可用即类型化失败（path = null）；
+     * 关闭 = `<游戏根>/<SaveFolder>`。
+     */
+    private fun ensureXs4SaveDir(
+        context: Context,
+        path: String,
+        settings: ResolvedEngineSettings,
+    ): LaunchResult.Failure? {
+        val saveDir = resolveXs4SaveDir(context, path, settings)
+            ?: return LaunchResult.Failure.Xs4SaveDirUnavailable(path = null)
+        if (saveDir.isDirectory) return null
+        if (saveDir.exists()) return LaunchResult.Failure.Xs4SavePathNotDirectory(saveDir.absolutePath)
+        if (saveDir.mkdirs() || saveDir.isDirectory) return null
+        return LaunchResult.Failure.Xs4SaveDirUnavailable(saveDir.absolutePath)
     }
 
     /**

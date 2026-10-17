@@ -154,6 +154,7 @@
     <string name="engine_desc_avg32">AVG32（VisualArt’s 早期引擎），Kanon/AIR/ONE 等</string>
     <string name="engine_desc_uk2">UK2（AyPio 早期引擎，PC-98），ソーサーキングダム 等</string>
     <string name="engine_desc_xsys35">System3.x（xsystem35）</string>
+    <string name="engine_desc_xsys4">System4（xsystem4）</string>
     <string name="engine_desc_unknown">未知引擎</string>
     <string name="engine_desc_psp">PSP 游戏通过外置 PPSSPP 运行</string>
     <string name="engine_desc_yuris">YU-RIS，yscfg.dat 与 .ypf 封包（ysbin/.ymv）游戏，经外置 Winlator 运行</string>
@@ -308,6 +309,23 @@
     <string name="engine_settings_xsys35_mute_unfocus_title">切后台静音</string>
     <string name="engine_settings_xsys35_note">文本为 Shift-JIS；独立存档开启时存档位于应用存档目录，关闭时位于游戏目录 save/</string>
     <string name="engine_settings_xsys35_uninstall_hint">卸载或删除游戏会清除应用独立存档目录</string>
+    <string name="engine_settings_xsys4_title">System4引擎设置</string>
+    <string name="engine_settings_xsys4_encoding_title">文本编码</string>
+    <string name="engine_settings_xsys4_encoding_sjis">Shift-JIS（日文版）</string>
+    <string name="engine_settings_xsys4_encoding_gbk">GBK（中文版）</string>
+    <string name="engine_settings_xsys4_font_gothic_title">自定义黑体字体</string>
+    <string name="engine_settings_xsys4_font_mincho_title">自定义明朝字体</string>
+    <string name="engine_settings_xsys4_font_hint">仅对 System4 生效；导入失效时回落内置字体；修改后需重新进入游戏。</string>
+    <string name="engine_settings_xsys4_joypad_title">手柄</string>
+    <string name="engine_settings_xsys4_joypad_auto">跟随引擎默认</string>
+    <string name="engine_settings_xsys4_joypad_on">开</string>
+    <string name="engine_settings_xsys4_joypad_off">关</string>
+    <string name="engine_settings_xsys4_msgskip_title">跳字延迟</string>
+    <string name="engine_settings_xsys4_msgskip_default">引擎默认</string>
+    <string name="engine_settings_xsys4_msgskip_value">%1$d ms</string>
+    <string name="engine_settings_xsys4_note">文本编码须与游戏版本一致；独立存档开启时存档位于应用存档目录，关闭时位于游戏目录</string>
+    <string name="engine_settings_xsys4_uninstall_hint">卸载或删除游戏会清除应用独立存档目录</string>
+    <string name="engine_settings_xsys4_compat_hint">Rance X 及之后作品、Evenicle 等不受支持；影像仅支持 MPEG-1</string>
     <string name="engine_settings_ppsspp_title">PPSSPP引擎设置</string>
     <string name="engine_settings_input_title">输入与手柄</string>
     <string name="engine_settings_input_pad_title">虚拟按键</string>
@@ -571,6 +589,7 @@
     <string name="save_location_ons_game_dir">ONS 游戏内存档目录</string>
     <string name="save_error_tyrano_external_unavailable">Tyrano 应用独立存储目录不可用</string>
     <string name="save_error_xsys35_external_unavailable">外部存储不可用，无法使用独立存档目录</string>
+    <string name="save_error_xsys4_external_unavailable">外部存储不可用，无法使用独立存档目录</string>
     <string name="save_location_engine_scoped">%1$s 应用独立存档目录</string>
     <string name="save_location_engine_game_dir">%1$s 游戏内存档目录</string>
     <string name="save_location_engine_no_file_interface">%1$s 没有标准文件存档接口</string>
@@ -729,6 +748,11 @@
     <string name="launch_error_xs35_save_path_not_directory">存档路径存在但不是目录：%1$s</string>
     <string name="launch_error_xs35_save_dir_unavailable">无法创建存档目录：%1$s</string>
     <string name="launch_error_xs35_external_unavailable">外部存储不可用，无法使用独立存档目录</string>
+    <string name="launch_error_xs4_save_path_not_directory">存档路径存在但不是目录：%1$s</string>
+    <string name="launch_error_xs4_save_dir_unavailable">无法创建存档目录：%1$s</string>
+    <string name="launch_error_xs4_external_unavailable">外部存储不可用，无法使用独立存档目录</string>
+    <string name="launch_error_xs4_ini_missing">未找到 System40.ini / AliceStart.ini，无法启动 System4 游戏</string>
+    <string name="launch_error_xs4_gles3_required">需要支持 OpenGL ES 3.0 的设备</string>
 
     <string name="archive_title">解包 / 封包</string>
     <string name="archive_permission_rationale">需要「所有文件访问」权限以直接读取存储中的封包；未授权时部分目录可能扫描不到或需慢速中转</string>

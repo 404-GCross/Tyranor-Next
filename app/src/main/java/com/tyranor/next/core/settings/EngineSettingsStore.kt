@@ -75,6 +75,14 @@ object EngineSettingsStore {
     const val KEY_XSYS35_INTEGER_SCALE = "xsys35_integer_scale"
     const val KEY_XSYS35_MUTE_UNFOCUS = "xsys35_mute_unfocus"
 
+    // System4（xsystem4）应用级默认（独立存档 / 文本编码 / 自定义字体 / 手柄 / 跳字延迟）
+    const val KEY_XSYS4_SCOPED_SAVE_DIR = "xsys4_scoped_save_dir"
+    const val KEY_XSYS4_ENCODING = "xsys4_encoding"
+    const val KEY_XSYS4_FONT_GOTHIC_PATH = "xsys4_font_gothic_path"
+    const val KEY_XSYS4_FONT_MINCHO_PATH = "xsys4_font_mincho_path"
+    const val KEY_XSYS4_JOYPAD = "xsys4_joypad"
+    const val KEY_XSYS4_MSGSKIP_DELAY = "xsys4_msgskip_delay"
+
     // Winlator 外置启动（YU-RIS / CatSystem2 / PC 经 Winlator 跳转时的下发参数）
     const val KEY_WINLATOR_CONTAINER_ID = "winlator_container_id"
     const val KEY_WINLATOR_CONTAINER_NAME = "winlator_container_name"
@@ -308,6 +316,21 @@ object EngineSettingsStore {
         XSYS35_RENDERER_OPENGL,
         XSYS35_RENDERER_SOFTWARE,
     )
+
+    // System4 文本编码（sjis = 日文版默认，gbk = 中文版）
+    const val XSYS4_ENCODING_SJIS = "sjis"
+    const val XSYS4_ENCODING_GBK = "gbk"
+    val XSYS4_ENCODING_VALUES: Set<String> = linkedSetOf(XSYS4_ENCODING_SJIS, XSYS4_ENCODING_GBK)
+
+    // System4 手柄取值（auto 不传 --joypad，交由引擎默认）
+    const val XSYS4_JOYPAD_AUTO = "auto"
+    const val XSYS4_JOYPAD_ON = "on"
+    const val XSYS4_JOYPAD_OFF = "off"
+    val XSYS4_JOYPAD_VALUES: Set<String> = linkedSetOf(XSYS4_JOYPAD_AUTO, XSYS4_JOYPAD_ON, XSYS4_JOYPAD_OFF)
+
+    // System4 跳字延迟预设（毫秒；0 = 引擎默认，不传 --msgskip-delay）
+    const val XSYS4_MSGSKIP_DELAY_DEFAULT = 0
+    val XSYS4_MSGSKIP_DELAY_VALUES: Set<Int> = linkedSetOf(0, 100, 200, 400)
 
     // Winlator 外置启动取值域（空串 = 不下发该参数，跟随容器/快捷方式配置）
     /**
@@ -760,6 +783,39 @@ object EngineSettingsStore {
     fun isXs35MuteUnfocus(c: Context): Boolean = prefs(c).getBoolean(KEY_XSYS35_MUTE_UNFOCUS, false)
     fun setXs35MuteUnfocus(c: Context, b: Boolean) =
         prefs(c).edit().putBoolean(KEY_XSYS35_MUTE_UNFOCUS, b).apply()
+
+    // ---------- System4（xsystem4） ----------
+    fun isXs4ScopedSaveDir(c: Context): Boolean =
+        prefs(c).getBoolean(KEY_XSYS4_SCOPED_SAVE_DIR, true)
+    fun setXs4ScopedSaveDir(c: Context, b: Boolean) =
+        prefs(c).edit().putBoolean(KEY_XSYS4_SCOPED_SAVE_DIR, b).apply()
+    fun getXs4Encoding(c: Context): String =
+        normalizeXs4Encoding(prefs(c).getString(KEY_XSYS4_ENCODING, XSYS4_ENCODING_SJIS))
+    fun setXs4Encoding(c: Context, v: String) =
+        prefs(c).edit().putString(KEY_XSYS4_ENCODING, normalizeXs4Encoding(v)).apply()
+    fun normalizeXs4Encoding(v: String?): String =
+        v?.trim()?.lowercase()?.takeIf { it in XSYS4_ENCODING_VALUES } ?: XSYS4_ENCODING_SJIS
+    fun getXs4FontGothicPath(c: Context): String =
+        normalizeXs4FontPath(prefs(c).getString(KEY_XSYS4_FONT_GOTHIC_PATH, ""))
+    fun setXs4FontGothicPath(c: Context, v: String?) =
+        prefs(c).edit().putString(KEY_XSYS4_FONT_GOTHIC_PATH, normalizeXs4FontPath(v)).apply()
+    fun getXs4FontMinchoPath(c: Context): String =
+        normalizeXs4FontPath(prefs(c).getString(KEY_XSYS4_FONT_MINCHO_PATH, ""))
+    fun setXs4FontMinchoPath(c: Context, v: String?) =
+        prefs(c).edit().putString(KEY_XSYS4_FONT_MINCHO_PATH, normalizeXs4FontPath(v)).apply()
+    fun normalizeXs4FontPath(v: String?): String = v?.trim().orEmpty()
+    fun getXs4Joypad(c: Context): String =
+        normalizeXs4Joypad(prefs(c).getString(KEY_XSYS4_JOYPAD, XSYS4_JOYPAD_AUTO))
+    fun setXs4Joypad(c: Context, v: String) =
+        prefs(c).edit().putString(KEY_XSYS4_JOYPAD, normalizeXs4Joypad(v)).apply()
+    fun normalizeXs4Joypad(v: String?): String =
+        v?.trim()?.lowercase()?.takeIf { it in XSYS4_JOYPAD_VALUES } ?: XSYS4_JOYPAD_AUTO
+    fun getXs4MsgskipDelay(c: Context): Int =
+        normalizeXs4MsgskipDelay(prefs(c).getString(KEY_XSYS4_MSGSKIP_DELAY, null)?.trim()?.toIntOrNull())
+    fun setXs4MsgskipDelay(c: Context, v: Int) =
+        prefs(c).edit().putString(KEY_XSYS4_MSGSKIP_DELAY, normalizeXs4MsgskipDelay(v).toString()).apply()
+    fun normalizeXs4MsgskipDelay(v: Int?): Int =
+        v?.takeIf { it in XSYS4_MSGSKIP_DELAY_VALUES } ?: XSYS4_MSGSKIP_DELAY_DEFAULT
 
     // ---------- Winlator 外置启动 ----------
 

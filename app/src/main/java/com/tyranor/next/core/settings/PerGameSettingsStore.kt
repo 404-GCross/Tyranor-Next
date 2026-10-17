@@ -120,6 +120,14 @@ object PerGameSettingsStore {
     const val F_XSYS35_INTEGER_SCALE = "xsys35_integer_scale"
     const val F_XSYS35_MUTE_UNFOCUS = "xsys35_mute_unfocus"
 
+    // System4（独立存档/文本编码/自定义字体/手柄/跳字延迟覆盖；null=跟随全局）
+    const val F_XSYS4_SCOPED_SAVE_DIR = "xsys4_scoped_save_dir"
+    const val F_XSYS4_ENCODING = "xsys4_encoding"
+    const val F_XSYS4_FONT_GOTHIC_PATH = "xsys4_font_gothic_path"
+    const val F_XSYS4_FONT_MINCHO_PATH = "xsys4_font_mincho_path"
+    const val F_XSYS4_JOYPAD = "xsys4_joypad"
+    const val F_XSYS4_MSGSKIP_DELAY = "xsys4_msgskip_delay"
+
     // Winlator 外置启动（null=跟随全局；字符串 "" = 显式不下发该参数）
     const val F_WINLATOR_CONTAINER_ID = "winlator_container_id"
     const val F_WINLATOR_CONTAINER_NAME = "winlator_container_name"

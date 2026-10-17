@@ -244,6 +244,46 @@ class GameOverridePartitionsTest {
     }
 
     @Test
+    fun system4KeysArePartitionedIntoTyrano() {
+        val pairs = listOf(
+            GameOverridePartitions.KEY_XSYS4_SCOPED_SAVE_DIR to PerGameSettingsStore.F_XSYS4_SCOPED_SAVE_DIR,
+            GameOverridePartitions.KEY_XSYS4_ENCODING to PerGameSettingsStore.F_XSYS4_ENCODING,
+            GameOverridePartitions.KEY_XSYS4_FONT_GOTHIC_PATH to PerGameSettingsStore.F_XSYS4_FONT_GOTHIC_PATH,
+            GameOverridePartitions.KEY_XSYS4_FONT_MINCHO_PATH to PerGameSettingsStore.F_XSYS4_FONT_MINCHO_PATH,
+            GameOverridePartitions.KEY_XSYS4_JOYPAD to PerGameSettingsStore.F_XSYS4_JOYPAD,
+            GameOverridePartitions.KEY_XSYS4_MSGSKIP_DELAY to PerGameSettingsStore.F_XSYS4_MSGSKIP_DELAY,
+        )
+        pairs.forEach { (partitionKey, perGameKey) ->
+            assertEquals(perGameKey, partitionKey)
+            assertTrue("System4 分区缺少字段 $perGameKey", perGameKey in GameOverridePartitions.TYRANO_KEYS)
+        }
+
+        // 字面量锚定：与全局设置键、引擎侧契约的键名一致（三处同值，改名需同步）
+        assertEquals("xsys4_scoped_save_dir", EngineSettingsStore.KEY_XSYS4_SCOPED_SAVE_DIR)
+        assertEquals("xsys4_encoding", EngineSettingsStore.KEY_XSYS4_ENCODING)
+        assertEquals("xsys4_font_gothic_path", EngineSettingsStore.KEY_XSYS4_FONT_GOTHIC_PATH)
+        assertEquals("xsys4_font_mincho_path", EngineSettingsStore.KEY_XSYS4_FONT_MINCHO_PATH)
+        assertEquals("xsys4_joypad", EngineSettingsStore.KEY_XSYS4_JOYPAD)
+        assertEquals("xsys4_msgskip_delay", EngineSettingsStore.KEY_XSYS4_MSGSKIP_DELAY)
+
+        val blob = JSONObject()
+            .put(PerGameSettingsStore.F_XSYS4_SCOPED_SAVE_DIR, false)
+            .put(PerGameSettingsStore.F_XSYS4_ENCODING, "gbk")
+            .put(PerGameSettingsStore.F_XSYS4_FONT_GOTHIC_PATH, "")
+            .put(PerGameSettingsStore.F_XSYS4_FONT_MINCHO_PATH, "/data/user/0/app/files/fonts/a.ttf")
+            .put(PerGameSettingsStore.F_XSYS4_JOYPAD, "on")
+            .put(PerGameSettingsStore.F_XSYS4_MSGSKIP_DELAY, "200")
+
+        val row = GameOverridePartitions.split("/games/xsys4", blob, 1L)
+        val tyranoPartition = JSONObject(row.tyranoJson!!)
+        for (key in blob.keys()) {
+            assertTrue("System4 键 $key 未落入 tyrano 分区", tyranoPartition.has(key))
+            assertEquals(blob.opt(key)?.toString(), GameOverridePartitions.assemble(row).opt(key)?.toString())
+        }
+        assertEquals(blob.length(), GameOverridePartitions.assemble(row).length())
+    }
+
+    @Test
     fun renPyModuleKeysArePartitionedIntoRenpy() {
         val pairs = listOf(
             GameOverridePartitions.KEY_RENPY_CHEATS to PerGameSettingsStore.F_RENPY_CHEATS,

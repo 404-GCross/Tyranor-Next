@@ -59,29 +59,32 @@ object CoverScraperService {
 
         val updatedGames = games.map { game ->
             coroutineContext.ensureActive()
-            val local = runCatchingCancellable { EngineScanner.applyLocalCover(context, game) }.getOrDefault(game)
-            val updated = if (onlyMissing && !local.coverUri.isNullOrBlank()) {
+            // 图标兜底的产物不算「已有封面」：先剥离再探测本地封面，之后在线来源仍可替换它
+            val base = if (Xs4IconCover.isIconCoverUri(game.coverUri)) game.copy(coverUri = null) else game
+            val local = runCatchingCancellable { EngineScanner.applyLocalCover(context, base) }.getOrDefault(base)
+            val updated = if (keepsLocalCover(onlyMissing, local.coverUri)) {
                 if (local.coverUri != game.coverUri) updatedCount++ else skippedCount++
                 local
             } else {
-                val searchBase = if (onlyMissing) local else local.copy(coverUri = null)
                 val scraped = sources.firstNotNullOfOrNull { source ->
                     coroutineContext.ensureActive()
-                    runCatchingCancellable { scrapeWithSource(context, searchBase, source) }.getOrNull()
+                    runCatchingCancellable { scrapeWithSource(context, local.copy(coverUri = null), source) }.getOrNull()
                         ?.asCoverOnlyUpdateFrom(local)
                 }
                 if (scraped != null && !scraped.coverUri.isNullOrBlank()) {
                     updatedCount++
                     scraped
                 } else {
-                    if (local.coverUri != game.coverUri) {
+                    // 本地与在线来源都没有封面，才由 XSYS4 图标兜底；仍无封面时保留原游戏（含原图标）
+                    val resolved = applyXs4IconCover(context, local).takeIf { !it.coverUri.isNullOrBlank() } ?: game
+                    if (resolved.coverUri != game.coverUri) {
                         updatedCount++
                     } else if (sources.isEmpty()) {
                         skippedCount++
                     } else {
                         failedCount++
                     }
-                    local
+                    resolved
                 }
             }
             // 封面或 VNDB 元数据任一变化都要回调持久化（仅元数据变化时封面 URI 可能不变）
@@ -93,6 +96,14 @@ object CoverScraperService {
             updated
         }
         return CoverScrapeResult(updatedGames, updatedCount, skippedCount, failedCount)
+    }
+
+    /** XSYS4 图标兜底（调用方须已确认本地与在线来源都无封面）；用户已有封面不覆盖，不写游戏目录。 */
+    private fun applyXs4IconCover(context: Context, game: ScanGame): ScanGame {
+        if (!Xs4IconCover.needsFallback(game.engine, game.coverUri)) return game
+        val cover = runCatchingCancellable { Xs4IconCover.resolveCoverUri(context, game) }.getOrNull()
+            ?: return game
+        return game.copy(coverUri = cover, coverSource = AppSettingsStore.COVER_SOURCE_LOCAL)
     }
 
     /**
@@ -441,6 +452,13 @@ private fun Throwable.toCoverErrorCode(): CoverErrorCode {
     Log.w(TAG, "cover source request failed", this)
     return CoverErrorCode.UNKNOWN
 }
+
+/**
+ * 批量刮削对单个游戏的分支判定（纯函数，JVM 可测）：仅「只补缺失」且本地已有封面时保留本地封面，
+ * 其余情况都先走在线来源；图标兜底只能排在在线来源之后。
+ */
+internal fun keepsLocalCover(onlyMissing: Boolean, localCoverUri: String?): Boolean =
+    onlyMissing && !localCoverUri.isNullOrBlank()
 
 private fun ScanGame.asCoverOnlyUpdateFrom(base: ScanGame): ScanGame =
     base.copy(

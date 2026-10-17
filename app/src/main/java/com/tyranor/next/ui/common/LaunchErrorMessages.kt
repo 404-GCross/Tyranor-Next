@@ -82,6 +82,22 @@ private fun LaunchResult.Failure.toUserMessage(context: Context): String {
                 localized.getString(R.string.launch_error_xs35_save_dir_unavailable, path)
             }
 
+        is LaunchResult.Failure.Xs4SavePathNotDirectory ->
+            localized.getString(R.string.launch_error_xs4_save_path_not_directory, path)
+
+        is LaunchResult.Failure.Xs4SaveDirUnavailable ->
+            if (path == null || path.isEmpty()) {
+                localized.getString(R.string.launch_error_xs4_external_unavailable)
+            } else {
+                localized.getString(R.string.launch_error_xs4_save_dir_unavailable, path)
+            }
+
+        LaunchResult.Failure.Xs4IniMissing ->
+            localized.getString(R.string.launch_error_xs4_ini_missing)
+
+        LaunchResult.Failure.Xs4Gles3Required ->
+            localized.getString(R.string.launch_error_xs4_gles3_required)
+
         is LaunchResult.Failure.ExternalModuleFailed -> {
             val moduleName = result.moduleNameRes?.let { localized.getString(it) }
                 ?: result.moduleNameFallback.orEmpty()

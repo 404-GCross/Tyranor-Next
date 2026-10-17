@@ -144,6 +144,29 @@ object LaunchContract {
      */
     const val XS35_PATH_HASH = "xs35_path_hash"
 
+    // ---------- System4 (xsystem4) ----------
+
+    /** 生效存档目录**绝对路径**（由 App 解析，宿主不推导；非绝对路径时宿主忽略并记日志）。 */
+    const val XS4_SAVE_DIR = "xs4_save_dir"
+
+    /** 独立存档布尔（供宿主日志/诊断用；路径以 [XS4_SAVE_DIR] 为准）。 */
+    const val XS4_SCOPED_SAVE_DIR = "xs4_scoped_save_dir"
+
+    /** 文本编码：`sjis`（默认）| `gbk`，映射为 `--encoding`；非白名单值由宿主回落 `sjis`。 */
+    const val XS4_ENCODING = "xs4_encoding"
+
+    /** 自定义 gothic 字体**绝对路径**（仅用户导入时下发；宿主校验失败回落内置映射）。 */
+    const val XS4_FONT_GOTHIC_PATH = "xs4_font_gothic_path"
+
+    /** 自定义 mincho 字体**绝对路径**（同 [XS4_FONT_GOTHIC_PATH]）。 */
+    const val XS4_FONT_MINCHO_PATH = "xs4_font_mincho_path"
+
+    /** 手柄：`auto`（默认，不传 `--joypad`）| `on` | `off`。 */
+    const val XS4_JOYPAD = "xs4_joypad"
+
+    /** 跳字延迟（int 毫秒；0 = 引擎默认，不传 `--msgskip-delay`）。 */
+    const val XS4_MSGSKIP_DELAY = "xs4_msgskip_delay"
+
     // ---------- framebuffer 引擎（RealLive / AVG32 / UK2） ----------
 
     /** 引擎 id：`reallive` | `avg32` | `uk2`（不传时引擎库自行探测）。 */
@@ -166,4 +189,5 @@ object LaunchContract {
     const val LAUNCH_MODE_ETHORNELL = "internal.ethornell"
     const val LAUNCH_MODE_FRAMEBUFFER = "internal.framebuffer"
     const val LAUNCH_MODE_XSYS35 = "internal.xsys35"
+    const val LAUNCH_MODE_XSYS4 = "internal.xsys4"
 }

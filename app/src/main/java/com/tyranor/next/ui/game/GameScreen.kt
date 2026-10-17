@@ -116,6 +116,7 @@ import com.tyranor.next.core.game.model.GameSortKeys
 import com.tyranor.next.core.game.model.GameTitleTags
 import com.tyranor.next.core.game.model.ScanGame
 import com.tyranor.next.core.cover.VndbCoverService
+import com.tyranor.next.core.cover.persistentCoverDir
 import com.tyranor.next.core.cover.stableKey
 import com.tyranor.next.core.i18n.AppLocaleController
 import com.tyranor.next.core.settings.AppSettingsStore
@@ -434,7 +435,7 @@ internal fun cleanupDeletedGame(context: android.content.Context, target: ScanGa
 private fun deleteCoverFile(context: android.content.Context, coverUri: String?) {
     if (coverUri.isNullOrBlank()) return
     val file = runCatching { File(android.net.Uri.parse(coverUri).path ?: return) }.getOrNull() ?: return
-    val coverDir = File(context.filesDir, "covers_remote").canonicalPath
+    val coverDir = persistentCoverDir(context).canonicalPath
     if (runCatching { file.canonicalPath }.getOrNull()?.startsWith(coverDir) == true) {
         file.delete()
     }
@@ -2206,6 +2207,7 @@ internal fun EngineType.coverColor(): Color = when (this) {
     EngineType.REALLIVE -> Color(0xFF00695C)
     EngineType.AVG32 -> Color(0xFF8E7CC3)
     EngineType.XSYS35 -> Color(0xFF8B3A5E)
+    EngineType.XSYS4 -> Color(0xFF00A176)
     EngineType.UK2 -> Color(0xFF4E6E81)
     EngineType.FVP -> Color(0xFFB05A2A)
     EngineType.ETHORNELL -> com.tyranor.next.theme.EthornellCoverColor

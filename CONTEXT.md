@@ -5,16 +5,20 @@
 ## 引擎与运行时
 
 **引擎（EngineType）**:
-游戏所属的运行时家族，扫描时按目录特征（脚本/资源文件）判定：KIRIKIRI、ONS、TYRANO、RPG Maker（RGSS 系列）、RPG_MV、RPG_MZ、VN、WebOther、ARTEMIS、SIGLUS、REALLIVE、AVG32、XSYS35、UK2、FVP、ETHORNELL、RENPY、YURIS、CATSYSTEM2、PC、ANDROID_APP、UNKNOWN；类型已接入不等于其游戏兼容性已验收。
+游戏所属的运行时家族，扫描时按目录特征（脚本/资源文件）判定：KIRIKIRI、ONS、TYRANO、RPG Maker（RGSS 系列）、RPG_MV、RPG_MZ、VN、WebOther、ARTEMIS、SIGLUS、REALLIVE、AVG32、XSYS35、XSYS4、UK2、FVP、ETHORNELL、RENPY、YURIS、CATSYSTEM2、PC、ANDROID_APP、UNKNOWN；类型已接入不等于其游戏兼容性已验收。
 _Avoid_: 游戏类型、格式
 
 **内置引擎**:
-随 App 分发、无需外置安装的引擎运行时（Kirikiroid2 / krkrsdl3、ONScripter、Artemis、Siglus（siglus_rs Rust 运行时）、RealLive / AVG32 / UK2（siglus_rs game_launcher 软渲染运行时）、FVP（rfvp Rust 运行时）、System35（xsystem35）、Ethornell / BGI（实验接入，兼容性未验收）、Tyrano 网页壳）。RPG Maker MV/MZ 由内置 Web 运行环境承载。
+随 App 分发、无需外置安装的引擎运行时（Kirikiroid2 / krkrsdl3、ONScripter、Artemis、Siglus（siglus_rs Rust 运行时）、RealLive / AVG32 / UK2（siglus_rs game_launcher 软渲染运行时）、FVP（rfvp Rust 运行时）、System35（xsystem35）、System4（xsystem4，与 System35 共用 libSDL2x）、Ethornell / BGI（实验接入，兼容性未验收）、Tyrano 网页壳）。RPG Maker MV/MZ 由内置 Web 运行环境承载。
 _Avoid_: 预制引擎、捆绑引擎
 
 **Ethornell / BGI（ETHORNELL）**:
 以 ethornell-rs 重实现承载的内置引擎家族，已接入扫描、启动与设置，目前仍属实验运行时，不能据此声明全家族可玩。App 存档管理尚未开放，不能把运行时用户数据与已验证的存档镜像或 PC 存档互通等同。
 _Avoid_: Winlator BGI 插件、完整 BGI 支持
+
+**System3.x / System4（XSYS35 / XSYS4）**:
+AliceSoft 的两代引擎，各为独立的引擎类型（XSYS35 对应 System 3.x，XSYS4 对应 System 4）：目录特征、启动参数与设置互不相同，不合并为一类。
+_Avoid_: System3/4、AliceSoft 引擎
 
 **视觉小说引擎组（Framebuffer 引擎）**:
 Siglus 之外由 game_launcher 运行库承载的三个软件渲染引擎（RealLive、AVG32、UK2）的统称：引擎逐帧输出 RGBA 帧缓冲，宿主 `FramebufferGameActivity` 拷进 Bitmap 呈现并转发指针/键盘/文本输入；文本编码（NLS）按全局/单游戏设置。
@@ -48,6 +52,10 @@ _Avoid_: v0/v1/v2（旧编号）
 同一引擎家族下的可替换底层运行时（KiriKiri 家族：Kirikiroid2 与 krkrsdl3），可在引擎设置中选择。
 _Avoid_: 渲染器、后端
 
+**SDL2 共享运行库（libSDL2x / app32）**:
+System35 与 System4 共用的 SDL2 2.32.10 原生库（`libSDL2x.so`）与重命名 Java 层（`org.libsdl.app32`），与 ONS 的 SDL2 2.26.3（`libSDL2.so` / `org.libsdl.app`）并存、互不替代。
+_Avoid_: SDL 补丁版、第二套 SDL
+
 **补丁 overlay（Patch Overlay）**:
 启动 KiriKiri 游戏时为兼容 Steam 插件等场景生成的虚拟 `patch.tjs` overlay 目录；行为由「自动/强制/关闭」模式控制。
 _Avoid_: 补丁、Hook
@@ -57,7 +65,7 @@ Artemis 启动前对必要文件（system.ini、list_windows、movie 等）进�
 _Avoid_: 自动补丁、提问开关
 
 **标题回写（Title Feedback）**:
-引擎宿主在引擎进程内解析游戏标题并写入共享 prefs（`<engine>_title.<pathHash>`），主 App 在库加载时条件导入为游戏标题；仅当标题仍等于启动前登记的目录名（未被用户改名）时覆盖；Siglus 与 System35 均使用该协议。
+引擎宿主在引擎进程内解析游戏标题并写入共享 prefs（`<engine>_title.<pathHash>`），主 App 在库加载时条件导入为游戏标题；仅当标题仍等于启动前登记的目录名（未被用户改名）时覆盖；Siglus 与 System35 均使用该协议；System4 不使用该协议，标题在扫描期解析 ini 的 `GameName`。
 _Avoid_: 自动改名、元数据抓取
 
 ## 游戏库
@@ -105,7 +113,7 @@ _Avoid_: 设置优先级、全局设置
 _Avoid_: 设置合并、覆盖层
 
 **引擎设置种类（EngineSettingsKind）**:
-引擎设置页的分类入口（KRKR / ONS / ARTEMIS / RPG_MAKER / TYRANO / RENPY / SIGLUS / FRAMEBUFFER / FVP / XSYS35 / ETHORNELL / PPSSPP / WINLATOR），各自提供该引擎族专属参数项。
+引擎设置页的分类入口（KRKR / ONS / ARTEMIS / RPG_MAKER / TYRANO / RENPY / SIGLUS / FRAMEBUFFER / FVP / XSYS35 / XSYS4 / ETHORNELL / PPSSPP / WINLATOR），各自提供该引擎族专属参数项。
 _Avoid_: 引擎设置 Tab
 
 **导航样式（Nav Style）**:

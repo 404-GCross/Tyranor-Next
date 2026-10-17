@@ -86,6 +86,13 @@ internal object GameOverridePartitions {
     const val KEY_XSYS35_RENDERER = "xsys35_renderer"
     const val KEY_XSYS35_INTEGER_SCALE = "xsys35_integer_scale"
     const val KEY_XSYS35_MUTE_UNFOCUS = "xsys35_mute_unfocus"
+    // System4 无独立分区：六项覆盖随 tyrano 分区持久化（与 PerGameSettingsStore.F_XSYS4_* 字面量锚定）
+    const val KEY_XSYS4_SCOPED_SAVE_DIR = "xsys4_scoped_save_dir"
+    const val KEY_XSYS4_ENCODING = "xsys4_encoding"
+    const val KEY_XSYS4_FONT_GOTHIC_PATH = "xsys4_font_gothic_path"
+    const val KEY_XSYS4_FONT_MINCHO_PATH = "xsys4_font_mincho_path"
+    const val KEY_XSYS4_JOYPAD = "xsys4_joypad"
+    const val KEY_XSYS4_MSGSKIP_DELAY = "xsys4_msgskip_delay"
     // Ren'Py 外置模块配置覆盖键（与 PerGameSettingsStore.F_RENPY_* 字面量锚定）
     const val KEY_RENPY_CHEATS = "renpy_cheats"
     const val KEY_RENPY_HW_VIDEO = "renpy_hw_video"
@@ -126,6 +133,9 @@ internal object GameOverridePartitions {
         KEY_FVP_NLS, KEY_FVP_SYSTEM_FONT, KEY_FVP_TEXT_HIDPI, KEY_FVP_FONT,
         KEY_XSYS35_SCOPED_SAVE_DIR, KEY_XSYS35_RENDERER,
         KEY_XSYS35_INTEGER_SCALE, KEY_XSYS35_MUTE_UNFOCUS,
+        KEY_XSYS4_SCOPED_SAVE_DIR, KEY_XSYS4_ENCODING,
+        KEY_XSYS4_FONT_GOTHIC_PATH, KEY_XSYS4_FONT_MINCHO_PATH,
+        KEY_XSYS4_JOYPAD, KEY_XSYS4_MSGSKIP_DELAY,
     )
     // Ren'Py 分区：版本选择 + 外置模块配置，显式建模防止未来收紧分区时丢键
     val RENPY_KEYS: Set<String> = setOf(
