@@ -1,0 +1,26 @@
+plugins { id 'groovy' }
+
+// Use only the Gradle distribution's own APIs and Groovy, including standalone CI invocation.
+dependencies {
+    implementation gradleApi()
+    implementation localGroovy()
+}
+
+sourceSets {
+    graphicsRegression {
+        compileClasspath += sourceSets.main.output
+        runtimeClasspath += sourceSets.main.output
+    }
+}
+configurations {
+    graphicsRegressionImplementation.extendsFrom implementation
+    graphicsRegressionRuntimeOnly.extendsFrom runtimeOnly
+}
+
+tasks.register('graphicsResourcesRegression', JavaExec) {
+    group = 'verification'
+    description = 'Checks graphics contribution ownership and provenance with isolated resource fixtures.'
+    dependsOn tasks.named('graphicsRegressionClasses')
+    classpath = sourceSets.graphicsRegression.runtimeClasspath
+    mainClass = 'VerifyGraphicsResourcesRegression'
+}
