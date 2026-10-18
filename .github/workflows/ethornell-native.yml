@@ -53,7 +53,7 @@ jobs:
           packages: platform-tools
       - name: Install pinned official Linux NDK
         run: sdkmanager "ndk;28.0.13004108"
-      - name: Verify vendored ABI, exact published engine source, ELF and dependencies
+      - name: Verify vendored ABI, artifact hashes, ELF and dependencies (source audit if requested)
         env:
           STRICT_RELEASE: ${{ github.event_name == 'workflow_dispatch' || inputs.strict-release }}
         run: |
@@ -67,7 +67,7 @@ jobs:
             --host-tag linux-x86_64 \
             --report ethornell-native-acceptance.json
           if [[ "$STRICT_RELEASE" != "true" ]]; then
-            echo "::notice::Local static acceptance only; source provenance/reproducibility is PENDING (release_ready=false)."
+            echo "::notice::Static artifact acceptance only; public source was not verified (release_ready=false describes the strict source-audit scope, not automatic release eligibility)."
           fi
       - name: Preserve acceptance evidence even on failure
         if: always()

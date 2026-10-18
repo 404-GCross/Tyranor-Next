@@ -7,10 +7,12 @@
 | 入口 | 实际检查 | 外部源码 | 未提交构建 | 缺正式库 |
 | --- | --- | --- | --- | --- |
 | `Android CI` | Python 单测；构建 manifest/header/library hash；真实 ELF/依赖闭环；构建后的 debug APK 精确字节/闭环 | 不下载、不依赖开发者绝对路径 | 静态通过仍写 `source_status=pending`、`release_ready=false` | **失败** |
-| `Android Beta Release` | 发布前的严格源码 + ELF 门禁；最终每个 release APK 字节/闭环 + `zipalign -c -P 16 -v 4` | 从固定公开 fork 获取 manifest 中的完整 commit SHA；独立枚举版本化策略范围内全部文件 | **失败，禁止自动发布** | **失败** |
-| 手动 `Ethornell Native Acceptance` | 同严格源码 + ELF 门禁（不组装 APK） | 同上 | **失败** | **失败** |
+| `Android Beta Release` | 发布前的 manifest/header/library hash + ELF 门禁；最终每个 release APK 字节/闭环 + `zipalign -c -P 16 -v 4` | 不下载，不要求公开源码或 PR 合并 | 允许真实记录 `dirty=true` 的本地产物；静态检查仍必须通过 | **失败** |
+| 手动 `Ethornell Native Acceptance` | 严格源码 + ELF 审计（不组装 APK） | 从固定公开 fork 获取 manifest 中的完整 commit SHA，核对干净源码及清单哈希 | **失败** | **失败** |
 
-`.github/workflows/ethornell-native.yml` 是复用门禁，`strict-release` 默认 `true`；只有普通 `Android CI` 显式传 `false`，这不是发布通道。发布 job 同时依赖版本变更判定和严格门禁成功；不使用 `continue-on-error`、缺文件条件 skip 或下载 HEAD 兜底。普通 CI 不因 dirty 引擎源码尚未公开而额外拉取失败，但静态本身、正式交付路径缺库、APK 字节变化仍必须失败。
+自 2026-10-18 起，按项目所有者决定，公开源码来源核验不再是自动发布的硬条件：本地编译产物加入 App 后，可在静态验收通过时自动发布，无需先公开准确源码或合并上游 PR。
+
+`.github/workflows/ethornell-native.yml` 是复用门禁，`strict-release` 默认 `true`；普通 `Android CI` 和 `Android Beta Release` 均显式传 `false`。发布 job 依赖版本变更判定和静态门禁成功，每个最终 release APK 也用 `--local-static` 验证；两个发布检查位置都不获取外部源码。手动 `Ethornell Native Acceptance` 仍执行可选的严格来源审计，其失败不阻塞自动发布。不使用 `continue-on-error`、缺文件条件 skip 或下载 HEAD 兜底；静态本身、正式交付路径缺库、APK 字节变化仍必须失败。
 
 证据报告通过 `actions/upload-artifact` 的 `always()` 保留。`if-no-files-found: warn` **仅**控制失败之前尚未生成 JSON 时的证据上传，不改变验证命令失败状态。Gradle 仍使用现有配置缓存设置，无 `--no-configuration-cache` 绕过。
 
@@ -58,11 +60,11 @@ python3 tools/ethornell/verify_provenance.py \
   --report ethornell-debug-apk.json
 ```
 
-`--local-static` 必须提供 NDK 并执行真实 ELF 检查，不能仅凭 manifest 哈希返回“native 通过”。该模式不调用原 CLI 的 `--source-root`，而是复用 `verify_native.py` 的 ELF/符号/16KB/API/依赖检查原语；没有拿 App checkout 冒充引擎。`ok=true` 仅指本次静态范围通过，**永远 `release_ready=false`**，即使 manifest 自称 `dirty=false` 也不改变这个结论。
+`--local-static` 必须提供 NDK 并执行真实 ELF 检查，不能仅凭 manifest 哈希返回“native 通过”。该模式不调用原 CLI 的 `--source-root`，而是复用 `verify_native.py` 的 ELF/符号/16KB/API/依赖检查原语；没有拿 App checkout 冒充引擎。`ok=true` 仅指本次静态范围通过，**永远 `release_ready=false`**，即使 manifest 自称 `dirty=false` 也不改变这个结论。此字段是验证器原有的「严格来源 + ELF」审计结论，不代表当前自动发布资格；自动发布以静态命令成功退出为准，不改写该字段或伪造来源已验证。manifest、真实 dirty 状态、库/头文件哈希和格式检查仍保留。
 
 若需要检查工作区外的开发产物，可显式 `--library /path/to/libethornell.so`、`--provenance /path/to/libethornell.provenance.json`；vendored header 默认仍来自 App 的正式头文件。CI 不配置这些开发机路径。
 
-## 严格源码检查与发布门禁
+## 可选的严格源码审计（不阻塞自动发布）
 
 ```bash
 # 新目录必须尚不存在；仅下载固定 fork 的指定 commit，不执行其中代码。
@@ -77,7 +79,7 @@ python3 tools/ethornell/verify_provenance.py \
 
 ### Runtime builder 的 policy 对接协议
 
-`cargo-workspace-build-inputs-v1` 固定为：路径任何一段属于 `target/dist/raw/.git/testcase/reverse/out`，或扩展名（忽略大小写）属于 `.so/.dll/.exe/.ttf/.ttc/.otf/.arc/.sud/.gdb/.cad/.bcd/.zip/.7z` 时排除，其他 regular 文件全部纳入。builder 可在 dirty 开发模式从 `git ls-files --cached --others --exclude-standard` 收集，**发布仍必须 clean**；strict 从干净 Git tracked 文件独立枚举同一规则，不按 manifest 自报的文件名决定范围。规则变化必须换 policy 版本并一起审查；不要仅更改字段名。
+`cargo-workspace-build-inputs-v1` 固定为：路径任何一段属于 `target/dist/raw/.git/testcase/reverse/out`，或扩展名（忽略大小写）属于 `.so/.dll/.exe/.ttf/.ttc/.otf/.arc/.sud/.gdb/.cad/.bcd/.zip/.7z` 时排除，其他 regular 文件全部纳入。builder 可在 dirty 开发模式从 `git ls-files --cached --others --exclude-standard` 收集，**可选 strict 审计仍必须 clean，自动发布不要求**；strict 从干净 Git tracked 文件独立枚举同一规则，不按 manifest 自报的文件名决定范围。规则变化必须换 policy 版本并一起审查；不要仅更改字段名。
 
 另外 strict 有保守安全断言：
 
@@ -87,7 +89,7 @@ python3 tools/ethornell/verify_provenance.py \
 
 当前外部脚本已经使用上述排除规则，但观察时**尚未声明 policy 字段**；需要 runtime owner 修改其脚本并重建生成，不由 App gate 代填。任意 `build.rs` 文件 I/O、Rust 宏展开生成的依赖、`OUT_DIR` 生成输入和外部 Cargo 依赖源码闭环无法靠这套静态 inventory 证明，明确列为 `not_verified`。含这些用法时，完整可复现验收仍需独立构建输入捕获/隔离重建；这不是无条件自动证明输入闭环。
 
-本地已有精确干净引擎 checkout 时可用 `--source-root /path/to/ethornell-rs` 代替 `--fetch-source`，仍验证上述 root/origin/revision/inventory，拒绝 App 根目录。**仅 `--source-root` 且不传 NDK 是来源一致性检查，绝不是 ELF 验收**；报告没有 `native`、`release_ready=false`。发布 workflow 始终传 NDK 并使用联网获取模式。
+本地已有精确干净引擎 checkout 时可用 `--source-root /path/to/ethornell-rs` 代替 `--fetch-source`，仍验证上述 root/origin/revision/inventory，拒绝 App 根目录。**仅 `--source-root` 且不传 NDK 是来源一致性检查，绝不是 ELF 验收**；报告没有 `native`、`release_ready=false`。自动发布 workflow 始终传 NDK 并使用 `--local-static`；联网来源获取仅用于可选 strict 审计。
 
 `release_ready=true` 仅表示本工具定义的**来源一致性 + ELF 静态发布门禁**均通过，不证明已重建二进制或做过设备验收。新版构建 manifest 已记录命令/rustflags/host/strip 信息，但仍缺完整 pinned Rust toolchain/feature 重现验证、签名 build attestation 和运行时 `build_info` 对照，工具如实列入 `not_verified`；不可把来源哈希吻合写成“可复现构建已验证”。API26/16KB 真设备 RTLD_NOW、ABI 行为、GPU/音频、真实游戏、许可证仍须独立验证。
 

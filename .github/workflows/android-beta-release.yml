@@ -98,7 +98,9 @@ jobs:
     if: needs.detect-version-change.outputs.changed == 'true'
     uses: ./.github/workflows/ethornell-native.yml
     with:
-      strict-release: true
+      # Publish prebuilt local artifacts after static acceptance; public source
+      # availability is an optional audit, not an automatic release prerequisite.
+      strict-release: false
     permissions:
       contents: read
 
@@ -184,7 +186,7 @@ jobs:
           index=0
           for apk in "${apks[@]}"; do
             python3 tools/ethornell/verify_provenance.py \
-              --fetch-source "$RUNNER_TEMP/ethornell-release-source-$index" \
+              --local-static \
               --ndk "$ANDROID_HOME/ndk/28.0.13004108" \
               --host-tag linux-x86_64 \
               --apk "$apk" \

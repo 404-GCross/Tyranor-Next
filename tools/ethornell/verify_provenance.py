@@ -271,7 +271,8 @@ def main():
     group.add_argument("--source-root", type=Path, help="exact clean engine Git checkout, not the App")
     group.add_argument("--fetch-source", type=Path, help="new directory for approved fork at exact manifest SHA")
     group.add_argument("--local-static", action="store_true",
-                       help="source-free development ELF/hash check; always release_ready=false, never release acceptance")
+                        help="source-free ELF/hash check used by automatic publishing; always release_ready=false "
+                             "because strict source provenance is not verified")
     parser.add_argument("--ndk", help="also run native ELF/closure gate with this NDK")
     parser.add_argument("--host-tag", default="linux-x86_64")
     parser.add_argument("--apk", type=Path, help="also verify APK exact runtime bytes/closure (requires --ndk)")
