@@ -311,6 +311,8 @@ final class SiglusStageSize {
             }
             try {
                 String text = decode(bytes, encoding);
+                // Upstream removes the UTF-16LE BOM before probing Gameexe entries.
+                if (text.startsWith("\uFEFF")) text = text.substring(1);
                 int entries = 0;
                 BufferedReader lines = new BufferedReader(new StringReader(text));
                 for (int number = 0; number < 200; number++) {

@@ -134,6 +134,44 @@ public final class SiglusStageSizeTest {
         assertSize(root, 1920, 1080);
     }
 
+    @Test public void plaintextUtf16DatCountsTheFirstEntryAfterABom() throws Exception {
+        File root = game();
+        for (String prefix : new String[]{"", "\uFEFF"}) {
+            for (String suffix : new String[]{"", "#OPTION=1\n"}) {
+                write(root, "Gameexe.dat", (prefix + config(1920, 1080) + suffix)
+                        .getBytes(StandardCharsets.UTF_16LE));
+                assertSize(root, 1920, 1080);
+            }
+        }
+    }
+
+    @Test public void rawCompressedUtf16DatCountsTheFirstEntryAfterABom() throws Exception {
+        File root = game();
+        byte[] text = ("\uFEFF" + config(1600, 900)).getBytes(StandardCharsets.UTF_16LE);
+        write(root, "Gameexe.dat", literalArchive(text));
+        assertSize(root, 1600, 900);
+    }
+
+    @Test public void headerWrappedUtf16DatCountsTheFirstEntryAfterABom() throws Exception {
+        File root = game();
+        for (int mode : new int[]{0, 1}) {
+            write(root, "Gameexe.dat", encrypted("\uFEFF" + config(1280, 720), mode));
+            assertSize(root, 1280, 720);
+        }
+    }
+
+    @Test public void bomDoesNotRelaxEntryThresholdOrRestoreAnInvalidFinalSize() throws Exception {
+        File root = game();
+        for (String text : new String[]{"\uFEFF#TITLE=\"sample\"\n#SCREEN_SIZE=1920,1080\n",
+                "\uFEFF" + config(1920, 1080) + "#SCREEN_SIZE=invalid,1080\n"}) {
+            byte[] plain = text.getBytes(StandardCharsets.UTF_16LE);
+            for (byte[] bytes : new byte[][]{plain, literalArchive(plain), encrypted(text, 0), encrypted(text, 1)}) {
+                write(root, "Gameexe.dat", bytes);
+                assertNull(SiglusStageSize.read(root));
+            }
+        }
+    }
+
     @Test public void truncationAndUntrustedOutputSizeCannotProduceAStage() throws Exception {
         File root = game();
         byte[] valid = encrypted(config(1920, 1080), 1);
