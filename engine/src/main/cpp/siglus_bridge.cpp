@@ -67,7 +67,7 @@ static std::once_flag g_api_once;
 static void* g_lib_handle = nullptr;
 
 // The shim owns the fromSurface reference until Rust drops its corresponding
-// surface. Engine-handle calls are serialized by the dedicated owner thread;
+// surface. Handle calls stay on their selected Java owner (direct UI or filter worker);
 // the mutex protects lookup by late Java callbacks, never a call into Rust.
 static std::mutex g_window_mutex;
 static std::unordered_map<void*, ANativeWindow*> g_windows;
@@ -160,7 +160,7 @@ static JNIEnv* get_env(bool* attached) {
     return nullptr;
 }
 
-// Runs on the dedicated engine thread that stepped the VM.
+// Runs on the selected Java owner thread that stepped the VM.
 static void messagebox_trampoline(void* user_data,
                                   uint64_t request_id,
                                   int32_t kind,

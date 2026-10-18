@@ -10,25 +10,16 @@ import android.view.Surface;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Sole owner of every live-handle JNI call. BufferQueue backpressure may block
  * step(), but never the UI or the independent GLES consumer. A silent step is
  * allowed: the unmodified ABI does not promise that each step presents a frame.
  */
-final class SiglusEngineThread {
-    interface Listener {
-        void onCreated(boolean success, boolean cancelled, int windowGeneration);
-        void onConnected(long request, boolean success, int windowGeneration);
-        void onStepped(int status, boolean imeNeeded, int[] imeArea);
-        void onBlocked();
-        void onFailure(RuntimeException failure);
-    }
-
+final class SiglusEngineThread implements SiglusHost {
     private static final String TAG = "SiglusEngineThread";
     private static final long OPERATION_WARNING_MS = 10000L;
-    private static final AtomicBoolean PROCESS_OWNER = new AtomicBoolean();
+    private final SiglusEngineAdmission.Permit processOwner;
     // Failed native destruction must retain the producer's consumer as well;
     // releasing it on a different thread would invalidate a still-live handle.
     private static final List<SiglusEngineThread> RETAINED_OWNERS = new ArrayList<>();
@@ -51,19 +42,20 @@ final class SiglusEngineThread {
     SiglusEngineThread(Context context, Listener listener) {
         this.context = context.getApplicationContext();
         this.listener = listener;
-        if (!PROCESS_OWNER.compareAndSet(false, true))
+        processOwner = SiglusEngineAdmission.PROCESS.acquire();
+        if (processOwner == null)
             throw new IllegalStateException("Previous Siglus owner has not stopped");
         try {
             thread.start();
             worker = new Handler(thread.getLooper());
         } catch (RuntimeException | Error failure) {
             try { thread.quitSafely(); }
-            finally { PROCESS_OWNER.set(false); }
+            finally { processOwner.release(); }
             throw failure;
         }
     }
 
-    boolean matchesHandle(long value) { return !closed && value != 0L && handle == value; }
+    @Override public boolean matchesHandle(long value) { return !closed && value != 0L && handle == value; }
 
     void create(Surface surface, int width, int height, double scale, String directory,
                 String language, int generation) {
@@ -155,7 +147,7 @@ final class SiglusEngineThread {
         return null;
     }
 
-    boolean step(int dtMs) {
+    @Override public boolean step(int dtMs) {
         if (!steps.reserve()) return false;
         if (!worker.post(() -> {
             if (!steps.begin()) return;
@@ -175,19 +167,19 @@ final class SiglusEngineThread {
         return true;
     }
 
-    void touch(int phase, double x, double y) {
+    @Override public void touch(int phase, double x, double y) {
         lastPointerX = x; lastPointerY = y;
         postInput(() -> NativeSiglus.touch(handle, phase, x, y));
     }
-    void keyEvent(int keyCode, String text, boolean repeat) {
+    @Override public void keyEvent(int keyCode, String text, boolean repeat) {
         // Preserve the original mobile key_event semantics; no extra key ABI.
         postInput(() -> NativeSiglus.keyEvent(handle, keyCode, text, repeat));
     }
-    void textInput(String text) { postInput(() -> NativeSiglus.textInput(handle, text)); }
-    void imePreedit(String text, int start, int end) {
+    @Override public void textInput(String text) { postInput(() -> NativeSiglus.textInput(handle, text)); }
+    @Override public void imePreedit(String text, int start, int end) {
         postInput(() -> NativeSiglus.imePreedit(handle, text, start, end));
     }
-    void submitMessagebox(long engineHandle, long requestId, long value) {
+    @Override public void submitMessagebox(long engineHandle, long requestId, long value) {
         if (closed || messageboxReplyPending) return;
         // Siglus exposes one native modal request at a time. Its reply has a
         // reserved queue slot and cannot be dropped by ordinary input saturation.
@@ -288,7 +280,7 @@ final class SiglusEngineThread {
     }
 
     /** Stops admission immediately; destruction stays behind any running JNI call. */
-    void close(Runnable afterStopped) {
+    @Override public void close(Runnable afterStopped) {
         if (closed) return;
         closed = true;
         listener = null;
@@ -302,7 +294,7 @@ final class SiglusEngineThread {
                 handle = 0L;
                 if (boundSurface != null) boundSurface.release();
                 boundSurface = boundSource = null;
-                PROCESS_OWNER.set(false);
+                processOwner.release();
                 Runnable completion = releaseAfterStop;
                 releaseAfterStop = null;
                 if (completion != null) main.post(completion);

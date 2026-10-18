@@ -150,7 +150,7 @@
             <meta-data android:name="android.app.lib_name" android:value="artemis_loader" />
         </activity>
 
-        <!-- SiglusEngine（siglus_rs）宿主：TextureView 显示 + 私有 producer，由独立线程驱动 Rust 引擎 -->
+        <!-- SiglusEngine（siglus_rs）宿主：关闭滤镜沿用 SurfaceView；开启滤镜使用 TextureView + 私有 producer -->
         <activity
             android:name="com.core.siglus.SiglusActivity"
             android:exported="false"

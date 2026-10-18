@@ -16,6 +16,8 @@ import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.Surface;
+import android.view.SurfaceHolder;
+import android.view.SurfaceView;
 import android.graphics.SurfaceTexture;
 import android.view.TextureView;
 import android.view.View;
@@ -50,13 +52,15 @@ import java.util.Set;
 /**
  * SiglusEngine（siglus_rs）宿主 Activity。
  *
- * <p>Java 持有 TextureView 显示窗口租约与 Choreographer 时钟，独立线程串行驱动 Rust 引擎
+ * <p>关闭滤镜时沿用 SurfaceView + 主线程同步驱动；开启有效滤镜链时使用 TextureView
+ * 显示窗口租约、私有 producer 与独立引擎线程。两种模式共用输入、IME 和生命周期外壳。
  * 经 {@code siglus_android_*} C ABI 被逐步驱动。差异点：游戏路径/语言/回写键取自
  * {@link LaunchContract} extras，消息框复用 engine 既有文案资源，IME 与键事件按
  * TyranorNext 契约转发。
  */
 public final class SiglusActivity extends AppCompatActivity implements
         TextureView.SurfaceTextureListener,
+        SurfaceHolder.Callback,
         Choreographer.FrameCallback,
         View.OnTouchListener,
         SiglusTextInputView.Listener,
@@ -80,14 +84,19 @@ public final class SiglusActivity extends AppCompatActivity implements
     private static final int MAX_FRAME_DT_MS = 250;
 
     private FrameLayout rootLayout;
-    private TextureView surfaceView;
+    private View surfaceView;
+    private boolean filterMode;
+    private GraphicsFilterChain requestedChain;
+    private final Handler main = new Handler(Looper.getMainLooper());
     private SurfaceTexture displayTexture;
     private SiglusWindowLease displayWindow;
     private final Runnable capacityAvailable = this::acquireDisplayWindow;
     private SiglusTextInputView textInputView;
     private View loadingOverlay;
 
-    private SiglusEngineThread engine;
+    private SiglusHost engine;
+    private SiglusEngineThread filteredEngine;
+    private SiglusDirectHost directEngine;
     private boolean engineReady, engineCreating, windowAvailable;
     private int surfaceGeneration;
     private long surfaceConnectionRequest;
@@ -115,6 +124,10 @@ public final class SiglusActivity extends AppCompatActivity implements
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        requestedChain = SiglusHostPolicy.requestedChain(
+                getIntent().getBooleanExtra(LaunchContract.GRAPHICS_FILTER_ENABLED, false),
+                getIntent().getStringExtra(LaunchContract.GRAPHICS_FILTER_CHAIN));
+        filterMode = requestedChain != null;
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         setContentView(buildContentView());
 
@@ -134,15 +147,21 @@ public final class SiglusActivity extends AppCompatActivity implements
 
         NativeSiglus.setMessageboxListener(this);
         try {
-            engine = new SiglusEngineThread(this, new SiglusEngineThread.Listener() {
+            SiglusHost.Listener listener = new SiglusHost.Listener() {
                 @Override public void onCreated(boolean success, boolean cancelled, int generation) {
                     engineCreating = false;
                     if (!success) {
-                        Log.e(TAG, "Private-producer engine creation failed");
+                        Log.e(TAG, "Engine creation failed");
                         failInitialization();
                         return;
                     }
                     engineReady = true;
+                    if (!filterMode) {
+                        surfaceReady = windowAvailable && generation == surfaceGeneration;
+                        writeBackGameTitleAsync();
+                        maybeStartFrameLoop();
+                        return;
+                    }
                     graphicsProxy.activate();
                     attachDisplay();
                     prepareGraphics();
@@ -150,11 +169,19 @@ public final class SiglusActivity extends AppCompatActivity implements
                     maybeStartFrameLoop();
                 }
                 @Override public void onConnected(long request, boolean success, int generation) {
-                    completeSurfaceConnection(request, success);
+                    if (!filterMode) {
+                        // Direct JNI and its ACK complete inside the UI callback;
+                        // there is no pending request-number assignment to race.
+                        surfaceReady = success && windowAvailable && generation == surfaceGeneration;
+                        if (!success) Toast.makeText(SiglusActivity.this, uiString(R.string.engine_launch_failed),
+                                Toast.LENGTH_LONG).show();
+                        maybeStartFrameLoop();
+                    } else completeSurfaceConnection(request, success);
                 }
                 @Override public void onStepped(int status, boolean imeNeeded, int[] area) {
-                    if (status > 0) { finish(); return; }
+                    if (status > 0) { stopFrameLoop(); finish(); return; }
                     if (status < 0) { faulted = true; stopFrameLoop(); return; }
+                    if (!filterMode) hideLoadingOverlay();
                     if (resumed) updateImeState(imeNeeded, area);
                 }
                 @Override public void onBlocked() {
@@ -170,15 +197,24 @@ public final class SiglusActivity extends AppCompatActivity implements
                     faulted = true;
                     stopFrameLoop();
                 }
-            });
+            };
+            if (filterMode) {
+                filteredEngine = new SiglusEngineThread(this, listener);
+                engine = filteredEngine;
+            } else {
+                directEngine = new SiglusDirectHost(this, listener);
+                engine = directEngine;
+            }
         } catch (RuntimeException failure) {
             Log.e(TAG, "Engine owner unavailable", failure);
             finish();
             return;
         }
 
-        SiglusWindowLease.observeCapacity(capacityAvailable);
-        surfaceView.setSurfaceTextureListener(this);
+        if (filterMode) {
+            SiglusWindowLease.observeCapacity(capacityAvailable);
+            ((TextureView) surfaceView).setSurfaceTextureListener(this);
+        } else ((SurfaceView) surfaceView).getHolder().addCallback(this);
         surfaceView.setOnTouchListener(this);
         surfaceView.setFocusable(true);
         surfaceView.setFocusableInTouchMode(true);
@@ -192,7 +228,7 @@ public final class SiglusActivity extends AppCompatActivity implements
         rootLayout = new FrameLayout(this);
         rootLayout.setBackgroundColor(Color.BLACK);
 
-        surfaceView = new TextureView(this);
+        surfaceView = filterMode ? new TextureView(this) : new SurfaceView(this);
         rootLayout.addView(surfaceView, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
@@ -247,8 +283,10 @@ public final class SiglusActivity extends AppCompatActivity implements
         super.onResume();
         resumed = true;
         applyImmersive();
-        acquireDisplayWindow();
-        attachDisplay();
+        if (filterMode) {
+            acquireDisplayWindow();
+            attachDisplay();
+        }
         maybeStartFrameLoop();
     }
 
@@ -266,7 +304,7 @@ public final class SiglusActivity extends AppCompatActivity implements
     protected void onDestroy() {
         destroying = true;
         resumed = false;
-        SiglusWindowLease.stopObservingCapacity(capacityAvailable);
+        if (filterMode) SiglusWindowLease.stopObservingCapacity(capacityAvailable);
         stageSizeRequest++;
         if (stageSizeWorker != null) { stageSizeWorker.interrupt(); stageSizeWorker = null; }
         stopFrameLoop();
@@ -274,8 +312,8 @@ public final class SiglusActivity extends AppCompatActivity implements
         hideIme();
         NativeSiglus.setMessageboxListener(null);
         destroyEngine(); // Native producer destruction precedes consumer disposal.
-        // Keep the TextureView listener and its UI lease until the framework
-        // calls onSurfaceTextureDestroyed; onDestroy alone does not end View use.
+        // In filter mode keep the TextureView listener and UI lease until
+        // onSurfaceTextureDestroyed; onDestroy alone does not end View use.
         super.onDestroy();
     }
 
@@ -318,6 +356,52 @@ public final class SiglusActivity extends AppCompatActivity implements
         });
     }
 
+    // ---------- Original direct SurfaceView path ----------
+
+    @Override public void surfaceCreated(@NonNull SurfaceHolder holder) {
+        if (filterMode || destroying || directEngine == null) return;
+        surfaceGeneration++;
+        windowAvailable = true;
+        surfaceReady = false;
+        stopFrameLoop();
+        if (engineReady) directEngine.connect(holder.getSurface(), surfaceWidth(holder), surfaceHeight(holder), surfaceGeneration);
+        else ensureDirectEngine(holder);
+        maybeStartFrameLoop();
+    }
+
+    @Override public void surfaceChanged(@NonNull SurfaceHolder holder, int format, int width, int height) {
+        if (filterMode || destroying || directEngine == null) return;
+        if (!engineReady) ensureDirectEngine(holder);
+        else directEngine.resize(Math.max(1, width), Math.max(1, height));
+    }
+
+    @Override public void surfaceDestroyed(@NonNull SurfaceHolder holder) {
+        if (filterMode) return;
+        surfaceGeneration++;
+        windowAvailable = surfaceReady = false;
+        stopFrameLoop();
+        cancelPointer();
+        // Every JNI render/create/set_surface/resize completed on this same UI
+        // thread before this callback; the worker never receives this window.
+    }
+
+    private int surfaceWidth(SurfaceHolder holder) {
+        Rect frame = holder.getSurfaceFrame();
+        return Math.max(1, frame == null ? surfaceView.getWidth() : frame.width());
+    }
+    private int surfaceHeight(SurfaceHolder holder) {
+        Rect frame = holder.getSurfaceFrame();
+        return Math.max(1, frame == null ? surfaceView.getHeight() : frame.height());
+    }
+
+    private void ensureDirectEngine(SurfaceHolder holder) {
+        if (filterMode || engineReady || engineCreating || destroying || directEngine == null || !windowAvailable) return;
+        engineCreating = true;
+        directEngine.create(holder.getSurface(), surfaceWidth(holder), surfaceHeight(holder),
+                getResources().getDisplayMetrics().density, gameRoot,
+                getIntent().getStringExtra(LaunchContract.SIGLUS_LANGUAGE), surfaceGeneration);
+    }
+
     // ---------- Display leases and private producer ----------
 
     @Override public void onSurfaceTextureAvailable(@NonNull SurfaceTexture texture, int width, int height) {
@@ -328,7 +412,7 @@ public final class SiglusActivity extends AppCompatActivity implements
     }
 
     private void acquireDisplayWindow() {
-        if (destroying || !windowAvailable || displayTexture == null || displayWindow != null) return;
+        if (!filterMode || destroying || !windowAvailable || displayTexture == null || displayWindow != null) return;
         try { displayWindow = SiglusWindowLease.acquire(displayTexture); }
         catch (RuntimeException failure) { Log.w(TAG, "Display lease unavailable", failure); return; }
         if (displayWindow == null) {
@@ -392,9 +476,9 @@ public final class SiglusActivity extends AppCompatActivity implements
     }
 
     private void prepareStartupProducer() {
-        if (engine == null || graphicsProxy != null || destroying || displayWindow == null) return;
+        if (!filterMode || filteredEngine == null || graphicsProxy != null || destroying || displayWindow == null) return;
         try {
-            // Even disabled filters or missing key.toml use a private producer.
+            // Only enabled filter mode uses this producer, even before a trusted stage is available.
             // Its screen-sized copy is never advertised as a measured raw stage.
             graphicsProxy = createProxy(GraphicsFilterChain.parse("v1:"), surfaceWidth(), surfaceHeight(), false);
             proxyPreparing = true;
@@ -413,7 +497,7 @@ public final class SiglusActivity extends AppCompatActivity implements
                     engineCreating = true;
                     proxyPreparing = false;
                     DisplayMetrics metrics = getResources().getDisplayMetrics();
-                    engine.create(producer, width, height, metrics.density, gameRoot,
+                    filteredEngine.create(producer, width, height, metrics.density, gameRoot,
                             getIntent().getStringExtra(LaunchContract.SIGLUS_LANGUAGE), surfaceGeneration);
                 } else if (proxy == pendingGraphicsProxy && engineReady) {
                     // Only the old GLES owner can disconnect its display EGL
@@ -457,7 +541,7 @@ public final class SiglusActivity extends AppCompatActivity implements
         if (destroying || pendingGraphicsProxy != proxy || engine == null) return;
         if (!detached) { pausePresentation(proxy); return; }
         proxyAttached = true; // May reach native before the ACK.
-        surfaceConnectionRequest = engine.setSurface(producer, width, height, surfaceGeneration);
+        surfaceConnectionRequest = filteredEngine.setSurface(producer, width, height, surfaceGeneration);
     }
 
     private void handleProxyFailure(SiglusGraphicsProxy proxy) {
@@ -507,14 +591,12 @@ public final class SiglusActivity extends AppCompatActivity implements
     }
 
     private void prepareGraphics() {
-        GraphicsFilterChain chain = GraphicsFilterChain.parse(
-                getIntent().getStringExtra(LaunchContract.GRAPHICS_FILTER_CHAIN));
-        if (!getIntent().getBooleanExtra(LaunchContract.GRAPHICS_FILTER_ENABLED, false)
-                || chain == null || !chain.hasActive()) return;
+        if (!filterMode || filteredEngine == null) return;
+        GraphicsFilterChain chain = requestedChain;
         // create() may have generated key.toml. Decode only after it succeeds,
         // off the engine/UI thread; the VM keeps its private copy producer meanwhile.
         final File directory = new File(gameRoot);
-        final SiglusEngineThread engineOwner = engine;
+        final SiglusEngineThread engineOwner = filteredEngine;
         final int request = ++stageSizeRequest;
         final Handler main = new Handler(Looper.getMainLooper());
         final WeakReference<SiglusActivity> owner = new WeakReference<>(this);
@@ -571,8 +653,10 @@ public final class SiglusActivity extends AppCompatActivity implements
         SiglusGraphicsProxy producerOwner = graphicsProxy;
         SiglusGraphicsProxy candidateOwner = pendingGraphicsProxy;
         graphicsProxy = pendingGraphicsProxy = null;
-        SiglusEngineThread owner = engine;
+        SiglusHost owner = engine;
         engine = null;
+        filteredEngine = null;
+        directEngine = null;
         engineReady = engineCreating = false;
         if (producerOwner != null) {
             producerOwner.stopObserving();
@@ -598,7 +682,7 @@ public final class SiglusActivity extends AppCompatActivity implements
     }
 
     private boolean canStep() {
-        return resumed && !destroying && !faulted && engineReady && engine != null && surfaceReady
+        return resumed && !destroying && !isFinishing() && !faulted && engineReady && engine != null && surfaceReady
                 && !proxyPreparing && !proxyFailed;
     }
 
@@ -638,10 +722,11 @@ public final class SiglusActivity extends AppCompatActivity implements
             dtMs = MAX_FRAME_DT_MS;
         }
 
-        // At most one queued/in-flight owner step. A step without a produced
-        // buffer still completes, so load/script Frame boundaries can advance.
+        // Filter mode admits at most one queued/in-flight owner step; direct
+        // mode completes the upstream synchronous step before this call returns.
         engine.step(dtMs);
-        Choreographer.getInstance().postFrameCallback(this);
+        // Direct step/IME callbacks run synchronously and may stop the loop.
+        if (running && canStep()) Choreographer.getInstance().postFrameCallback(this);
     }
 
     // ---------- 输入 ----------
@@ -854,7 +939,9 @@ public final class SiglusActivity extends AppCompatActivity implements
 
     @Override
     public void onMessagebox(long engineHandle, long requestId, int kind, String title, String message) {
-        runOnUiThread(() -> showMessagebox(engineHandle, requestId, kind, title, message));
+        // Always enqueue, even for the direct main-thread owner: returning from
+        // the native callback must precede any reply that re-enters the VM.
+        main.post(() -> showMessagebox(engineHandle, requestId, kind, title, message));
     }
 
     private void showMessagebox(long engineHandle, long requestId, int kind, String title, String message) {
