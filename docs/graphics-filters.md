@@ -36,31 +36,36 @@ Kirikiroid2 1.2.6 使用独立的公共 Cocos 接口适配：其 `UpdateDrawBuff
 
 ### Siglus
 
-保持上游 main `740d7c13` 打包的 `libsiglus.so` 原文件。引擎从创建开始只连接宿主自有的离屏
-producer；TextureView 显示窗口由独立 GLES owner 呈现，不传入原生引擎。关闭滤镜或配置不可用
-时也经过显示拷贝；启动拷贝的请求尺寸不标为可信原始舞台。
+保持上游 main `740d7c13` 打包的 `libsiglus.so` 原文件。启动时根据生效开关和解析后的有效
+滤镜链选定路径，同一游戏实例运行期间不迁移句柄或切换原生调用线程。
 
-原生引擎创建成功、按其既有流程必要时生成 `key.toml` 后，宿主后台只读可选密钥和首启动实际
-选中的 Gameexe 配置，取得最终 `SCREEN_SIZE`。需要游戏密钥的加密模式缺少 key 时拒绝；明文
-或固定 mask 模式不强制 key。通过现有 `set_surface/resize` 请求同尺寸输出后执行共享滤镜链。
-宿主不恢复密钥、读取 EXE 或汉化 `.chs`，不写游戏目录，也不猜默认舞台尺寸。
+- **关闭滤镜、空链或无效链**：恢复上游 SurfaceView 与主线程同步 JNI/Choreographer 逻辑。
+  创建、窗口重挂、resize、步进与输入在主线程执行；窗口销毁只停帧并保留游戏 VM，Activity
+  销毁才销毁引擎。没有新增 TextureView、宿主 GLES 管线、私有 producer、显示拷贝或舞台配置
+  读取任务；继续保留上游同步调用可能阻塞 UI 的既有特征。
+- **开启有效滤镜链**：才创建 TextureView、私有 producer 和独立 engine/GLES owner。
+  native 从创建开始只接触私有 producer，已接管的显示窗口使用有界租约并承担最终释放。
+  不能将该线程持有的显示窗口重新混入上游 SurfaceHolder 路径。
 
-启动 producer → 舞台 producer 交接先由旧 GLES owner 确认断开显示 EGLSurface，再由引擎 owner
-确认替换私有 producer，最后连接当时最新的显示窗口。迟到的连接确认不依赖发起时的旧窗口世代。
-生命周期控制使用独立合并槽，不能被普通输入配额挤掉；显示连接和首帧回调均检查当前世代。
+两种宿主共用进程级原生实例准入；未结束或永久阻塞的旧 owner 不允许另一模式启动第二个
+原生引擎。消息框先异步投递主线程，校验当前 owner/句柄后处理，避免同步 native 回调中重入。
+输入、IME、标题回写和应用设置协议仍在同一 Activity 复用，不复制整份宿主页面。
 
-TextureView 销毁回调对已接管的窗口返回 false，由客户端负责最终释放。UI、待执行/执行中命令、
-已连接 EGL 与故障保留各自持有引用，最后一个引用释放后才销毁 Surface 和 SurfaceTexture；
-Activity 回调不等待 GPU 或 native。窗口租约进程上限为四个，GLES owner 共用既有两个资源席位。
-永久驱动失败会保留有界资源并停止呈现，不能保证故障驱动自动恢复。
+滤镜路径在 create 成功后后台只读可选 `key.toml` 和首启动实际选中的 Gameexe 配置，取得最终
+`SCREEN_SIZE`；需要游戏密钥的模式缺 key 时拒绝，明文或固定 mask 模式不强制 key。
+通过现有 `set_surface/resize` 请求同尺寸输出后执行共享滤镜链。舞台候选交接前先由旧 GLES
+owner 确认断开显示，再由 engine owner 确认替换私有 producer，最后连接当时最新的显示窗口。
+生命周期控制不占普通输入配额，Ready/首帧回调核验世代，原先三项 P2 修复继续适用于滤镜路径。
 
-该路线增加 Siglus 关闭滤镜时的 GLES 3.0 / external OES 兼容性要求和显示拷贝开销；启动消费者
-初始化失败提示既有初始化错误并结束，不回退到不安全的原生直连屏幕。舞台候选初始化失败且
-未交给 native 时可继续健康的启动拷贝。旧候选的实机验收不覆盖此次窗口架构改动。
+仅已启用的滤镜路径增加 GLES3/external OES 依赖及拷贝开销。缺少可信配置时保持该路径的
+私有启动拷贝，不在运行中退回原版或迁移句柄线程；启动拷贝尺寸不标为原始舞台。
+启动消费者不可用时提示初始化失败并结束；未交给 native 的舞台候选准备失败可继续健康的
+启动拷贝。永久驱动失败仅保留有界资源，不承诺自动恢复。
 
-不再依赖新增舞台几何 ABI，不重编或替换上游引擎库；固定 XOR 表的来源及 MPL 许可单独保留。
-此处尺寸来自配置和原接口契约，不宣称回读库内部 viewport。详见
-[原库接入说明](../engine/patches/siglus/README.md) 与 [本轮审查报告](reviews/PR108-siglus-window-review-20261019.md)。
+宿主不恢复密钥、读取 EXE/汉化 `.chs`，不写游戏目录，也不猜默认舞台尺寸。
+尺寸来自配置和原接口契约，不宣称回读库内部 viewport；不重编引擎、不新增舞台 ABI。
+详见 [原库接入说明](../engine/patches/siglus/README.md) 与
+[关闭滤镜路径复核](reviews/PR108-siglus-disabled-review-20261019.md)。本轮没有新的实机验收。
 
 ### 官方 Artemis
 
