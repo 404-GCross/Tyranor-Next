@@ -36,18 +36,31 @@ Kirikiroid2 1.2.6 使用独立的公共 Cocos 接口适配：其 `UpdateDrawBuff
 
 ### Siglus
 
-保持上游 main `740d7c13` 打包的 `libsiglus.so` 原文件。原生引擎创建成功、按其既有流程生成
-`key.toml` 后，宿主后台只读密钥和首启动选中的 Gameexe 配置，取得实际 `SCREEN_SIZE`，
-通过现有 `set_surface/resize` 请求同尺寸输出，交给共享滤镜链处理。宿主不破解密钥、读取 EXE
-或汉化 `.chs`，不写游戏目录，也不猜默认尺寸。配置选择、解码或边界无法确认时保留原呈现。
+保持上游 main `740d7c13` 打包的 `libsiglus.so` 原文件。引擎从创建开始只连接宿主自有的离屏
+producer；TextureView 显示窗口由独立 GLES owner 呈现，不传入原生引擎。关闭滤镜或配置不可用
+时也经过显示拷贝；启动拷贝的请求尺寸不标为可信原始舞台。
+
+原生引擎创建成功、按其既有流程必要时生成 `key.toml` 后，宿主后台只读可选密钥和首启动实际
+选中的 Gameexe 配置，取得最终 `SCREEN_SIZE`。需要游戏密钥的加密模式缺少 key 时拒绝；明文
+或固定 mask 模式不强制 key。通过现有 `set_surface/resize` 请求同尺寸输出后执行共享滤镜链。
+宿主不恢复密钥、读取 EXE 或汉化 `.chs`，不写游戏目录，也不猜默认舞台尺寸。
+
+启动 producer → 舞台 producer 交接先由旧 GLES owner 确认断开显示 EGLSurface，再由引擎 owner
+确认替换私有 producer，最后连接当时最新的显示窗口。迟到的连接确认不依赖发起时的旧窗口世代。
+生命周期控制使用独立合并槽，不能被普通输入配额挤掉；显示连接和首帧回调均检查当前世代。
+
+TextureView 销毁回调对已接管的窗口返回 false，由客户端负责最终释放。UI、待执行/执行中命令、
+已连接 EGL 与故障保留各自持有引用，最后一个引用释放后才销毁 Surface 和 SurfaceTexture；
+Activity 回调不等待 GPU 或 native。窗口租约进程上限为四个，GLES owner 共用既有两个资源席位。
+永久驱动失败会保留有界资源并停止呈现，不能保证故障驱动自动恢复。
+
+该路线增加 Siglus 关闭滤镜时的 GLES 3.0 / external OES 兼容性要求和显示拷贝开销；启动消费者
+初始化失败提示既有初始化错误并结束，不回退到不安全的原生直连屏幕。舞台候选初始化失败且
+未交给 native 时可继续健康的启动拷贝。旧候选的实机验收不覆盖此次窗口架构改动。
 
 不再依赖新增舞台几何 ABI，不重编或替换上游引擎库；固定 XOR 表的来源及 MPL 许可单独保留。
-当前路线按配置和原接口尺寸契约取得原始尺度，不能回读库内部 viewport。所有同句柄调用转入专用引擎线程，
-由独立 GLES 线程消费画面和输出队列自然背压，正常无绘制 step 可继续推进；不再依赖帧序号或因没有新帧而关闭滤镜。
-详细格式范围、原库哈希、同步限制和旧方案撤回清单见 [Siglus 原库接入说明](../engine/patches/siglus/README.md)。
-
-暂停及窗口销毁仅停止步进并异步解绑输出，不在 Activity 回调里等待 GPU。准备或恢复失败保持当前游戏实例，
-根据 SurfaceHolder 世代恢复原有连接；配置读取的迟到结果不能接管已销毁或替换的引擎实例。
+此处尺寸来自配置和原接口契约，不宣称回读库内部 viewport。详见
+[原库接入说明](../engine/patches/siglus/README.md) 与 [本轮审查报告](reviews/PR108-siglus-window-review-20261019.md)。
 
 ### 官方 Artemis
 
@@ -121,7 +134,7 @@ python tools/generate-cas-filters.py --sources build/filter-sources/cas --check
 
 既有滤镜设置、官方 Artemis、Kirikiroid2 和 krkrsdl3 接入由提交者运行多个样本验收；
 官方 Artemis 开启画质处理实际游玩两小时未见问题。上述记录属于原候选功能的历史验收。
-Siglus 原库、配置解析和专用 owner 线程路线已在 2026-10-18 获提交者测试通过；该结论对应原库候选，不套用旧重编库结果。
+Siglus 原库、配置解析和专用 owner 线程路线候选在 2026-10-18 获提交者测试通过；该结论不覆盖后续 TextureView 窗口所有权修复，也不套用旧重编库结果。
 本轮只通过 CI 执行项目测试与构建，具体候选 SHA 和运行链接记录在本地交付索引。
 
 完整静态复核见 [新基线与原库接入审查报告](reviews/PR108-keytoml-review-20261018.md)。
