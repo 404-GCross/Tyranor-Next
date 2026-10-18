@@ -37,17 +37,15 @@ final class SiglusEngineThread {
     private final HandlerThread thread = new HandlerThread("Siglus-engine");
     private final Handler worker;
     private final SiglusStepDispatch steps = new SiglusStepDispatch();
+    private final SiglusLatestControl<SiglusLatestControl.Command> controls = new SiglusLatestControl<>();
     private volatile Listener listener;
-    private volatile boolean closed, windowAvailable, queueWarning, messageboxReplyPending;
+    private volatile boolean closed, queueWarning, messageboxReplyPending;
     private volatile double lastPointerX, lastPointerY;
-    private volatile int windowGeneration;
     private volatile long handle, connectionRequest, activeOperation;
     private long nextOperation;
     // Owner-thread state. Hold Java Surface wrappers until the corresponding
     // native window is replaced/destroyed, including delayed close after step().
     private Surface boundSurface, boundSource;
-    private int boundWindowGeneration = -1;
-    private boolean boundDirect;
     private Runnable releaseAfterStop;
 
     SiglusEngineThread(Context context, Listener listener) {
@@ -65,11 +63,6 @@ final class SiglusEngineThread {
         }
     }
 
-    void windowState(int generation, boolean available) {
-        windowGeneration = generation;
-        windowAvailable = available;
-    }
-
     boolean matchesHandle(long value) { return !closed && value != 0L && handle == value; }
 
     void create(Surface surface, int width, int height, double scale, String directory,
@@ -79,9 +72,9 @@ final class SiglusEngineThread {
             created(false, surface == null || !surface.isValid(), generation);
             return;
         }
-        postCommand(() -> {
+        postControl(() -> {
             try {
-                if (!windowCurrent(generation) || !target.isValid()) {
+                if (!target.isValid()) {
                     created(false, true, generation);
                     return;
                 }
@@ -94,8 +87,6 @@ final class SiglusEngineThread {
                 if (handle != 0L) {
                     boundSurface = target;
                     boundSource = surface;
-                    boundDirect = true;
-                    boundWindowGeneration = generation;
                     NativeSiglus.setNativeMessageboxCallback(handle);
                 }
                 created(handle != 0L, false, generation);
@@ -110,26 +101,24 @@ final class SiglusEngineThread {
         deliver(callback -> callback.onCreated(success, cancelled, generation));
     }
 
-    long setSurface(Surface surface, int width, int height, boolean direct, int generation) {
+    long setSurface(Surface surface, int width, int height, int generation) {
         final long request = ++connectionRequest;
         final Surface target = snapshot(surface);
         if (target == null) {
             deliver(callback -> callback.onConnected(request, false, generation));
             return request;
         }
-        if (!postCommand(() -> {
+        postControl(() -> {
             try {
-                if (handle == 0L || request != connectionRequest || !target.isValid()
-                        || (direct && !windowCurrent(generation))) {
+                if (handle == 0L || request != connectionRequest || !target.isValid()) {
                     deliver(callback -> callback.onConnected(request, false, generation));
                     return;
                 }
                 runNative(() -> {
                     boolean success;
-                    if (boundDirect == direct && (direct
-                            ? boundWindowGeneration == generation : boundSource == surface)) {
-                        // A cancelled proxy handoff can leave the original direct
-                        // window current. Reconnecting it would duplicate ownership.
+                    if (boundSource == surface) {
+                        // Private producer dimensions remain stable until this
+                        // ordered control operation; no Android window is passed.
                         NativeSiglus.resize(handle, width, height);
                         success = true;
                     } else {
@@ -138,8 +127,6 @@ final class SiglusEngineThread {
                             Surface previous = boundSurface;
                             boundSurface = target;
                             boundSource = surface;
-                            boundDirect = direct;
-                            boundWindowGeneration = direct ? generation : -1;
                             if (previous != null) previous.release();
                         }
                     }
@@ -147,14 +134,14 @@ final class SiglusEngineThread {
                     deliver(callback -> callback.onConnected(request, connected, generation));
                 });
             } finally { if (boundSurface != target) target.release(); }
-        }, target::release)) deliver(callback -> callback.onConnected(request, false, generation));
+        }, () -> { target.release(); deliver(callback -> callback.onConnected(request, false, generation)); });
         return request;
     }
 
     private static Surface snapshot(Surface source) {
-        // A SurfaceHolder reuses its Java Surface wrapper for future windows.
-        // Parcel copying pins this request's native window before it crosses
-        // threads; only this owned copy is released, never the holder's Surface.
+        // Only proxy-owned private producers enter this class. Parcel copying
+        // keeps each pending control request separate; the consumer stays alive
+        // until ordered native replacement/destruction acknowledges detachment.
         Parcel parcel = Parcel.obtain();
         try {
             if (source == null || !source.isValid()) return null;
@@ -166,14 +153,6 @@ final class SiglusEngineThread {
         } catch (RuntimeException failure) { Log.w(TAG, "Window snapshot unavailable", failure); }
         finally { parcel.recycle(); }
         return null;
-    }
-
-    void resize(int width, int height, int generation) {
-        final long connection = connectionRequest;
-        postHandle(() -> {
-            if (windowCurrent(generation) && boundDirect && connection == connectionRequest)
-                NativeSiglus.resize(handle, width, height);
-        });
     }
 
     boolean step(int dtMs) {
@@ -240,8 +219,20 @@ final class SiglusEngineThread {
         })) steps.completeInputReset();
     }
 
-    private boolean windowCurrent(int generation) {
-        return windowAvailable && windowGeneration == generation;
+    private void postControl(Runnable operation, Runnable discarded) {
+        SiglusLatestControl.Command command = new SiglusLatestControl.Command() {
+            @Override public void run() { if (closed) discard(); else operation.run(); }
+            @Override public void discard() { if (discarded != null) discarded.run(); }
+        };
+        if (controls.offer(command) && !worker.post(this::drainControl)) controls.close();
+    }
+
+    private void drainControl() {
+        SiglusLatestControl.Command command = controls.take();
+        try { if (command != null) command.run(); }
+        finally {
+            if (controls.complete() && !worker.post(this::drainControl)) controls.close();
+        }
     }
 
     private boolean postCommand(Runnable operation) { return postCommand(operation, null); }
@@ -267,10 +258,6 @@ final class SiglusEngineThread {
             return false;
         }
         return true;
-    }
-
-    private void postHandle(Runnable operation) {
-        postCommand(() -> { if (handle != 0L) runNative(operation); });
     }
 
     private void runNative(Runnable operation) {
@@ -306,6 +293,7 @@ final class SiglusEngineThread {
         closed = true;
         listener = null;
         steps.close();
+        controls.close();
         connectionRequest++;
         releaseAfterStop = afterStopped;
         worker.post(() -> {

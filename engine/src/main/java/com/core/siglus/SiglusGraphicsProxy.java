@@ -36,13 +36,12 @@ final class SiglusGraphicsProxy implements ArtemisPerformanceOverlay.Source {
     interface Listener {
         void onPrepared(SiglusGraphicsProxy proxy, Surface producer);
         void onPreparationTimeout(SiglusGraphicsProxy proxy);
-        void onOutputReady(SiglusGraphicsProxy proxy);
+        void onOutputReady(SiglusGraphicsProxy proxy, SiglusWindowLease window);
         void onFirstFrame(SiglusGraphicsProxy proxy);
         void onFailure(SiglusGraphicsProxy proxy, RuntimeException failure);
     }
 
     private static final String TAG = "SiglusGraphics";
-    private static final long DISCONNECT_TIMEOUT_MS = 4000L;
     private static final long PREPARATION_TIMEOUT_MS = 10000L;
     private static final long RELEASE_RETRY_MS = 1000L;
     private static final int MAX_RELEASE_ATTEMPTS = 5;
@@ -57,6 +56,7 @@ final class SiglusGraphicsProxy implements ArtemisPerformanceOverlay.Source {
         final GraphicsFilterPipeline pipeline;
         final Surface producer;
         final SurfaceTexture texture;
+        final SiglusWindowLease window;
         final int[] glNames;
         final boolean initialized;
         final GraphicsProxyResourceSlots.Slot resourceSlot;
@@ -64,7 +64,7 @@ final class SiglusGraphicsProxy implements ArtemisPerformanceOverlay.Source {
             display = proxy.display; context = proxy.eglContext; initialized = proxy.initialized;
             resourceSlot = proxy.resourceSlot;
             parking = proxy.parking; output = proxy.output; pipeline = proxy.pipeline;
-            producer = proxy.producer; texture = proxy.texture;
+            producer = proxy.producer; texture = proxy.texture; window = proxy.outputLease;
             glNames = new int[]{proxy.oesProgram, proxy.copyProgram, proxy.inputFbo,
                     proxy.inputTexture, proxy.oes, proxy.vao};
         }
@@ -95,8 +95,7 @@ final class SiglusGraphicsProxy implements ArtemisPerformanceOverlay.Source {
     private final float[] transform = new float[16];
     private final int[] scratch = new int[1];
     private volatile boolean closed, terminalFailure, stageConfigured;
-    private volatile boolean outputWanted;
-    private volatile long outputGeneration;
+    private final SiglusOutputState outputState = new SiglusOutputState();
     private volatile SiglusViewport viewport;
     private volatile int status = GraphicsStatus.WAITING;
 
@@ -121,20 +120,11 @@ final class SiglusGraphicsProxy implements ArtemisPerformanceOverlay.Source {
     private int transformLocation;
     private boolean hasImage, frameQueued;
     private volatile long attachedGeneration;
-    private boolean firstPresented, initialized;
+    private boolean initialized;
+    private long firstPresentedGeneration;
     private int releaseAttempts;
-    // Activity-thread state; a timed-out request stays in flight on the worker.
-    private boolean detachPending;
-    private Consumer<Boolean> detachCompletion;
-    private final Runnable detachTimeout = () -> {
-        Consumer<Boolean> completion = detachCompletion;
-        if (!closed && completion != null) {
-            // Keep this observer for a late success after Activity retry exhaustion.
-            // Only the owner worker can prove the window has disconnected.
-            completion.accept(false);
-        }
-    };
-
+    private SiglusWindowLease outputLease;
+    private final SiglusLatestControl<OutputCommand> outputs = new SiglusLatestControl<>();
     SiglusGraphicsProxy(Context context, GraphicsFilterChain chain, int width, int height,
                         boolean analyzer, Listener listener) {
         this.context = context.getApplicationContext();
@@ -159,8 +149,8 @@ final class SiglusGraphicsProxy implements ArtemisPerformanceOverlay.Source {
             if (closed) return;
             try {
                 initialize();
-                // Rust still owns the display producer. The Activity switches
-                // it to our producer before asking us to connect the display.
+                // Rust never sees an Android display window. The Activity creates
+                // or connects it to this private producer before presentation.
                 main.post(() -> {
                     if (!closed && !terminalFailure && listener != null && preparation.deliver()) {
                         main.removeCallbacks(preparationTimeout);
@@ -175,63 +165,70 @@ final class SiglusGraphicsProxy implements ArtemisPerformanceOverlay.Source {
     SiglusViewport viewport() { return viewport; }
     boolean hasFailed() { return terminalFailure; }
 
-    void attachOutput(Surface screen, int width, int height) {
-        long generation = nextOutput(true);
-        worker.post(() -> {
-            if (closed || terminalFailure) return;
-            try {
-                if (!attach(screen, width, height, generation)) return;
-                main.post(() -> { if (!closed && !terminalFailure && outputWanted
-                        && outputGeneration == generation && listener != null) listener.onOutputReady(this); });
-                if (hasImage) draw();
-            } catch (RuntimeException failure) { fail(failure); }
-        });
+    void attachOutput(SiglusWindowLease window, int width, int height) {
+        if (window == null || !window.retain()) return;
+        submitOutput(new OutputCommand(window, width, height, outputState.attach(), null));
     }
 
-    private long nextOutput(boolean wanted) {
-        outputWanted = wanted;
-        return ++outputGeneration;
-    }
-
-    /** Stops new swaps immediately; queued GL work parks without blocking Activity callbacks. */
+    /** Return immediately; the lease, not the UI callback, owns the native window. */
     void detachOutput() { detachOutput(null); }
-
-    /**
-     * Completion runs on the Activity thread. A timeout reports false; the same
-     * observer may later receive the worker result without another detach request.
-     */
     void detachOutput(Consumer<Boolean> completion) {
-        nextOutput(false);
-        if (closed) { if (completion != null) completion.accept(false);return; }
-        if (completion != null) {
-            detachCompletion = completion;
-            main.removeCallbacks(detachTimeout);
-            main.postDelayed(detachTimeout, DISCONNECT_TIMEOUT_MS);
-        }
-        // A timeout reports failure without transferring Surface ownership.
-        // Later retries observe the same operation instead of growing its queue.
-        if (detachPending) return;
-        detachPending = true;
-        if (!worker.post(() -> {
-            boolean detached = false;
-            try {
-                detached = detach();
-                if (!detached) fail(new IllegalStateException("Display could not disconnect"));
-            } catch (RuntimeException failure) { fail(failure); }
-            boolean result = detached;
-            main.post(() -> finishDetach(result));
-        })) {
-            fail(new IllegalStateException("Graphics worker unavailable"));
-            finishDetach(false);
-        }
+        long generation = outputState.detach(completion != null);
+        if (generation != 0L) submitOutput(new OutputCommand(null, 0, 0, generation, completion));
     }
 
-    private void finishDetach(boolean detached) {
-        detachPending = false;
-        main.removeCallbacks(detachTimeout);
-        Consumer<Boolean> completion = detachCompletion;
-        detachCompletion = null;
-        if (!closed && completion != null) completion.accept(detached);
+    private void submitOutput(OutputCommand command) {
+        if (closed) { command.discard(); return; }
+        if (outputs.offer(command) && !worker.post(this::drainOutput)) outputs.close();
+    }
+
+    private void drainOutput() {
+        OutputCommand command = outputs.take();
+        try { if (command != null) command.run(); }
+        finally { if (outputs.complete() && !worker.post(this::drainOutput)) outputs.close(); }
+    }
+
+    private final class OutputCommand implements SiglusLatestControl.Command {
+        private final SiglusWindowLease window;
+        private final int width, height;
+        private final long generation;
+        private final Consumer<Boolean> completion;
+        OutputCommand(SiglusWindowLease window, int width, int height, long generation,
+                      Consumer<Boolean> completion) {
+            this.window = window; this.width = width; this.height = height;
+            this.generation = generation; this.completion = completion;
+        }
+        @Override public void run() {
+            boolean success = false;
+            try {
+                if (closed || generation != outputState.generation) return;
+                if (window == null) success = detach();
+                else if (!terminalFailure) {
+                    success = attach(window, width, height, generation);
+                    if (success) {
+                        main.post(() -> {
+                            if (!closed && !terminalFailure && outputState.wanted
+                                    && outputState.generation == generation && listener != null)
+                                listener.onOutputReady(SiglusGraphicsProxy.this, window);
+                        });
+                        if (hasImage) draw();
+                    }
+                }
+            } catch (RuntimeException failure) { fail(failure); }
+            finally {
+                // The command and EGL attachment own separate references.
+                // Failed attachment cleanup cannot consume the UI's reference.
+                if (window != null) window.release();
+                complete(success);
+            }
+        }
+        @Override public void discard() {
+            if (window != null) window.release();
+            complete(false);
+        }
+        private void complete(boolean success) {
+            if (completion != null) main.post(() -> completion.accept(success));
+        }
     }
 
     private void initialize() {
@@ -323,15 +320,18 @@ final class SiglusGraphicsProxy implements ArtemisPerformanceOverlay.Source {
                 + GLES30.glGetString(GLES30.GL_RENDERER));
     }
 
-    private boolean attach(Surface screen, int width, int height, long generation) {
-        if (!outputWanted || generation != outputGeneration || closed
+    private boolean attach(SiglusWindowLease window, int width, int height, long generation) {
+        Surface screen = window.surface;
+        if (!outputState.wanted || generation != outputState.generation || closed
                 || screen == null || !screen.isValid() || width <= 0 || height <= 0) return false;
         SiglusViewport nextViewport = SiglusViewport.fit(stageWidth, stageHeight, width, height);
         if (nextViewport == null) return false;
         if (!detach()) throw new IllegalStateException("Previous display could not disconnect");
-        // The holder can be destroyed while this request waits behind GL work.
-        // Ignore that transient window; its next callback supplies a fresh one.
-        if (!outputWanted || generation != outputGeneration || !screen.isValid()) return false;
+        // This command owns a lease across creation, swap and cleanup. A
+        // TextureView destruction callback cannot revoke its retained window.
+        if (!outputState.wanted || generation != outputState.generation || !screen.isValid()) return false;
+        if (!window.retain()) return false;
+        outputLease = window;
         output = EGL14.eglCreateWindowSurface(display, config, screen, new int[]{EGL14.EGL_NONE}, 0);
         if (output == EGL14.EGL_NO_SURFACE || !makeCurrent(output)) {
             int error = EGL14.eglGetError();
@@ -357,6 +357,7 @@ final class SiglusGraphicsProxy implements ArtemisPerformanceOverlay.Source {
                 EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_CONTEXT)) return false;
         if (output != EGL14.EGL_NO_SURFACE && !EGL14.eglDestroySurface(display, output)) return false;
         output = EGL14.EGL_NO_SURFACE;
+        if (outputLease != null) { outputLease.release(); outputLease = null; }
         return true;
     }
 
@@ -380,16 +381,16 @@ final class SiglusGraphicsProxy implements ArtemisPerformanceOverlay.Source {
 
     private void draw() {
         SiglusViewport v = viewport;
-        if (!hasImage || !stageConfigured || !outputWanted || closed || terminalFailure
-                || attachedGeneration != outputGeneration || v == null || output == EGL14.EGL_NO_SURFACE) return;
+        if (!hasImage || !stageConfigured || !outputState.wanted || closed || terminalFailure
+                || attachedGeneration != outputState.generation || v == null || output == EGL14.EGL_NO_SURFACE) return;
         if (!makeCurrent(output)) throw new IllegalStateException("Display context lost");
         beginGlOperations();
-        int result = pipeline.renderTexture(inputTexture, stageWidth, stageHeight,
-                v.surfaceWidth, v.surfaceHeight);
+        int result = chain.hasActive() ? pipeline.renderTexture(inputTexture, stageWidth, stageHeight,
+                v.surfaceWidth, v.surfaceHeight) : inputTexture;
         // Do not clear errors produced by the chain/state restoration before presenting.
         checkGl("filter output");
-        int outWidth = pipeline.outputWidth();
-        int outHeight = pipeline.outputHeight();
+        int outWidth = chain.hasActive() ? pipeline.outputWidth() : stageWidth;
+        int outHeight = chain.hasActive() ? pipeline.outputHeight() : stageHeight;
         status = pipeline.isFailed() ? GraphicsStatus.FILTER_FAILED
                 : pipeline.bypassReason() != Anime4kPostProcessor.BYPASS_NONE ? GraphicsStatus.SIZE_UNAVAILABLE
                 : GraphicsStatus.READY;
@@ -403,11 +404,15 @@ final class SiglusGraphicsProxy implements ArtemisPerformanceOverlay.Source {
         GLES30.glUniform1i(GLES30.glGetUniformLocation(copyProgram, "tex"), 0);
         GLES30.glDrawArrays(GLES30.GL_TRIANGLES, 0, 3);
         checkGl("presentation");
-        if (!outputWanted || attachedGeneration != outputGeneration) return;
+        if (!outputState.wanted || attachedGeneration != outputState.generation) return;
         if (!EGL14.eglSwapBuffers(display, output)) throw new IllegalStateException("Display swap failed");
-        if (!firstPresented) {
-            firstPresented = true;
-            main.post(() -> { if (!closed && listener != null) listener.onFirstFrame(this); });
+        if (firstPresentedGeneration != attachedGeneration) {
+            final long presentedGeneration = attachedGeneration;
+            firstPresentedGeneration = presentedGeneration;
+            main.post(() -> {
+                if (!closed && !terminalFailure && outputState.current(presentedGeneration)
+                        && listener != null) listener.onFirstFrame(this);
+            });
         }
         if (analyzerRequested) {
             stats.frame(stageWidth, stageHeight, outWidth, outHeight, v.width, v.height);
@@ -475,7 +480,7 @@ final class SiglusGraphicsProxy implements ArtemisPerformanceOverlay.Source {
     private void fail(RuntimeException failure) {
         if (closed || terminalFailure) return;
         terminalFailure = true; status = GraphicsStatus.NATIVE_FAILED;
-        Log.e(TAG, "Proxy failed; engine owner will restore direct presentation", failure);
+        Log.e(TAG, "Proxy failed; pausing presentation while retaining native producer ownership", failure);
         main.post(() -> { if (!closed && listener != null) listener.onFailure(this, failure); });
     }
 
@@ -484,15 +489,14 @@ final class SiglusGraphicsProxy implements ArtemisPerformanceOverlay.Source {
         listener = null;
         preparation.cancel();
         main.removeCallbacks(preparationTimeout);
-        main.removeCallbacks(detachTimeout);
-        detachCompletion = null;
     }
 
     /** Call only after Rust has stopped using the producer Surface. */
     void release() {
         if (closed) return;
-        closed = true; stageConfigured = false; nextOutput(false);
+        closed = true; stageConfigured = false; outputState.detach(true);
         stopObserving();
+        outputs.close();
         worker.post(this::finishRelease);
     }
 
@@ -546,8 +550,8 @@ final class SiglusGraphicsProxy implements ArtemisPerformanceOverlay.Source {
                     EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_CONTEXT);
             boolean released = EGL14.eglReleaseThread();
             if (!unbound && !released) return false;
-            // The holder's display Surface is borrowed, so only EGL's window
-            // reference is destroyed here; Java must not release the holder.
+            // The display lease outlives the TextureView callback until EGL
+            // proves that its native window reference has disconnected.
             if (output != EGL14.EGL_NO_SURFACE && EGL14.eglDestroySurface(display, output))
                 output = EGL14.EGL_NO_SURFACE;
             if (parking != EGL14.EGL_NO_SURFACE && EGL14.eglDestroySurface(display, parking))
@@ -559,6 +563,7 @@ final class SiglusGraphicsProxy implements ArtemisPerformanceOverlay.Source {
             boolean handlesGone = output == EGL14.EGL_NO_SURFACE && parking == EGL14.EGL_NO_SURFACE
                     && eglContext == EGL14.EGL_NO_CONTEXT;
             if (!handlesGone) return false;
+            if (outputLease != null) { outputLease.release(); outputLease = null; }
             // The default EGLDisplay can have other initialize references. A
             // successful terminate does not prove our failed destroys completed.
             if (initialized && !EGL14.eglTerminate(display)) return false;
@@ -570,7 +575,7 @@ final class SiglusGraphicsProxy implements ArtemisPerformanceOverlay.Source {
     }
 
     @Override public ArtemisGraphicsStats stats() { return stats; }
-    public boolean isEnabled() { return stageConfigured && !terminalFailure && !closed; }
+    public boolean isEnabled() { return chain.hasActive() && stageConfigured && !terminalFailure && !closed; }
     @Override public boolean isAnalyzing() { return analyzerRequested && isEnabled(); }
     @Override public int status() { return status; }
 }
