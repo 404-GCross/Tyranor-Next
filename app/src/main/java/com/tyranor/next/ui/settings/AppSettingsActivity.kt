@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import com.tyranor.next.R
 import com.tyranor.next.ui.common.AppScreenActivity
 import com.tyranor.next.ui.common.AppTopBar
+import com.tyranor.next.ui.common.effectiveNavStyle
 import com.tyranor.next.ui.common.isSideRailLayout
 import com.tyranor.next.ui.common.BottomInsetSpacer
 import com.tyranor.next.ui.common.AppNavItem
@@ -61,7 +62,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.basic.Card as MiuixCard
 import top.yukonga.miuix.kmp.basic.ColorPicker
-import top.yukonga.miuix.kmp.basic.Scaffold as MiuixScaffold
+import com.tyranor.next.ui.common.MiuixTopBarBlurScaffold
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
@@ -86,7 +87,7 @@ class AppSettingsActivity : AppScreenActivity() {
 @Composable
 internal fun AppSettingsScreen() {
     val ctx = LocalContext.current
-    val navStyle by AppSettingsStore.navStyleState.collectAsState()
+    val navStyle = effectiveNavStyle()
     val engineTabs by AppSettingsStore.engineTabsState.collectAsState()
     val sideRailEnabled by AppSettingsStore.sideRailState.collectAsState()
     val hideCardTitleTag by AppSettingsStore.gameCardTitleTagState.collectAsState()
@@ -116,10 +117,8 @@ internal fun AppSettingsScreen() {
     }
 
     MiuixSettingsTheme {
-        MiuixScaffold(
+        MiuixTopBarBlurScaffold(
             modifier = Modifier.fillMaxSize(),
-            containerColor = ComposeColor.Transparent,
-            contentWindowInsets = WindowInsets(0.dp),
             topBar = {
                 AppTopBar(
                     title = stringResource(R.string.settings_app_title),
@@ -127,13 +126,10 @@ internal fun AppSettingsScreen() {
                     contentColor = MiuixTheme.colorScheme.onBackground,
                 )
             },
-        ) { innerPadding ->
+        ) { topInset ->
             LazyColumn(
-                // 顶栏透明：列表整体垫在顶栏下方（持久 padding），避免滚动时内容穿过顶栏
-                modifier = Modifier.fillMaxSize()
-                    .padding(horizontal = 12.dp)
-                    .padding(top = innerPadding.calculateTopPadding()),
-                contentPadding = PaddingValues(top = 12.dp, bottom = 24.dp),
+                modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
+                contentPadding = PaddingValues(top = 12.dp + topInset, bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 item {
@@ -282,12 +278,13 @@ internal fun AppSettingsScreen() {
                 item {
                     MiuixCard(modifier = Modifier.fillMaxWidth().glassShadow().glassBorder(), cornerRadius = AppComponentCornerRadius) {
                         Column(Modifier.padding(vertical = 4.dp)) {
-                            // 导航栏样式：默认 / 液态玻璃 · 经典 / 液态玻璃 · 透镜 三选一。
+                            // 导航栏样式：经典 MD / 液态玻璃 · 经典 / 液态玻璃 · 透镜 / 悬浮按钮。
+                            // 未显式选择时，仅默认外观用透镜；玻璃系外观保留经典 MD 的悬浮玻璃条。
                             // 「透镜」档需要 Android 13+ 的 RuntimeShader，低版本不提供该选项（列表里不出现）。
                             val navStyleOptions = buildList {
                                 add(
-                                    AppSettingsStore.NAV_STYLE_DEFAULT to
-                                        stringResource(R.string.settings_nav_bar_default),
+                                    AppSettingsStore.NAV_STYLE_CLASSIC_MD to
+                                        stringResource(R.string.settings_nav_bar_classic_md),
                                 )
                                 add(
                                     AppSettingsStore.NAV_STYLE_LIQUID_GLASS to
@@ -309,10 +306,10 @@ internal fun AppSettingsScreen() {
                                 .coerceAtLeast(0)
                             OverlayDropdownPreference(
                                 title = stringResource(R.string.settings_nav_bar_title),
-                                // 说明只保留「安卓版本提醒」：默认档无需提醒（任何版本可用）
+                                // 说明只保留「安卓版本提醒」：经典 MD 无需提醒（任何版本可用）
                                 summary = when {
                                     // 平板侧栏布局：液态玻璃两档不参与侧栏适配，提示实际以侧栏显示
-                                    railLayout && navStyle != AppSettingsStore.NAV_STYLE_DEFAULT ->
+                                    railLayout && navStyle != AppSettingsStore.NAV_STYLE_CLASSIC_MD ->
                                         stringResource(R.string.settings_nav_bar_desc_rail)
                                     navStyle == AppSettingsStore.NAV_STYLE_LIQUID_GLASS ->
                                         stringResource(R.string.settings_nav_bar_desc_liquid_glass)

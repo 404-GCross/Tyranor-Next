@@ -56,6 +56,7 @@ import com.tyranor.next.theme.glassBorder
 import com.tyranor.next.theme.AppComponentShape
 import com.tyranor.next.ui.common.AppScreenActivity
 import com.tyranor.next.ui.common.AppTopBar
+import com.tyranor.next.ui.common.TopBarBlurHost
 import com.tyranor.next.ui.common.AppSearchField
 import com.tyranor.next.ui.common.NoRippleButton
 import com.tyranor.next.ui.common.TimeFormats
@@ -129,7 +130,7 @@ private fun KrkrOnlinePatchScreen(game: ScanGame) {
         KrkrOnlinePatchService.search(entries, keyword).take(80)
     }
 
-    Column(Modifier.fillMaxSize()) {
+    TopBarBlurHost(topBar = {
         AppTopBar(
             title = stringResource(R.string.patch_title),
             trailing = {
@@ -138,10 +139,10 @@ private fun KrkrOnlinePatchScreen(game: ScanGame) {
                 }
             },
         )
-
+    }) { topInset ->
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
-            contentPadding = PaddingValues(top = 16.dp, bottom = 20.dp),
+            contentPadding = PaddingValues(top = 16.dp + topInset, bottom = 20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item {

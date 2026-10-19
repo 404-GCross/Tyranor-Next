@@ -91,6 +91,7 @@ import com.tyranor.next.ui.common.LaunchErrorState
 import com.tyranor.next.ui.common.LiquidGlassNavigationBar
 import com.tyranor.next.ui.common.NavigationTabIcon
 import com.tyranor.next.ui.common.SidePanelEdgeExclusionBar
+import com.tyranor.next.ui.common.effectiveNavStyle
 import com.tyranor.next.ui.common.isSideRailLayout
 import com.tyranor.next.ui.common.rememberSidePanelSwipeModifier
 import com.tyranor.next.ui.common.toErrorState
@@ -169,7 +170,7 @@ fun MainScreen(modifier: Modifier = Modifier) {
       }
     }
   }
-  val navStyle by AppSettingsStore.navStyleState.collectAsState()
+  val navStyle = effectiveNavStyle()
   // ===== 侧边栏（仅四大页面可唤出）：左缘右滑 / 左边缘返回手势打开 =====
   // 面板关闭时把「左边缘返回手势」解读为唤出侧边栏；右边缘/返回键保持系统默认（退出）。
   // 页面级 BackHandler（如 Web 首页回退历史、悬浮按钮展开态）在更晚的组合位置注册，

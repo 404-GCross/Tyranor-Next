@@ -45,7 +45,7 @@
     <string name="settings_side_rail">Tablet side rail</string>
     <string name="settings_side_rail_summary">Move navigation to the side on tablets and large windows; keep it at the bottom when off</string>
     <string name="settings_nav_bar_title">Navigation bar style</string>
-    <string name="settings_nav_bar_default">Default</string>
+    <string name="settings_nav_bar_classic_md">Classic MD</string>
     <string name="settings_nav_bar_liquid_glass">Liquid glass · Classic</string>
     <string name="settings_nav_bar_liquid_glass_enhanced">Liquid glass · Lens</string>
     <string name="settings_nav_bar_floating_button">Floating button</string>

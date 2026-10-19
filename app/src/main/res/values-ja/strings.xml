@@ -45,7 +45,7 @@
     <string name="settings_side_rail">タブレットサイドレール</string>
     <string name="settings_side_rail_summary">タブレット・大画面ではナビを側面に移動。オフの場合は下部のまま</string>
     <string name="settings_nav_bar_title">ナビゲーションバーのスタイル</string>
-    <string name="settings_nav_bar_default">デフォルト</string>
+    <string name="settings_nav_bar_classic_md">クラシック MD</string>
     <string name="settings_nav_bar_liquid_glass">リキッドグラス · クラシック</string>
     <string name="settings_nav_bar_liquid_glass_enhanced">リキッドグラス · レンズ</string>
     <string name="settings_nav_bar_floating_button">フローティングボタン</string>

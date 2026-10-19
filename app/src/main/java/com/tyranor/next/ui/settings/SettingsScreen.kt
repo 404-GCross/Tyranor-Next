@@ -17,12 +17,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material3.Icon
@@ -31,6 +32,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -64,6 +66,7 @@ import com.tyranor.next.theme.AppThemeColors
 import com.tyranor.next.theme.glassShadow
 import com.tyranor.next.theme.DialogItemSurface
 import com.tyranor.next.theme.MiuixSettingsTheme
+import com.tyranor.next.theme.NoticeDotRed
 import com.tyranor.next.theme.TextColor
 import com.tyranor.next.theme.glassBorder
 import com.tyranor.next.theme.AppComponentShape
@@ -76,6 +79,7 @@ import com.tyranor.next.ui.common.BottomInsetSpacer
 import com.tyranor.next.ui.common.ByteFormats
 import com.tyranor.next.ui.common.DialogTextButton
 import com.tyranor.next.ui.common.NoIndication
+import com.tyranor.next.ui.common.MiuixTopBarBlurScaffold
 import com.tyranor.next.ui.common.TopBarIcon
 import com.tyranor.next.ui.common.formatUiDecimal
 import com.tyranor.next.ui.common.glassNavBottomInset
@@ -96,7 +100,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.basic.Card as MiuixCard
 import top.yukonga.miuix.kmp.basic.LinearProgressIndicator
-import top.yukonga.miuix.kmp.basic.Scaffold as MiuixScaffold
 import top.yukonga.miuix.kmp.basic.Slider
 import top.yukonga.miuix.kmp.basic.SliderDefaults
 import top.yukonga.miuix.kmp.preference.ArrowPreference
@@ -124,6 +127,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
     // 已知行为：以下更新弹窗状态均为 remember 持有，Activity 重建（旋转/语言切换）会丢失并静默取消下载；
     // 更新检查是低频操作，接受该取舍，未上 ViewModel 持久化。
     var checkingUpdate by remember { mutableStateOf(false) }
+    val hasUpdate by GitHubUpdateChecker.hasUpdate.collectAsState()
     var updateAvailable by remember { mutableStateOf<UpdateCheckResult.UpdateAvailable?>(null) }
     var activeCandidate by remember { mutableStateOf<UpdateCandidate?>(null) }
     var updateDownloadPhase by remember { mutableStateOf<UpdateDownloadPhase?>(null) }
@@ -243,18 +247,14 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
     }
 
     MiuixSettingsTheme {
-        MiuixScaffold(
+        // 默认风格下列表铺到顶栏下方并渐进模糊；其余风格退化为顶栏在上、列表在下
+        MiuixTopBarBlurScaffold(
             modifier = modifier,
-            containerColor = Color.Transparent,
-            contentWindowInsets = WindowInsets(0.dp),
             topBar = { SettingsTopBar(stringResource(R.string.nav_settings)) },
-        ) { innerPadding ->
+        ) { topInset ->
             LazyColumn(
-                // 顶栏透明：列表整体垫在顶栏下方（持久 padding），避免滚动时内容穿过顶栏
-                modifier = Modifier.fillMaxSize()
-                    .padding(horizontal = 12.dp)
-                    .padding(top = innerPadding.calculateTopPadding()),
-                contentPadding = PaddingValues(top = 12.dp, bottom = 24.dp + glassNavBottomInset()),
+                modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
+                contentPadding = PaddingValues(top = 12.dp + topInset, bottom = 24.dp + glassNavBottomInset()),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 item {
@@ -343,7 +343,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                             ArrowPreference(
                                 title = if (checkingUpdate) stringResource(R.string.settings_update_checking) else stringResource(R.string.settings_update_check),
                                 summary = stringResource(R.string.settings_update_check_summary),
-                                startAction = { SettingsItemIcon(R.drawable.ic_settings_update) },
+                                startAction = { SettingsItemIcon(R.drawable.ic_settings_update, showBadge = hasUpdate) },
                                 onClick = { checkUpdate() },
                             )
                             ArrowPreference(
@@ -896,10 +896,8 @@ internal fun EngineSettingsDetailScreen(kind: EngineSettingsKind) {
     }
 
     MiuixSettingsTheme {
-        MiuixScaffold(
+        MiuixTopBarBlurScaffold(
             modifier = Modifier.fillMaxSize(),
-            containerColor = Color.Transparent,
-            contentWindowInsets = WindowInsets(0.dp),
             topBar = {
                 AppTopBar(
                     title = engineSettingsKindTitle(kind),
@@ -913,7 +911,7 @@ internal fun EngineSettingsDetailScreen(kind: EngineSettingsKind) {
                     },
                 )
             },
-        ) { innerPadding ->
+        ) { topInset ->
             LazyListPlaceholder(
                 kind,
                 krVersion, krKernel, krScoped, krSkipStartupDialogs, krFont, krForceFont, krRenderer, krDrawThread,
@@ -926,7 +924,7 @@ internal fun EngineSettingsDetailScreen(kind: EngineSettingsKind) {
                 xs4Scoped, xs4Encoding, xs4FontGothic, xs4FontMincho, xs4Joypad, xs4MsgskipDelay,
                 fontLauncher, fvpFontLauncher, xs4GothicFontLauncher, xs4MinchoFontLauncher,
                 winlator, ppssppVersion, webShellPort,
-                topInset = innerPadding.calculateTopPadding(),
+                topInset = topInset,
                 graphicsContent = {
                     graphicsFamily?.let { family ->
                         GlobalGraphicsSettings(
@@ -1000,14 +998,26 @@ internal fun EngineSettingsDetailScreen(kind: EngineSettingsKind) {
 }
 
 @Composable
-private fun SettingsItemIcon(@DrawableRes iconRes: Int) {
-    Image(
-        painter = painterResource(iconRes),
-        contentDescription = null,
-        // 深色模式下整体染白，保证低亮度背景上的可读性
-        colorFilter = if (AppThemeColors.isDark) ColorFilter.tint(Color.White) else null,
-        modifier = Modifier.padding(end = 6.dp).size(24.dp),
-    )
+private fun SettingsItemIcon(@DrawableRes iconRes: Int, showBadge: Boolean = false) {
+    Box(modifier = Modifier.padding(end = 6.dp).size(24.dp)) {
+        Image(
+            painter = painterResource(iconRes),
+            contentDescription = null,
+            // 深色模式下整体染白，保证低亮度背景上的可读性
+            colorFilter = if (AppThemeColors.isDark) ColorFilter.tint(Color.White) else null,
+            modifier = Modifier.fillMaxSize(),
+        )
+        if (showBadge) {
+            // 红点提醒：固定亮红，不随主题色变化
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .offset(x = 5.dp, y = (-5).dp)
+                    .size(8.dp)
+                    .background(NoticeDotRed, CircleShape),
+            )
+        }
+    }
 }
 
 /** 顶部栏：统一复用 AppTopBar（Miuix 页面背景取色）。 */
@@ -1117,11 +1127,8 @@ private fun LazyListPlaceholder(
     val artFontCacheMap = artFontCacheOptions()
 
     LazyColumn(
-        // 顶栏透明：列表整体垫在顶栏下方（持久 padding），避免滚动时内容穿过顶栏
-        modifier = Modifier.fillMaxSize()
-            .padding(horizontal = 12.dp)
-            .padding(top = topInset),
-        contentPadding = PaddingValues(top = 12.dp, bottom = 24.dp),
+        modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
+        contentPadding = PaddingValues(top = 12.dp + topInset, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         if (kind == EngineSettingsKind.KRKR) item {
