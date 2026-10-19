@@ -443,6 +443,8 @@ public final class SiglusActivity extends AppCompatActivity implements
         if (graphicsOverlay != null) graphicsOverlay.hide();
         if (graphicsProxy != null) graphicsProxy.detachOutput();
         boolean owned = displayWindow != null;
+        // A retained EGL lease needs the native window, not TextureView's UI listener.
+        if (owned) texture.setOnFrameAvailableListener(null);
         releaseDisplayWindow();
         // TextureView.SurfaceTextureListener permits false only when the client
         // assumes SurfaceTexture.release(). Pending/in-flight/attached EGL work
