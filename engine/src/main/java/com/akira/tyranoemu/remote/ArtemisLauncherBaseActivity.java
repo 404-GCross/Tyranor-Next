@@ -17,6 +17,37 @@ public abstract class ArtemisLauncherBaseActivity extends com.ies_net.artemis.Ar
     private static final String KEY_ARTEMIS_ENGINE_SUCCESS_PREFIX = "artemis_engine_success.";
     private long createdAtElapsed;
     private boolean userRequestedFinish;
+    private String resolvedLibraryName;
+    private String resolvedLibraryPath;
+
+    /** Called by the native bootstrap before engine startup, then reused by System.load. */
+    public final synchronized String resolveArtemisEngineLibraryPath(String engineLibName) throws java.io.IOException {
+        String fileName = "lib" + engineLibName + ".so";
+        if (!com.core.nativeplugin.NativePluginConstants.INSTANCE.getARTEMIS_REQUIRED_LIBS().contains(fileName)) {
+            throw new java.io.IOException("Invalid Artemis library name");
+        }
+        if (resolvedLibraryPath != null) {
+            if (!engineLibName.equals(resolvedLibraryName)) throw new java.io.IOException("Artemis library already selected");
+            return resolvedLibraryPath;
+        }
+        String original = com.core.nativeplugin.NativePluginManager.artemisLibPath(this, fileName);
+        if (original == null) throw new java.io.IOException("Artemis library unavailable");
+        java.io.File runtime = com.core.nativeplugin.ArtemisVorbisRepair.prepare(
+                new java.io.File(original),
+                new java.io.File(com.core.nativeplugin.NativePluginManager.artemisRootDir(this), "derived"));
+        resolvedLibraryName = engineLibName;
+        resolvedLibraryPath = runtime.getAbsolutePath();
+        Log.i("YukiArtemis", "resolved engine library " + resolvedLibraryPath);
+        return resolvedLibraryPath;
+    }
+
+    protected final void loadResolvedEngineLibrary(String engineLibName) {
+        try {
+            System.load(resolveArtemisEngineLibraryPath(engineLibName));
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException("Artemis library preparation failed", e);
+        }
+    }
     /** Loads the revision-specific Artemis native library (e.g. libartemis.so). Called once from onCreate. */
     public abstract void loadEngineLibrary();
 
