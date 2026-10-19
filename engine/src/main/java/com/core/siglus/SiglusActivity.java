@@ -5,6 +5,7 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.Rect;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -228,7 +229,9 @@ public final class SiglusActivity extends AppCompatActivity implements
         rootLayout = new FrameLayout(this);
         rootLayout.setBackgroundColor(Color.BLACK);
 
-        surfaceView = filterMode ? new TextureView(this) : new SurfaceView(this);
+        // Android 16 may retain this View through a SurfaceTexture frame-rate listener.
+        // The display is unthemed; its Context must not keep the Activity alive.
+        surfaceView = filterMode ? new TextureView(getApplicationContext()) : new SurfaceView(this);
         rootLayout.addView(surfaceView, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
@@ -311,10 +314,20 @@ public final class SiglusActivity extends AppCompatActivity implements
         if (graphicsOverlay != null) graphicsOverlay.hide();
         hideIme();
         NativeSiglus.setMessageboxListener(null);
+        if (filterMode) detachFilteredDisplay();
         destroyEngine(); // Native producer destruction precedes consumer disposal.
-        // In filter mode keep the TextureView listener and UI lease until
-        // onSurfaceTextureDestroyed; onDestroy alone does not end View use.
         super.onDestroy();
+    }
+
+    private void detachFilteredDisplay() {
+        TextureView display = (TextureView) surfaceView;
+        // Keep the callback until normal detach returns the UI lease. Removing
+        // the child also clears its Activity-owned parent and window AttachInfo.
+        rootLayout.removeView(display);
+        display.setSurfaceTextureListener(null);
+        display.setOnTouchListener(null);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) display.setContentCaptureSession(null);
+        // Do not release the texture: pending/retained EGL work still owns its lease.
     }
 
     @Override
