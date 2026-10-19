@@ -33,23 +33,25 @@ import top.yukonga.miuix.kmp.basic.Scaffold as MiuixScaffold
 /** 顶栏渐进模糊的最大模糊半径（顶端）。 */
 private val TopBarBlurRadius: Dp = 44.dp
 
-/** 模糊区向顶栏下方延伸的高度：给「清晰 → 模糊」的过渡留足空间，否则渐变被压在顶栏高度内看不出来。 */
-private val TopBarBlurTail: Dp = 56.dp
-
 /** 顶栏底色叠层的最大透明度（顶端值，随整体遮罩向下渐隐到 0）。 */
 private const val TopBarTintAlpha = 0.6f
 
-/** 整体遮罩保持不透明的范围占顶栏本身高度的比例：标题区在此范围内完全不透明，之后一路渐隐到延伸区底边。 */
-private const val TopBarOpaqueBarFraction = 0.85f
+/** 底色叠层开始变淡的位置（占顶栏高度比例）：之前保持最大透明度，之后平滑收敛到顶栏底边的 0。 */
+private const val TopBarTintFadeStart = 0.2f
 
-private const val TopBarMaskSteps = 24
+/** 整体遮罩保持不透明的范围占顶栏高度的比例：此范围内完全不透明，之后一路渐隐到顶栏底边（不超出顶栏）。 */
+private const val TopBarOpaqueBarFraction = 5f / 6f
+
+private const val TopBarMaskSteps = 32
 
 /** 渐进模糊的叠层数：半径按 1/n … n/n 等分，自上而下逐层淡出，使模糊强度随位置连续递减。 */
-private const val TopBarBlurLayerCount = 4
+private const val TopBarBlurLayerCount = 6
 
-/** 各层淡出区间的起点与每层淡出宽度（占模糊区总高度比例）：n=4 时依次为 0.1–0.3、0.3–0.5、0.5–0.7、0.7–0.9。 */
-private const val TopBarLayerFadeOrigin = 0.1f
-private const val TopBarLayerFadeSpan = 0.2f
+/**
+ * 每层淡出区间的宽度（占顶栏高度比例）：各层区间起点在 0..(1−span) 内等距错开、彼此大幅重叠，
+ * 相邻两层的过渡叠在一起，强度变化连续，不会出现「一档一档」的台阶。
+ */
+private const val TopBarLayerFadeSpan = 0.7f
 
 /**
  * 竖向遮罩的多段采样：从 [start] 起到 [end] 止 alpha = 1 − smootherstep（6x⁵−15x⁴+10x³，
@@ -65,7 +67,8 @@ private fun fadeStops(start: Float, end: Float): Array<Pair<Float, Color>> =
 
 /** 各模糊层的淡出遮罩，下标 0 为半径最小的一层（最先淡出）。 */
 private val TopBarLayerMaskStops: List<Array<Pair<Float, Color>>> = List(TopBarBlurLayerCount) { index ->
-    val start = TopBarLayerFadeOrigin + (TopBarBlurLayerCount - 1 - index) * TopBarLayerFadeSpan
+    val step = (1f - TopBarLayerFadeSpan) / (TopBarBlurLayerCount - 1)
+    val start = (TopBarBlurLayerCount - 1 - index) * step
     fadeStops(start, start + TopBarLayerFadeSpan)
 }
 
@@ -83,8 +86,8 @@ fun isTopBarBlurActive(): Boolean =
 
 /**
  * 顶栏 + 正文的统一宿主：默认外观风格下正文铺满整页并垫在顶栏下方，
- * 顶栏及其下方一段延伸区（[TopBarBlurTail]）叠一层渐进模糊：顶端最糊最实，向下模糊与不透明度连续递减，
- * 到延伸区底边完全清晰透明；其余情况退化为「顶栏在上、正文在下」的 Column。
+ * 仅在顶栏自身范围内叠一层渐进模糊：顶端最糊最实，向下模糊与不透明度连续递减，
+ * 到顶栏底边完全清晰透明（不超出顶栏）；其余情况退化为「顶栏在上、正文在下」的 Column。
  * 层级自下而上为：正文 → 模糊层 → 顶栏（标题 / 图标始终清晰），模糊层不拦截触摸。
  *
  * [content] 收到的 `topInset` 为顶栏高度（退化时为 0）：滚动列表须把它加到 `contentPadding.top`，
@@ -109,10 +112,10 @@ fun TopBarBlurHost(
             .map { it.measure(constraints.copy(minWidth = constraints.maxWidth, minHeight = 0)) }
         val topInsetPx = topBarPlaceables.maxOfOrNull { it.height } ?: 0
         val topInset = topInsetPx.toDp()
-        val blurHeightPx = (topInsetPx + TopBarBlurTail.roundToPx()).coerceAtMost(constraints.maxHeight)
+        // 模糊层严格等于顶栏高度，不向正文区延伸
         val blurPlaceables = subcompose(TopBarBlurSlot.Blur) {
-            TopBarBlurLayer(backdrop = backdrop, barHeightPx = topInsetPx, totalHeightPx = blurHeightPx)
-        }.map { it.measure(Constraints.fixed(constraints.maxWidth, blurHeightPx)) }
+            TopBarBlurLayer(backdrop = backdrop, barHeightPx = topInsetPx)
+        }.map { it.measure(Constraints.fixed(constraints.maxWidth, topInsetPx)) }
         val contentPlaceables = subcompose(TopBarBlurSlot.Content) {
             Box(Modifier.fillMaxSize().layerBackdrop(backdrop)) { content(topInset) }
         }.map { it.measure(constraints) }
@@ -147,19 +150,14 @@ fun MiuixTopBarBlurScaffold(
  * 渐进模糊层：[TopBarBlurLayerCount] 层半径递增的 backdrop 模糊自下而上叠放，
  * 每层按各自的淡出遮罩渐隐，模糊强度因此随位置连续变化（顶端最强、向下逐渐清晰），
  * 而不是「均匀模糊 + 透明度渐变」那样在窄带内从糊到清晰地突变。
- * 页面底色半透明叠层只画一次，整体再按竖向遮罩渐隐：顶栏本身（[barHeightPx] 的 [TopBarOpaqueBarFraction]）
- * 内不透明，其后到延伸区底边（[totalHeightPx]）完全透明。
+ * 页面底色半透明叠层只画一次，整体再按竖向遮罩渐隐：顶栏高度（[barHeightPx]）的
+ * [TopBarOpaqueBarFraction] 内不透明，其后到顶栏底边完全透明。整层严格限定在顶栏范围内。
  */
 @Composable
-private fun TopBarBlurLayer(backdrop: Backdrop, barHeightPx: Int, totalHeightPx: Int) {
+private fun TopBarBlurLayer(backdrop: Backdrop, barHeightPx: Int) {
     val density = LocalDensity.current
     val tint = MaterialTheme.colorScheme.background
-    val fadeStart = if (totalHeightPx > 0) {
-        (barHeightPx * TopBarOpaqueBarFraction / totalHeightPx).coerceIn(0f, 0.95f)
-    } else {
-        0f
-    }
-    val maskStops = remember(fadeStart) { fadeStops(fadeStart, 1f) }
+    val maskStops = remember(barHeightPx) { fadeStops(TopBarOpaqueBarFraction, 1f) }
     Box(
         Modifier
             .fillMaxSize()
@@ -196,6 +194,16 @@ private fun TopBarBlurLayer(backdrop: Backdrop, barHeightPx: Int, totalHeightPx:
                     ),
             )
         }
-        Box(Modifier.fillMaxSize().background(tint.copy(alpha = TopBarTintAlpha)))
+        // 底色叠层自身也按 smootherstep 在整个顶栏高度内逐渐变淡（而不是被整体遮罩在末段突然切掉），
+        // 与各模糊层同步收敛到 0，才不会在顶栏底边留下一条底色硬边
+        val tintStops = remember(tint) {
+            Array(TopBarMaskSteps + 1) { i ->
+                val t = i / TopBarMaskSteps.toFloat()
+                val x = ((t - TopBarTintFadeStart) / (1f - TopBarTintFadeStart)).coerceIn(0f, 1f)
+                val eased = x * x * x * (x * (x * 6f - 15f) + 10f)
+                t to tint.copy(alpha = TopBarTintAlpha * (1f - eased))
+            }
+        }
+        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(colorStops = tintStops)))
     }
 }

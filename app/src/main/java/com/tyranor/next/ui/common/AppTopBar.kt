@@ -33,7 +33,7 @@ import androidx.compose.ui.unit.dp
  * 禁止任何页面自行手写该结构。
  *
  * 默认外观风格（Android 12+）下，页面经 [TopBarBlurHost] / [MiuixTopBarBlurScaffold] 托管时，
- * 顶栏及其下方一段延伸区会叠渐进模糊（由宿主绘制，顶端最实、向下渐隐到完全透明）；未托管或玻璃系风格保持纯透明。
+ * 顶栏范围内会叠渐进模糊（由宿主绘制，严格限定在顶栏高度内，顶端最实、向下渐隐到完全透明）；未托管或玻璃系风格保持纯透明。
  *
  * @param title 标题文案
  * @param background 背景色；**默认透明**（露出页面根部背景层：纯色 + 主题柔光渐变 + 模糊），
