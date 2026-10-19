@@ -29,10 +29,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Folder
@@ -43,6 +45,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -74,6 +77,7 @@ import com.tyranor.next.theme.glassShadow
 import com.tyranor.next.theme.DialogItemSurface
 import com.tyranor.next.theme.MiuixSettingsTheme
 import com.tyranor.next.theme.NavWhite
+import com.tyranor.next.theme.NoticeDotRed
 import com.tyranor.next.theme.TextColor
 import com.tyranor.next.theme.glassBorder
 import com.tyranor.next.theme.AppComponentShape
@@ -133,6 +137,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
     // 已知行为：以下更新弹窗状态均为 remember 持有，Activity 重建（旋转/语言切换）会丢失并静默取消下载；
     // 更新检查是低频操作，接受该取舍，未上 ViewModel 持久化。
     var checkingUpdate by remember { mutableStateOf(false) }
+    val hasUpdate by GitHubUpdateChecker.hasUpdate.collectAsState()
     var updateAvailable by remember { mutableStateOf<UpdateCheckResult.UpdateAvailable?>(null) }
     var activeCandidate by remember { mutableStateOf<UpdateCandidate?>(null) }
     var updateDownloadPhase by remember { mutableStateOf<UpdateDownloadPhase?>(null) }
@@ -352,7 +357,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                             ArrowPreference(
                                 title = if (checkingUpdate) stringResource(R.string.settings_update_checking) else stringResource(R.string.settings_update_check),
                                 summary = stringResource(R.string.settings_update_check_summary),
-                                startAction = { SettingsItemIcon(R.drawable.ic_settings_update) },
+                                startAction = { SettingsItemIcon(R.drawable.ic_settings_update, showBadge = hasUpdate) },
                                 onClick = { checkUpdate() },
                             )
                             ArrowPreference(
@@ -998,14 +1003,26 @@ internal fun EngineSettingsDetailScreen(kind: EngineSettingsKind) {
 }
 
 @Composable
-private fun SettingsItemIcon(@DrawableRes iconRes: Int) {
-    Image(
-        painter = painterResource(iconRes),
-        contentDescription = null,
-        // 深色模式下整体染白，保证低亮度背景上的可读性
-        colorFilter = if (AppThemeColors.isDark) ColorFilter.tint(Color.White) else null,
-        modifier = Modifier.padding(end = 6.dp).size(24.dp),
-    )
+private fun SettingsItemIcon(@DrawableRes iconRes: Int, showBadge: Boolean = false) {
+    Box(modifier = Modifier.padding(end = 6.dp).size(24.dp)) {
+        Image(
+            painter = painterResource(iconRes),
+            contentDescription = null,
+            // 深色模式下整体染白，保证低亮度背景上的可读性
+            colorFilter = if (AppThemeColors.isDark) ColorFilter.tint(Color.White) else null,
+            modifier = Modifier.fillMaxSize(),
+        )
+        if (showBadge) {
+            // 红点提醒：固定亮红，不随主题色变化
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .offset(x = 5.dp, y = (-5).dp)
+                    .size(8.dp)
+                    .background(NoticeDotRed, CircleShape),
+            )
+        }
+    }
 }
 
 /** 顶部栏：统一复用 AppTopBar（Miuix 页面背景取色）。 */
