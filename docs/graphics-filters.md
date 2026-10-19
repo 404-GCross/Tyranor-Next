@@ -45,7 +45,7 @@ Kirikiroid2 1.2.6 使用独立的公共 Cocos 接口适配：其 `UpdateDrawBuff
   读取任务；继续保留上游同步调用可能阻塞 UI 的既有特征。
 - **开启有效滤镜链**：才创建 TextureView、私有 producer 和独立 engine/GLES owner。
   native 从创建开始只接触私有 producer，已接管的显示窗口使用有界租约并承担最终释放。
-  不能将该线程持有的显示窗口重新混入上游 SurfaceHolder 路径。
+  不能将该线程持有的显示窗口重新混入上游 SurfaceHolder 路径。销毁已接管显示纹理时，先清框架帧监听器再归还 UI 租约，避免永久保留输出窗口时连带保留旧界面；不提前释放 EGL 所需资源。
 
 两种宿主共用进程级原生实例准入；未结束或永久阻塞的旧 owner 不允许另一模式启动第二个
 原生引擎。消息框先异步投递主线程，校验当前 owner/句柄后处理，避免同步 native 回调中重入。

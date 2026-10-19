@@ -45,7 +45,7 @@
 
 作者、独立 Agent 与主 Agent 对照上游 main `740d7c13` 的 SurfaceView 宿主，分别复核
 启动路由、SurfaceHolder 回调、同步 ACK、步进、消息框、输入/IME、跨模式准入及资源释放。
-当前作者、独立 Agent 和主 Agent 的静态复核未发现新的可确认 P1/P2/P3；独立意见与本轮 CI 结果在 PR 进度评论中记录；模型回归只证明生产路由/准入规则，
+该候选当时的静态复核未发现新的可确认 P1/P2/P3；随后复审发现的窄条件 P3 及修复另记于下节；独立意见与本轮 CI 结果在 PR 进度评论中记录；模型回归只证明生产路由/准入规则，
 不代替实际 Handler、JNI、EGL、SurfaceView 或设备后台恢复测试。
 
 修改限于 engine 宿主与小型纯 Java 状态模型；没有 app UI/Compose 反向依赖、设置布局或
@@ -66,3 +66,28 @@ AGENTS 要求的多 Agent 独立复核已执行；指定 Android CLI 审查技�
 此前三项窗口/队列 P2 与 BOM P3 修复保留在开启滤镜的路径；关闭路径不会重新引入
 工作线程持有 SurfaceHolder、输入配额挤掉窗口控制或跨世代异步直出恢复。
 分析器后台位置偏移、特定 KR 原版偏色、文本排除、用户导入等暂缓项不在本轮修复范围。
+
+## 后续复审：永久输出租约的框架帧监听器
+
+对应 [维护者复审 6259836471](https://github.com/Weiss-UltimateSavior/Tyranor-Next/pull/108#issuecomment-6259836471)，
+固定对象 `ba55d9b4`。该复审确认此前三项 P2 与 BOM P3 原触发路径已修复，并新增一项窄条件 P3。
+
+问题原因：显示纹理销毁时客户端返回 false 但未清框架帧监听器。若销毁前框架未先走不可见状态
+的监听清理，且 EGL 输出解绑/销毁持续失败并静态保留非空 outputLease，SurfaceTexture 可通过
+帧 Handler/listener 持有旧 TextureView/Activity。普通 stop/finish 通常已清理，不是退出必现；
+仅 eglTerminate 失败不成立，因为该处之前输出租约已经释放。
+
+修复 `849d552acfa6884e6139625702cac48eda5d8e9c`：仅当前已接管的显示纹理，在 releaseDisplayWindow 前清除帧监听器。
+UI 引用此时仍在，worker 归还自己的引用不能提前销毁纹理；修复不 release native window、
+不更改 EGL 或租约所有权，也不清理私有 producer 的消费监听器。后续新窗口沿用框架正常安装监听流程。
+
+源码依据：[AOSP Android 14 TextureView](https://raw.githubusercontent.com/aosp-mirror/platform_frameworks_base/android-14.0.0_r1/core/java/android/view/TextureView.java)
+的销毁/可见性及帧监听安装，和 [SurfaceTexture](https://raw.githubusercontent.com/aosp-mirror/platform_frameworks_base/android-14.0.0_r1/graphics/java/android/graphics/SurfaceTexture.java)
+的 Handler/listener 引用及空监听设置。结论来自源码引用链，不声称厂商触发频率、实测 GC 结果，
+也不扩大为全部未来框架监听器或永久驱动故障均可回收。
+
+主 Agent 与两路独立 Agent 复核了实际两行 diff、引用持有顺序、回调对象身份及后续重建，
+未发现新的可确认 P0–P3。未新增重复实现的模型测试，也未做真实 Activity 回收或驱动失败注入；
+本轮仅运行候选 Android CI 的现有回归与 Debug 编译/产物检查，无本地构建、实机、Release/R8 或完整 Lint。
+CI 精确 head 与链接补在 PR 评论；维护者对旧 ba55 候选报告的构建/测试结果仍属其固定对象。
+关闭滤镜原版路线、所有预编译引擎库、根 README/AGENTS 和两项待维护者裁决的规范例外均未改变。
