@@ -60,7 +60,7 @@ import com.tyranor.next.ui.auth.HikarinagiOAuthCallbackActivity
 import com.tyranor.next.theme.AppComponentShape
 import com.tyranor.next.theme.AppComponentCornerRadius
 import top.yukonga.miuix.kmp.basic.Card as MiuixCard
-import top.yukonga.miuix.kmp.basic.Scaffold as MiuixScaffold
+import com.tyranor.next.ui.common.MiuixTopBarBlurScaffold
 import top.yukonga.miuix.kmp.basic.Switch
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -118,19 +118,14 @@ internal fun CoverScraperSettingsScreen() {
     }
 
     MiuixSettingsTheme {
-        MiuixScaffold(
+        MiuixTopBarBlurScaffold(
             modifier = Modifier.fillMaxSize(),
-            containerColor = ComposeColor.Transparent,
-            contentWindowInsets = WindowInsets(0.dp),
             topBar = { CoverScraperTopBar() },
-        ) { innerPadding ->
+        ) { topInset ->
             LazyColumn(
-                // 顶栏透明：列表整体垫在顶栏下方（持久 padding），避免滚动时内容穿过顶栏
-                modifier = Modifier.fillMaxSize()
-                    .padding(horizontal = 12.dp)
-                    .padding(top = innerPadding.calculateTopPadding()),
+                modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
                 contentPadding = PaddingValues(
-                    top = 12.dp,
+                    top = 12.dp + topInset,
                     bottom = 24.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding(),
                 ),
                 verticalArrangement = Arrangement.spacedBy(12.dp),

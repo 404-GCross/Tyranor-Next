@@ -90,6 +90,7 @@ import com.tyranor.next.ui.common.BottomInsetSpacer
 import com.tyranor.next.ui.common.ByteFormats
 import com.tyranor.next.ui.common.DialogTextButton
 import com.tyranor.next.ui.common.NoIndication
+import com.tyranor.next.ui.common.MiuixTopBarBlurScaffold
 import com.tyranor.next.ui.common.TopBarIcon
 import com.tyranor.next.ui.common.glassNavBottomInset
 import com.tyranor.next.core.updater.GitHubUpdateChecker
@@ -109,7 +110,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.basic.Card as MiuixCard
 import top.yukonga.miuix.kmp.basic.LinearProgressIndicator
-import top.yukonga.miuix.kmp.basic.Scaffold as MiuixScaffold
 import top.yukonga.miuix.kmp.basic.Slider
 import top.yukonga.miuix.kmp.basic.SliderDefaults
 import top.yukonga.miuix.kmp.preference.ArrowPreference
@@ -257,18 +257,14 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
     }
 
     MiuixSettingsTheme {
-        MiuixScaffold(
+        // 默认风格下列表铺到顶栏下方并渐进模糊；其余风格退化为顶栏在上、列表在下
+        MiuixTopBarBlurScaffold(
             modifier = modifier,
-            containerColor = Color.Transparent,
-            contentWindowInsets = WindowInsets(0.dp),
             topBar = { SettingsTopBar(stringResource(R.string.nav_settings)) },
-        ) { innerPadding ->
+        ) { topInset ->
             LazyColumn(
-                // 顶栏透明：列表整体垫在顶栏下方（持久 padding），避免滚动时内容穿过顶栏
-                modifier = Modifier.fillMaxSize()
-                    .padding(horizontal = 12.dp)
-                    .padding(top = innerPadding.calculateTopPadding()),
-                contentPadding = PaddingValues(top = 12.dp, bottom = 24.dp + glassNavBottomInset()),
+                modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
+                contentPadding = PaddingValues(top = 12.dp + topInset, bottom = 24.dp + glassNavBottomInset()),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 item {
@@ -906,10 +902,8 @@ internal fun EngineSettingsDetailScreen(kind: EngineSettingsKind) {
     }
 
     MiuixSettingsTheme {
-        MiuixScaffold(
+        MiuixTopBarBlurScaffold(
             modifier = Modifier.fillMaxSize(),
-            containerColor = Color.Transparent,
-            contentWindowInsets = WindowInsets(0.dp),
             topBar = {
                 AppTopBar(
                     title = engineSettingsKindTitle(kind),
@@ -923,7 +917,7 @@ internal fun EngineSettingsDetailScreen(kind: EngineSettingsKind) {
                     },
                 )
             },
-        ) { innerPadding ->
+        ) { topInset ->
             LazyListPlaceholder(
                 kind,
                 krVersion, krKernel, krScoped, krSkipStartupDialogs, krFont, krForceFont, krRenderer, krDrawThread,
@@ -936,7 +930,7 @@ internal fun EngineSettingsDetailScreen(kind: EngineSettingsKind) {
                 xs4Scoped, xs4Encoding, xs4FontGothic, xs4FontMincho, xs4Joypad, xs4MsgskipDelay,
                 fontLauncher, fvpFontLauncher, xs4GothicFontLauncher, xs4MinchoFontLauncher,
                 winlator, ppssppVersion, webShellPort,
-                topInset = innerPadding.calculateTopPadding(),
+                topInset = topInset,
                 onKrVersion = { krVersion = it },
                 onKrKernel = { krKernel = it },
                 onKrScoped = { krScoped = it },
@@ -1130,11 +1124,8 @@ private fun LazyListPlaceholder(
     val artFontCacheMap = artFontCacheOptions()
 
     LazyColumn(
-        // 顶栏透明：列表整体垫在顶栏下方（持久 padding），避免滚动时内容穿过顶栏
-        modifier = Modifier.fillMaxSize()
-            .padding(horizontal = 12.dp)
-            .padding(top = topInset),
-        contentPadding = PaddingValues(top = 12.dp, bottom = 24.dp),
+        modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
+        contentPadding = PaddingValues(top = 12.dp + topInset, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         if (kind == EngineSettingsKind.KRKR) item {

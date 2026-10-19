@@ -57,7 +57,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.basic.Card as MiuixCard
-import top.yukonga.miuix.kmp.basic.Scaffold as MiuixScaffold
+import com.tyranor.next.ui.common.MiuixTopBarBlurScaffold
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -211,10 +211,8 @@ internal fun InputSettingsScreen() {
     }
 
     MiuixSettingsTheme {
-        MiuixScaffold(
+        MiuixTopBarBlurScaffold(
             modifier = Modifier.fillMaxSize(),
-            containerColor = ComposeColor.Transparent,
-            contentWindowInsets = WindowInsets(0.dp),
             topBar = {
                 AppTopBar(
                     title = stringResource(R.string.input_settings_title),
@@ -222,12 +220,10 @@ internal fun InputSettingsScreen() {
                     contentColor = MiuixTheme.colorScheme.onBackground,
                 )
             },
-        ) { innerPadding ->
+        ) { topInset ->
             LazyColumn(
-                modifier = Modifier.fillMaxSize()
-                    .padding(horizontal = 12.dp)
-                    .padding(top = innerPadding.calculateTopPadding()),
-                contentPadding = PaddingValues(top = 12.dp, bottom = 24.dp),
+                modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
+                contentPadding = PaddingValues(top = 12.dp + topInset, bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 item {

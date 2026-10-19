@@ -152,6 +152,11 @@
   `contentPadding`），否则滚动内容会从顶栏下方穿过与标题重叠。设置类页面（MiuixScaffold）的
   `innerPadding` 顶部值一律加到列表 modifier 上，`contentPadding` 只保留额外的间距。
 
+- **默认外观风格的渐进模糊（仅默认风格，Android 12+）**：顶部栏背景仍是透明色，但页面经 `ui/common/TopBarBlur.kt` 的 `TopBarBlurHost`（Miuix 页用 `MiuixTopBarBlurScaffold`）托管时，正文铺满整页并垫在顶栏下方，顶栏背景层采样正文做模糊 + 页面底色半透明叠层，整体按竖向渐变遮罩——**顶端最实、底边完全透明**，形成「向上渐模糊」。
+  - 使用方式：`TopBarBlurHost(topBar = { AppTopBar(...) }) { topInset -> … }`；滚动列表把 `topInset` 加到 `contentPadding.top`，非滚动内容用 `padding(top = topInset)`。顶栏下方的固定条（分页/分类栏/搜索框）必须放进 `AppTopBar` 的 `underTitle`，才处于模糊区内。
+  - 玻璃系外观风格（复古/高级）与 Android 12 以下**不启用**：`TopBarBlurHost` 退化为「顶栏在上、正文在下」的 Column，`topInset = 0`，行为与原先一致。
+  - Web 首页（WebView）、解封包页不接入（WebView 不得录入采样层，见 `MainScreen.kt` 的 Web 首页采样降级说明）。
+
 - 禁止使用主题色 `primary` 作为顶部栏背景。
 
 ### 5. 状态栏
