@@ -1,0 +1,21 @@
+{
+  "upstream": "https://github.com/Weiss-UltimateSavior/Tyranor-Next",
+  "upstreamBundledRevision": "740d7c130fce019350e135066478de61fa9b439e",
+  "libraryFile": "engine/src/main/jniLibs/arm64-v8a/libsiglus.so",
+  "librarySha256": "fdef411e1f30550ef7adb7ab4ff1f383433aee94be7609a481eb18c13c3563df",
+  "libraryStatus": "unmodified-upstream-bundled",
+  "purpose": "Use the upstream bundled runtime unchanged; read engine-generated key.toml and Gameexe SCREEN_SIZE in the host.",
+  "configurationFormatReference": {
+    "upstream": "https://github.com/xmoezzz/siglus_rs",
+    "revision": "5f358ef1360b0439e92aed2b749e8f25d8721954",
+    "fixedTableSource": "crates/siglus_assets/src/keys.rs",
+    "license": "MPL-2.0"
+  },
+  "assetDirectory": "siglus-stage-size",
+  "files": [
+    {
+      "file": "LICENSE.MPL-2.0.txt",
+      "sha256": "cde215e5b42363eb28ca2462c4558ff4807b38f383c537624c31e44657ac58f4"
+    }
+  ]
+}

@@ -37,7 +37,17 @@ class WorkflowPolicyTests(unittest.TestCase):
 
     def test_shared_gate_preserves_static_and_manual_strict_modes(self):
         text = (ROOT / ".github/workflows/ethornell-native.yml").read_text()
-        self.assertIn("github.event_name == 'workflow_dispatch' || inputs.strict-release", text)
+        # A caller may itself be manually dispatched while explicitly asking
+        # the reusable gate for static acceptance. Do not override that input.
+        self.assertIn("STRICT_RELEASE: ${{ inputs.strict-release }}", text)
+        self.assertNotIn("github.event_name == 'workflow_dispatch' ||", text)
+        for trigger in ("workflow_call", "workflow_dispatch"):
+            with self.subTest(trigger=trigger):
+                block = text.split("  " + trigger + ":\n", 1)[1]
+                block = re.split(r"(?m)^  [A-Za-z_]+:\s*$|^permissions:", block, maxsplit=1)[0]
+                self.assertIn("      strict-release:", block)
+                self.assertIn("        type: boolean", block)
+                self.assertIn("        default: true", block)
         self.assertIn("source_args=(--local-static)", text)
         self.assertIn('source_args=(--fetch-source "$RUNNER_TEMP/ethornell-source")', text)
         command = re.search(r"python3 tools/ethornell/verify_provenance\.py.*?--report [^\n]+", text, re.S).group()
