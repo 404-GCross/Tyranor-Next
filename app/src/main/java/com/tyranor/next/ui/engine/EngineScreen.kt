@@ -66,6 +66,7 @@ import com.tyranor.next.ui.common.AppAlertDialog
 import com.tyranor.next.ui.common.AppNavItem
 import com.tyranor.next.ui.common.AppTopBar
 import com.tyranor.next.ui.common.SlidingTabRow
+import com.tyranor.next.ui.common.TopBarBlurHost
 import com.tyranor.next.ui.common.glassNavBottomInset
 import com.tyranor.next.ui.settings.artVersionOptions
 import top.yukonga.miuix.kmp.basic.TabRow
@@ -101,45 +102,49 @@ fun EngineScreen(modifier: Modifier = Modifier) {
         ppssppVersion = EngineSettingsStore.getPpssppVersion(context)
     }
 
-    Column(modifier.fillMaxSize()) {
-        AppTopBar(title = stringResource(R.string.nav_engine))
-
-        // 顶部分页（可在应用设置中关闭）：关闭时平铺展示全部引擎项
-        val categorizeEngines by AppSettingsStore.engineTabsState.collectAsState()
-        var selectedTab by remember { mutableIntStateOf(0) }
-        if (categorizeEngines) {
-            val tabs = listOf(
-                stringResource(R.string.engine_tab_gal),
-                stringResource(R.string.engine_tab_rpgm),
-                stringResource(R.string.engine_tab_console),
-                stringResource(R.string.engine_tab_web),
-            )
-            MiuixSettingsTheme {
-                val tabModifier = Modifier.padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 4.dp)
-                if (AppThemeColors.isGlass) {
-                    // 玻璃外观：Miuix TabRow 不支持指示器描边，改用统一标签栏组件
-                    // （亮卡指示器 + 滑动动画 + 0.5dp 描边，见 AGENTS.md「标签栏统一规范」）
-                    SlidingTabRow(
-                        tabs = tabs,
-                        selectedIndex = selectedTab,
-                        onTabSelected = { selectedTab = it },
-                        modifier = tabModifier,
+    // 顶部分页（可在应用设置中关闭）：关闭时平铺展示全部引擎项
+    val categorizeEngines by AppSettingsStore.engineTabsState.collectAsState()
+    var selectedTab by remember { mutableIntStateOf(0) }
+    TopBarBlurHost(modifier = modifier, topBar = {
+        // 分页放进 underTitle：与顶栏同属模糊背景区，列表滚动时不会在分页后面露出锐利内容
+        AppTopBar(
+            title = stringResource(R.string.nav_engine),
+            underTitle = {
+                if (categorizeEngines) {
+                    val tabs = listOf(
+                        stringResource(R.string.engine_tab_gal),
+                        stringResource(R.string.engine_tab_rpgm),
+                        stringResource(R.string.engine_tab_console),
+                        stringResource(R.string.engine_tab_web),
                     )
-                } else {
-                    TabRow(
-                        tabs = tabs,
-                        selectedTabIndex = selectedTab,
-                        onTabSelected = { selectedTab = it },
-                        // 圆角与组件统一入口同源：默认 8dp
-                        cornerRadius = AppComponentCornerRadius,
-                        // 容器背景透明（只保留选中指示器）：Miuix 默认取 surface，深色下呈不透明黑块
-                        colors = TabRowDefaults.tabRowColors(backgroundColor = Color.Transparent),
-                        modifier = tabModifier,
-                    )
+                    MiuixSettingsTheme {
+                        val tabModifier = Modifier.padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 4.dp)
+                        if (AppThemeColors.isGlass) {
+                            // 玻璃外观：Miuix TabRow 不支持指示器描边，改用统一标签栏组件
+                            // （亮卡指示器 + 滑动动画 + 0.5dp 描边，见 AGENTS.md「标签栏统一规范」）
+                            SlidingTabRow(
+                                tabs = tabs,
+                                selectedIndex = selectedTab,
+                                onTabSelected = { selectedTab = it },
+                                modifier = tabModifier,
+                            )
+                        } else {
+                            TabRow(
+                                tabs = tabs,
+                                selectedTabIndex = selectedTab,
+                                onTabSelected = { selectedTab = it },
+                                // 圆角与组件统一入口同源：默认 8dp
+                                cornerRadius = AppComponentCornerRadius,
+                                // 容器背景透明（只保留选中指示器）：Miuix 默认取 surface，深色下呈不透明黑块
+                                colors = TabRowDefaults.tabRowColors(backgroundColor = Color.Transparent),
+                                modifier = tabModifier,
+                            )
+                        }
+                    }
                 }
-            }
-        }
-
+            },
+        )
+    }) { topInset ->
         val tabEngines = (if (categorizeEngines) {
             engines.filter { engineTabOf(it) == EngineTab.entries[selectedTab] }
         } else {
@@ -149,7 +154,7 @@ fun EngineScreen(modifier: Modifier = Modifier) {
         // 引擎列表
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 16.dp + glassNavBottomInset()),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp + topInset, bottom = 16.dp + glassNavBottomInset()),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             items(
@@ -467,7 +472,8 @@ private enum class EngineTab { GAL, RPGM, CONSOLE, WEB }
 private fun engineTabOf(engine: EngineType): EngineTab = when (engine) {
     EngineType.RPGMAKER, EngineType.RPG_MV, EngineType.RPG_MZ -> EngineTab.RPGM
     EngineType.KIRIKIRI, EngineType.ONS, EngineType.ARTEMIS, EngineType.SIGLUS,
-    EngineType.REALLIVE, EngineType.AVG32, EngineType.XSYS35, EngineType.UK2, EngineType.FVP,
+    EngineType.REALLIVE, EngineType.AVG32, EngineType.XSYS35, EngineType.XSYS4, EngineType.UK2, EngineType.FVP,
+    EngineType.ETHORNELL,
     EngineType.RENPY, EngineType.YURIS, EngineType.CATSYSTEM2 -> EngineTab.GAL
     // PC（手动添加，经 Winlator 运行）与主机模拟器同属「主机」分类
     EngineType.PSP, EngineType.NINTENDO_SWITCH, EngineType.PC -> EngineTab.CONSOLE
@@ -497,8 +503,10 @@ private fun engineDescription(engine: EngineType): String = when (engine) {
     EngineType.REALLIVE -> stringResource(R.string.engine_desc_reallive)
     EngineType.AVG32 -> stringResource(R.string.engine_desc_avg32)
     EngineType.XSYS35 -> stringResource(R.string.engine_desc_xsys35)
+    EngineType.XSYS4 -> stringResource(R.string.engine_desc_xsys4)
     EngineType.UK2 -> stringResource(R.string.engine_desc_uk2)
     EngineType.FVP -> stringResource(R.string.engine_desc_fvp)
+    EngineType.ETHORNELL -> stringResource(R.string.engine_desc_ethornell)
 
     EngineType.YURIS -> stringResource(R.string.engine_desc_yuris)
     EngineType.CATSYSTEM2 -> stringResource(R.string.engine_desc_cs2)
@@ -540,6 +548,7 @@ private val rpgMakerWebBuiltin = listOf(
 
 /** 各内置引擎的「版本条目」弹窗内容（条目顺序即展示顺序）。 */
 private val builtinDialogEntries: Map<EngineType, List<EngineDialogEntry>> = mapOf(
+    EngineType.ETHORNELL to listOf(builtinEntry("internal.ethornell", "ethornell-rs / Android host ABI 1")),
     EngineType.TYRANO to tyranorWebBuiltin,
     EngineType.WEB_OTHER to tyranorWebBuiltin,
     EngineType.VN to tyranorWebBuiltin,
@@ -563,6 +572,9 @@ private val builtinDialogEntries: Map<EngineType, List<EngineDialogEntry>> = map
     ),
     EngineType.XSYS35 to listOf(
         builtinEntry("xsys35-2.20.0", "xsystem35-2.20.0"),
+    ),
+    EngineType.XSYS4 to listOf(
+        builtinEntry("xsys4-6a94a0c", "xsystem4-6a94a0c"),
     ),
     EngineType.FVP to listOf(
         builtinEntry("fvp-rfvp", "rfvp-xmoezzz"),

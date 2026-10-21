@@ -122,6 +122,22 @@ class MainLibraryViewModel(application: Application) : AndroidViewModel(applicat
             }
         }
         refreshFromStorage()
+        // System4 一次性迁移：旧版本把 System4 游戏存成了 XSYS35（增量扫描不改判）。
+        // 只对库中 XSYS35 条目定点重检测（不整库重扫，不重置标题/手动改动、不删除游戏）。
+        // 所有目标都得到确定结果（或没有目标）才置位；存在暂不可达 / 读取失败的条目时不置位，
+        // 下次启动仅重试仍为 XSYS35 的条目（成本低）。
+        viewModelScope.launch(Dispatchers.IO) {
+            if (AppSettingsStore.isXs4RescanMigrationDone(appContext)) return@launch
+            try {
+                val report = EngineScanner.redetectXs35Games(appContext)
+                if (report.changed > 0) refreshFromStorage()
+                if (report.complete) AppSettingsStore.markXs4RescanMigrationDone(appContext)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (throwable: Throwable) {
+                Log.e(TAG, "Xs4 redetect migration failed", throwable)
+            }
+        }
         // 标题回写导入：引擎宿主首次启动成功后写入解析出的标题，此处消费并差量落库
         viewModelScope.launch(Dispatchers.IO) {
             SiglusTitleFeedback.import(appContext)

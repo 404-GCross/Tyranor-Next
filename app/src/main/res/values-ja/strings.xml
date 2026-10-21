@@ -1,4 +1,5 @@
 <resources>
+    <string name="common_clear_input_content_description">入力をクリア</string>
     <string name="app_name">Tyranor Next</string>
     <string name="common_confirm">OK</string>
     <string name="common_done">完了</string>
@@ -44,7 +45,7 @@
     <string name="settings_side_rail">タブレットサイドレール</string>
     <string name="settings_side_rail_summary">タブレット・大画面ではナビを側面に移動。オフの場合は下部のまま</string>
     <string name="settings_nav_bar_title">ナビゲーションバーのスタイル</string>
-    <string name="settings_nav_bar_default">デフォルト</string>
+    <string name="settings_nav_bar_classic_md">クラシック MD</string>
     <string name="settings_nav_bar_liquid_glass">リキッドグラス · クラシック</string>
     <string name="settings_nav_bar_liquid_glass_enhanced">リキッドグラス · レンズ</string>
     <string name="settings_nav_bar_floating_button">フローティングボタン</string>
@@ -154,6 +155,7 @@
     <string name="engine_desc_avg32">AVG32（VisualArt’s 初期エンジン）。Kanon / AIR / ONE など</string>
     <string name="engine_desc_uk2">UK2（AyPio 初期エンジン、PC-98）。ソーサーキングダム など</string>
     <string name="engine_desc_xsys35">System3.x（xsystem35）</string>
+    <string name="engine_desc_xsys4">System4（xsystem4）</string>
     <string name="engine_desc_unknown">不明なエンジン</string>
     <string name="engine_desc_psp">PSP ゲームは外部 PPSSPP で実行します</string>
     <string name="engine_desc_yuris">YU-RIS（yscfg.dat と .ypf パッケージ、ysbin/.ymv）。外部 Winlator で実行</string>
@@ -308,6 +310,23 @@
     <string name="engine_settings_xsys35_mute_unfocus_title">非フォーカス時にミュート</string>
     <string name="engine_settings_xsys35_note">テキストは Shift-JIS。独立セーブ有効時はアプリのセーブフォルダ、無効時はゲームフォルダの save/</string>
     <string name="engine_settings_xsys35_uninstall_hint">アンインストールまたはゲーム削除時にアプリ専用セーブフォルダが消去されます</string>
+    <string name="engine_settings_xsys4_title">System4 エンジン設定</string>
+    <string name="engine_settings_xsys4_encoding_title">文字コード</string>
+    <string name="engine_settings_xsys4_encoding_sjis">Shift-JIS（日本語版）</string>
+    <string name="engine_settings_xsys4_encoding_gbk">GBK（中国語版）</string>
+    <string name="engine_settings_xsys4_font_gothic_title">カスタムゴシックフォント</string>
+    <string name="engine_settings_xsys4_font_mincho_title">カスタム明朝フォント</string>
+    <string name="engine_settings_xsys4_font_hint">System4 のみ有効。読み込めない場合は内蔵フォントに戻ります。変更後はゲームの再起動が必要です。</string>
+    <string name="engine_settings_xsys4_joypad_title">ゲームパッド</string>
+    <string name="engine_settings_xsys4_joypad_auto">エンジン既定</string>
+    <string name="engine_settings_xsys4_joypad_on">オン</string>
+    <string name="engine_settings_xsys4_joypad_off">オフ</string>
+    <string name="engine_settings_xsys4_msgskip_title">メッセージスキップ遅延</string>
+    <string name="engine_settings_xsys4_msgskip_default">エンジン既定</string>
+    <string name="engine_settings_xsys4_msgskip_value">%1$d ms</string>
+    <string name="engine_settings_xsys4_note">文字コードはゲーム版に合わせてください。独立セーブ有効時はアプリのセーブフォルダ、無効時はゲームフォルダ</string>
+    <string name="engine_settings_xsys4_uninstall_hint">アンインストールまたはゲーム削除時にアプリ専用セーブフォルダが消去されます</string>
+    <string name="engine_settings_xsys4_compat_hint">Rance X 以降の作品・Evenicle などは非対応。動画は MPEG-1 のみ</string>
     <string name="engine_settings_ppsspp_title">PPSSPP エンジン設定</string>
     <string name="engine_settings_input_title">入力とゲームパッド</string>
     <string name="engine_settings_input_pad_title">バーチャルパッド</string>
@@ -500,14 +519,6 @@
     <string name="engine_option_rpg_mv_v2">TynMV-0.2</string>
     <string name="engine_option_rpg_mz_v0">Tyranor-2.3.4</string>
     <string name="engine_option_rpg_mz_v2">TynMZ-0.1</string>
-    <string name="engine_settings_anime4k">アップスケーリング</string>
-    <string name="engine_option_anime4k_fast">高速（S）</string>
-    <string name="engine_option_anime4k_balanced">バランス（M）</string>
-    <string name="engine_option_anime4k_high">高品質（L）</string>
-    <string name="engine_option_anime4k_soft_fast">ソフト・高速</string>
-    <string name="engine_option_anime4k_soft_balanced">ソフト・バランス</string>
-    <string name="engine_option_anime4k_soft_high">ソフト・高品質</string>
-    <string name="engine_option_anime4k_deblur">ぼかし除去（DoG）</string>
 
     <string name="cover_source_local">ローカルカバー</string>
     <string name="cover_source_custom">カスタムカバー</string>
@@ -571,6 +582,7 @@
     <string name="save_location_ons_game_dir">ONS ゲーム内セーブフォルダ</string>
     <string name="save_error_tyrano_external_unavailable">Tyrano のアプリ個別ストレージを使用できません</string>
     <string name="save_error_xsys35_external_unavailable">外部ストレージが利用できないため、専用セーブフォルダを使用できません</string>
+    <string name="save_error_xsys4_external_unavailable">外部ストレージが利用できないため、専用セーブフォルダを使用できません</string>
     <string name="save_location_engine_scoped">%1$s アプリ個別セーブフォルダ</string>
     <string name="save_location_engine_game_dir">%1$s ゲーム内セーブフォルダ</string>
     <string name="save_location_engine_no_file_interface">%1$s には標準ファイルセーブ管理インターフェイスがありません</string>
@@ -729,6 +741,11 @@
     <string name="launch_error_xs35_save_path_not_directory">セーブパスがフォルダではありません：%1$s</string>
     <string name="launch_error_xs35_save_dir_unavailable">セーブフォルダを作成できません：%1$s</string>
     <string name="launch_error_xs35_external_unavailable">外部ストレージが利用できないため、専用セーブフォルダを使用できません</string>
+    <string name="launch_error_xs4_save_path_not_directory">セーブパスがフォルダではありません：%1$s</string>
+    <string name="launch_error_xs4_save_dir_unavailable">セーブフォルダを作成できません：%1$s</string>
+    <string name="launch_error_xs4_external_unavailable">外部ストレージが利用できないため、専用セーブフォルダを使用できません</string>
+    <string name="launch_error_xs4_ini_missing">System40.ini / AliceStart.ini が見つからないため System4 ゲームを起動できません</string>
+    <string name="launch_error_xs4_gles3_required">OpenGL ES 3.0 対応デバイスが必要です</string>
 
     <string name="archive_title">解凍 / 圧縮</string>
     <string name="archive_permission_rationale">アーカイブを直接読み取るには「すべてのファイルアクセス」権限が必要です。未許可の場合、一部のフォルダはスキャンできないか低速な転送になります</string>
@@ -793,4 +810,47 @@
     <string name="android_add_duplicate">このアプリは既に追加済みです</string>
     <string name="android_add_already_added">ライブラリに追加済み</string>
     <string name="game_cover_flow_caption">%1$s - %2$s</string>
+
+    <!-- Shared ordered graphics-chain settings -->
+    <string name="graphics_settings_title">画面フィルター</string>
+    <string name="graphics_settings_enabled">フィルターチェーンを有効化</string>
+    <string name="graphics_chain_title">フィルターチェーン</string>
+    <string name="graphics_chain_custom">このゲーム専用のチェーンを設定</string>
+    <string name="graphics_chain_empty">チェーンが空のため、画面処理と性能モニターは実行されません。</string>
+    <string name="graphics_chain_up">上へ</string>
+    <string name="graphics_chain_down">下へ</string>
+    <string name="graphics_chain_remove">削除</string>
+    <string name="graphics_chain_add_type">追加するフィルター</string>
+    <string name="graphics_chain_add">フィルターを追加</string>
+    <string name="graphics_chain_clear">チェーンを空にする</string>
+    <string name="graphics_chain_limit">最大 %1$d ノード</string>
+    <string name="graphics_filter_back_categories">戻る</string>
+    <string name="graphics_settings_unsupported">このエンジンのバージョンはフィルター非対応です</string>
+    <string name="graphics_settings_runtime_dependent">自動選択：フィルター対応は実際のエンジンに依存します</string>
+    <string name="graphics_filter_parameters">パラメーター</string>
+    <string name="graphics_filter_sharpness">シャープネス</string>
+    <string name="graphics_filter_scale_type">種類</string>
+    <string name="graphics_filter_scale_fit">画面に合わせる</string>
+    <string name="graphics_filter_scale_factor">倍率</string>
+    <string name="graphics_filter_scale_multiplier">拡大・縮小倍率（0.25–4）</string>
+    <string name="graphics_filter_scale_none">拡縮なし</string>
+    <string name="graphics_analyzer_title">パフォーマンス分析</string>
+    <string name="graphics_refresh_interval">データ更新間隔</string>
+    <string name="graphics_refresh_seconds">%1$s 秒</string>
+    <string name="graphics_analyzer_position">位置</string>
+    <string name="graphics_analyzer_top_center">上中央</string>
+    <string name="graphics_analyzer_bottom_center">下中央</string>
+    <string name="graphics_filter_decrease">−</string>
+    <string name="graphics_filter_increase">+</string>
+    <string name="ethornell_settings_title">Ethornell / BGI 設定</string>
+    <string name="ethornell_error_session_busy">Ethornell で別のゲームが実行中、またはセッションを開始・終了しています。現在のゲームを終了してから再試行してください。</string>
+    <string name="engine_desc_ethornell">内蔵 ethornell-rs 再実装ランタイム。互換性はゲームのバージョンに依存し、Windows プラグインには対応しません。</string>
+    <string name="ethornell_nls_title">描画テキストの文字コード</string>
+    <string name="ethornell_font_title">カスタムフォント</string>
+    <string name="ethornell_font_default">エンジンのフォント候補を使用</string>
+    <string name="ethornell_settings_note">文字コードは描画テキストのみに適用され、リソース名には影響しません。変更後はゲームを再起動してください。ユーザーデータはアプリ専用領域に保存され、セーブ管理はまだ利用できません。</string>
+    <string name="ethornell_error_root">ゲームフォルダーを読み取れません。アクセス可能なローカルフォルダーを選び、再度許可してください。</string>
+    <string name="ethornell_error_bootstrap">ipl._bp 起動項目を含む対応 system.arc 索引が見つかりません。</string>
+    <string name="ethornell_error_font">フォントが無効、または読み取れません。TTF、TTC、OTF、OTC フォントを再度取り込んでください。</string>
+    <string name="ethornell_error_userdata">Ethornell 専用ユーザーデータを作成できません。空き容量を確認してください。</string>
 </resources>

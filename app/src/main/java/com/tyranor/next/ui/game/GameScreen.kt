@@ -48,7 +48,6 @@ import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.material3.Button
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -117,6 +116,7 @@ import com.tyranor.next.core.game.model.GameSortKeys
 import com.tyranor.next.core.game.model.GameTitleTags
 import com.tyranor.next.core.game.model.ScanGame
 import com.tyranor.next.core.cover.VndbCoverService
+import com.tyranor.next.core.cover.persistentCoverDir
 import com.tyranor.next.core.cover.stableKey
 import com.tyranor.next.core.i18n.AppLocaleController
 import com.tyranor.next.core.settings.AppSettingsStore
@@ -144,6 +144,7 @@ import com.tyranor.next.ui.common.AppAlertDialog
 import com.tyranor.next.ui.common.AppNavItem
 import com.tyranor.next.ui.common.AppSearchField
 import com.tyranor.next.ui.common.AppTopBar
+import com.tyranor.next.ui.common.TopBarBlurHost
 import com.tyranor.next.ui.common.DialogTextButton
 import com.tyranor.next.ui.common.TopBarIcon
 import com.tyranor.next.ui.common.glassNavBottomInset
@@ -435,7 +436,7 @@ internal fun cleanupDeletedGame(context: android.content.Context, target: ScanGa
 private fun deleteCoverFile(context: android.content.Context, coverUri: String?) {
     if (coverUri.isNullOrBlank()) return
     val file = runCatching { File(android.net.Uri.parse(coverUri).path ?: return) }.getOrNull() ?: return
-    val coverDir = File(context.filesDir, "covers_remote").canonicalPath
+    val coverDir = persistentCoverDir(context).canonicalPath
     if (runCatching { file.canonicalPath }.getOrNull()?.startsWith(coverDir) == true) {
         file.delete()
     }
@@ -497,7 +498,7 @@ private fun GameLibraryContent(
     }
     val scrapingCoversDescription = stringResource(R.string.game_scraping_covers_content_description)
 
-    Column(modifier.fillMaxSize()) {
+    TopBarBlurHost(modifier = modifier, topBar = {
         // ===== 顶部栏：统一 AppTopBar（标题居左 + 右侧图标 + 折叠搜索框） =====
         AppTopBar(
             title = stringResource(R.string.game_title),
@@ -543,16 +544,16 @@ private fun GameLibraryContent(
                 }
             },
         )
-
+    }) { topInset ->
         // ===== 内容区 =====
         Box(Modifier.fillMaxSize()) {
             when {
                 scanning || !loaded -> {
-                    CircularProgressIndicator(Modifier.align(Alignment.Center))
+                    CircularProgressIndicator(Modifier.align(Alignment.Center).padding(top = topInset))
                 }
                 games.isEmpty() -> {
                     Column(
-                        Modifier.align(Alignment.Center),
+                        Modifier.align(Alignment.Center).padding(top = topInset),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         Text(stringResource(R.string.game_empty_title), style = MaterialTheme.typography.bodyMedium)
@@ -562,10 +563,11 @@ private fun GameLibraryContent(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = 8.dp),
                         )
-                        Button(
+                        com.tyranor.next.ui.common.NoRippleButton(
+                            text = stringResource(R.string.game_add_folder),
                             onClick = { dirPickerLaunch() },
                             modifier = Modifier.padding(top = 16.dp),
-                        ) { Text(stringResource(R.string.game_add_folder)) }
+                        )
                     }
                 }
                 else -> {
@@ -574,23 +576,26 @@ private fun GameLibraryContent(
                             stringResource(R.string.game_no_match),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.align(Alignment.Center),
+                            modifier = Modifier.align(Alignment.Center).padding(top = topInset),
                         )
                     } else {
                         val cardStyle by AppSettingsStore.gameCardStyleState.collectAsState()
                         if (cardStyle == AppSettingsStore.GAME_CARD_STYLE_COVER_FLOW) {
-                            // 「列表」风格：封面流横向轮播（列表/搜索/排序数据源相同）
-                            GameCoverFlow(
-                                games = filteredGames,
-                                onGameClick = onGameClick,
-                                onGameLongClick = onGameLongClick,
-                            )
+                            // 「列表」风格：封面流横向轮播（列表/搜索/排序数据源相同），不滚动穿过顶栏
+                            Box(Modifier.fillMaxSize().padding(top = topInset)) {
+                                GameCoverFlow(
+                                    games = filteredGames,
+                                    onGameClick = onGameClick,
+                                    onGameLongClick = onGameLongClick,
+                                )
+                            }
                         } else {
                             GameGrid(
                                 games = filteredGames,
                                 gridState = gridState,
                                 onGameClick = onGameClick,
                                 onGameLongClick = onGameLongClick,
+                                topInset = topInset,
                             )
                         }
                     }
@@ -1342,7 +1347,7 @@ private fun CoverSearchDialog(
     var candidates by rememberSaveable(source, game.uri, stateSaver = CoverSearchCandidatesSaver) {
         mutableStateOf(emptyList<CoverSearchCandidate>())
     }
-    // 二级（未萌 NextMoe）：作品 → 该作品全部封面；其它来源恒为 null
+    // 二级（未萌 NextMoe）：作品 → 该作品可获取的封面；其它来源恒为 null
     var drillDownWork by remember(source, game.uri) { mutableStateOf<CoverSearchCandidate?>(null) }
     var workCovers by remember(source, game.uri) { mutableStateOf(emptyList<CoverSearchCandidate>()) }
     var loadingCovers by remember(source, game.uri) { mutableStateOf(false) }
@@ -1402,7 +1407,7 @@ private fun CoverSearchDialog(
         }
     }
 
-    // 二级：拉取所选作品的全部封面（只有支持「一作品多封面」的来源会走到这里）
+    // 二级：拉取所选作品可获取的封面（只有支持「一作品多封面」的来源会走到这里）
     fun openWork(work: CoverSearchCandidate) {
         if (loadingCovers || binding) return
         // 上一个二级请求让位：其 finally 不再回写 loading 态（见下方 isActive 守卫）
@@ -1890,6 +1895,7 @@ internal fun GameGrid(
     gridState: LazyGridState,
     onGameClick: (ScanGame) -> Unit,
     onGameLongClick: (ScanGame) -> Unit,
+    topInset: Dp = 0.dp,
 ) {
     // 液态玻璃导航悬浮时不占布局：列表底部预留导航高度，滚动到底时最后一行可完全露出不被遮挡；
     // 滚动过程中内容仍可经过玻璃后面（沉浸）
@@ -1907,7 +1913,7 @@ internal fun GameGrid(
         columns = GridCells.Fixed(columns),
         state = gridState,
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 12.dp + glassBottomInset),
+        contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 12.dp + topInset, bottom = 12.dp + glassBottomInset),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -2206,8 +2212,10 @@ internal fun EngineType.coverColor(): Color = when (this) {
     EngineType.REALLIVE -> Color(0xFF00695C)
     EngineType.AVG32 -> Color(0xFF8E7CC3)
     EngineType.XSYS35 -> Color(0xFF8B3A5E)
+    EngineType.XSYS4 -> Color(0xFF00A176)
     EngineType.UK2 -> Color(0xFF4E6E81)
     EngineType.FVP -> Color(0xFFB05A2A)
+    EngineType.ETHORNELL -> com.tyranor.next.theme.EthornellCoverColor
     EngineType.YURIS -> Color(0xFF558B2F)
     EngineType.CATSYSTEM2 -> Color(0xFF6D4C41)
     EngineType.PC -> Color(0xFF455A64)
@@ -2223,6 +2231,8 @@ internal fun shouldShowSaveManagement(engine: EngineType): Boolean =
     // 手动添加的类型（PC / 安卓游戏）无统一存档接口，显式排除。
     engine == EngineType.YURIS ||
         (!engine.isManual &&
+            (engine != EngineType.ETHORNELL ||
+                com.tyranor.next.core.game.save.EthornellSaveCapability.available) &&
             !ExternalEngineModuleRegistry.isExternalEngine(engine) &&
             ExternalEmulatorRegistry.forEngine(engine) == null)
 

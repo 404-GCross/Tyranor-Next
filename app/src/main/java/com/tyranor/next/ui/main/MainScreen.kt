@@ -91,6 +91,7 @@ import com.tyranor.next.ui.common.LaunchErrorState
 import com.tyranor.next.ui.common.LiquidGlassNavigationBar
 import com.tyranor.next.ui.common.NavigationTabIcon
 import com.tyranor.next.ui.common.SidePanelEdgeExclusionBar
+import com.tyranor.next.ui.common.effectiveNavStyle
 import com.tyranor.next.ui.common.isSideRailLayout
 import com.tyranor.next.ui.common.rememberSidePanelSwipeModifier
 import com.tyranor.next.ui.common.toErrorState
@@ -169,8 +170,8 @@ fun MainScreen(modifier: Modifier = Modifier) {
       }
     }
   }
-  val navStyle by AppSettingsStore.navStyleState.collectAsState()
-  // ===== 侧边栏（仅四大页面可唤出）：左半屏右滑 / 左边缘返回手势打开 =====
+  val navStyle = effectiveNavStyle()
+  // ===== 侧边栏（仅四大页面可唤出）：左缘右滑 / 左边缘返回手势打开 =====
   // 面板关闭时把「左边缘返回手势」解读为唤出侧边栏；右边缘/返回键保持系统默认（退出）。
   // 页面级 BackHandler（如 Web 首页回退历史、悬浮按钮展开态）在更晚的组合位置注册，
   // 按返回分发「后注册优先」规则仍优先生效。
@@ -245,7 +246,7 @@ fun MainScreen(modifier: Modifier = Modifier) {
   val reportBottomNavTop = remember {
     Modifier.onGloballyPositioned { bottomNavTopY = it.positionInParent().y }
   }
-  // 左半屏右滑唤出：挂在根布局上（子内容优先，不遮挡任何点击/滚动）；
+  // 左缘右滑唤出：挂在根布局上（子内容优先，不遮挡任何点击/滚动）；
   // 起点落在底部导航栏区域内时不识别（见 rememberSidePanelSwipeModifier 的 bottomBarTopY）
   val sidePanelSwipeModifier = rememberSidePanelSwipeModifier(
     onOpen = { sidePanelOpen = true },

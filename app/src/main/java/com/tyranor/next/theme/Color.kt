@@ -2,6 +2,8 @@ package com.tyranor.next.theme
 
 import androidx.compose.ui.graphics.Color
 
+val EthornellCoverColor = Color(0xFF526F95)
+
 // 主色
 val Blue40 = Color(0xFF307DEF)
 val Teal40 = Color(0xFF2E7D78)
@@ -29,6 +31,9 @@ val CoverBadgeBackground = Color(0x8F000000)
 
 /** 角标文字/图标色：固定白色。 */
 val CoverBadgeText = Color.White
+
+/** 未读/更新提醒红点：固定亮红，不随主题色与深浅色变化。 */
+val NoticeDotRed = Color(0xFFFF2D2D)
 
 // ===== 玻璃外观风格色板（固定深色，不随外观模式/色调切换变化） =====
 

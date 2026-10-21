@@ -1,4 +1,5 @@
 <resources>
+    <string name="common_clear_input_content_description">Clear input</string>
     <string name="app_name">Tyranor Next</string>
     <string name="common_confirm">OK</string>
     <string name="common_done">Done</string>
@@ -44,7 +45,7 @@
     <string name="settings_side_rail">Tablet side rail</string>
     <string name="settings_side_rail_summary">Move navigation to the side on tablets and large windows; keep it at the bottom when off</string>
     <string name="settings_nav_bar_title">Navigation bar style</string>
-    <string name="settings_nav_bar_default">Default</string>
+    <string name="settings_nav_bar_classic_md">Classic MD</string>
     <string name="settings_nav_bar_liquid_glass">Liquid glass · Classic</string>
     <string name="settings_nav_bar_liquid_glass_enhanced">Liquid glass · Lens</string>
     <string name="settings_nav_bar_floating_button">Floating button</string>
@@ -154,6 +155,7 @@
     <string name="engine_desc_avg32">AVG32 (VisualArt’s early engine). Kanon / AIR / ONE and more</string>
     <string name="engine_desc_uk2">UK2 (AyPio early PC-98 engine). Sorcer Kingdom and more</string>
     <string name="engine_desc_xsys35">System3.x (xsystem35)</string>
+    <string name="engine_desc_xsys4">System4 (xsystem4)</string>
     <string name="engine_desc_unknown">Unknown engine</string>
     <string name="engine_desc_psp">PSP games run through the external PPSSPP</string>
     <string name="engine_desc_yuris">YU-RIS (yscfg.dat with .ypf packages, ysbin/.ymv), runs via external Winlator</string>
@@ -308,6 +310,23 @@
     <string name="engine_settings_xsys35_mute_unfocus_title">Mute when unfocused</string>
     <string name="engine_settings_xsys35_note">Text is Shift-JIS; saves live in the app save dir when scoped saves are on, otherwise in the game\'s save/</string>
     <string name="engine_settings_xsys35_uninstall_hint">Uninstalling or removing the game clears its scoped save directory</string>
+    <string name="engine_settings_xsys4_title">System4 engine settings</string>
+    <string name="engine_settings_xsys4_encoding_title">Text encoding</string>
+    <string name="engine_settings_xsys4_encoding_sjis">Shift-JIS (Japanese)</string>
+    <string name="engine_settings_xsys4_encoding_gbk">GBK (Chinese)</string>
+    <string name="engine_settings_xsys4_font_gothic_title">Custom gothic font</string>
+    <string name="engine_settings_xsys4_font_mincho_title">Custom mincho font</string>
+    <string name="engine_settings_xsys4_font_hint">System4 only; falls back to the built-in font if the file is unusable; re-enter the game after changes.</string>
+    <string name="engine_settings_xsys4_joypad_title">Gamepad</string>
+    <string name="engine_settings_xsys4_joypad_auto">Engine default</string>
+    <string name="engine_settings_xsys4_joypad_on">On</string>
+    <string name="engine_settings_xsys4_joypad_off">Off</string>
+    <string name="engine_settings_xsys4_msgskip_title">Message skip delay</string>
+    <string name="engine_settings_xsys4_msgskip_default">Engine default</string>
+    <string name="engine_settings_xsys4_msgskip_value">%1$d ms</string>
+    <string name="engine_settings_xsys4_note">Match the text encoding to the game version; saves live in the app save dir when scoped saves are on, otherwise in the game folder</string>
+    <string name="engine_settings_xsys4_uninstall_hint">Uninstalling or removing the game clears its scoped save directory</string>
+    <string name="engine_settings_xsys4_compat_hint">Rance X and later titles and Evenicle are unsupported; video is MPEG-1 only</string>
     <string name="engine_settings_ppsspp_title">PPSSPP engine settings</string>
     <string name="engine_settings_input_title">Input &amp; gamepad</string>
     <string name="engine_settings_input_pad_title">Virtual pad</string>
@@ -500,14 +519,6 @@
     <string name="engine_option_rpg_mv_v2">TynMV-0.2</string>
     <string name="engine_option_rpg_mz_v0">Tyranor-2.3.4</string>
     <string name="engine_option_rpg_mz_v2">TynMZ-0.1</string>
-    <string name="engine_settings_anime4k">Upscaling</string>
-    <string name="engine_option_anime4k_fast">Fast (S)</string>
-    <string name="engine_option_anime4k_balanced">Balanced (M)</string>
-    <string name="engine_option_anime4k_high">High (L)</string>
-    <string name="engine_option_anime4k_soft_fast">Soft · Fast</string>
-    <string name="engine_option_anime4k_soft_balanced">Soft · Balanced</string>
-    <string name="engine_option_anime4k_soft_high">Soft · High</string>
-    <string name="engine_option_anime4k_deblur">Deblur (DoG)</string>
 
     <string name="cover_source_local">Local cover</string>
     <string name="cover_source_custom">Custom cover</string>
@@ -571,6 +582,7 @@
     <string name="save_location_ons_game_dir">ONS in-game save directory</string>
     <string name="save_error_tyrano_external_unavailable">Tyrano app-specific storage is unavailable</string>
     <string name="save_error_xsys35_external_unavailable">External storage unavailable; cannot use the scoped save directory</string>
+    <string name="save_error_xsys4_external_unavailable">External storage unavailable; cannot use the scoped save directory</string>
     <string name="save_location_engine_scoped">%1$s app-specific save directory</string>
     <string name="save_location_engine_game_dir">%1$s in-game save directory</string>
     <string name="save_location_engine_no_file_interface">%1$s does not expose a standard file-based save interface</string>
@@ -729,6 +741,11 @@
     <string name="launch_error_xs35_save_path_not_directory">Save path exists but is not a directory: %1$s</string>
     <string name="launch_error_xs35_save_dir_unavailable">Cannot create save directory: %1$s</string>
     <string name="launch_error_xs35_external_unavailable">External storage unavailable; cannot use the scoped save directory</string>
+    <string name="launch_error_xs4_save_path_not_directory">Save path exists but is not a directory: %1$s</string>
+    <string name="launch_error_xs4_save_dir_unavailable">Cannot create save directory: %1$s</string>
+    <string name="launch_error_xs4_external_unavailable">External storage unavailable; cannot use the scoped save directory</string>
+    <string name="launch_error_xs4_ini_missing">System40.ini / AliceStart.ini not found; cannot start this System4 game</string>
+    <string name="launch_error_xs4_gles3_required">A device with OpenGL ES 3.0 support is required</string>
 
     <string name="archive_title">Unpack / Pack</string>
     <string name="archive_permission_rationale">“All files access” is required to read archives from storage directly; without it some folders cannot be scanned or fall back to slow transfers</string>
@@ -793,4 +810,47 @@
     <string name="android_add_duplicate">This app is already in the library</string>
     <string name="android_add_already_added">In library</string>
     <string name="game_cover_flow_caption">%1$s - %2$s</string>
+
+    <!-- Shared ordered graphics-chain settings -->
+    <string name="graphics_settings_title">Graphics filters</string>
+    <string name="graphics_settings_enabled">Enable filter chain</string>
+    <string name="graphics_chain_title">Filter chain</string>
+    <string name="graphics_chain_custom">Use a custom chain for this game</string>
+    <string name="graphics_chain_empty">The chain is empty. No graphics processing or performance monitoring will run.</string>
+    <string name="graphics_chain_up">Move up</string>
+    <string name="graphics_chain_down">Move down</string>
+    <string name="graphics_chain_remove">Remove</string>
+    <string name="graphics_chain_add_type">Filter to add</string>
+    <string name="graphics_chain_add">Add filter</string>
+    <string name="graphics_chain_clear">Clear chain</string>
+    <string name="graphics_chain_limit">Up to %1$d nodes</string>
+    <string name="graphics_filter_back_categories">Back</string>
+    <string name="graphics_settings_unsupported">This engine version does not support filters</string>
+    <string name="graphics_settings_runtime_dependent">Auto selection: filter support depends on the actual engine version</string>
+    <string name="graphics_filter_parameters">Parameters</string>
+    <string name="graphics_filter_sharpness">Sharpness</string>
+    <string name="graphics_filter_scale_type">Type</string>
+    <string name="graphics_filter_scale_fit">Fit</string>
+    <string name="graphics_filter_scale_factor">Factor</string>
+    <string name="graphics_filter_scale_multiplier">Scale factor (0.25–4)</string>
+    <string name="graphics_filter_scale_none">No resize</string>
+    <string name="graphics_analyzer_title">Performance analyzer</string>
+    <string name="graphics_refresh_interval">Data refresh interval</string>
+    <string name="graphics_refresh_seconds">%1$s s</string>
+    <string name="graphics_analyzer_position">Position</string>
+    <string name="graphics_analyzer_top_center">Top center</string>
+    <string name="graphics_analyzer_bottom_center">Bottom center</string>
+    <string name="graphics_filter_decrease">−</string>
+    <string name="graphics_filter_increase">+</string>
+    <string name="ethornell_settings_title">Ethornell / BGI settings</string>
+    <string name="ethornell_error_session_busy">Ethornell is running another game, or its session is starting or closing. Exit the current game before trying again.</string>
+    <string name="engine_desc_ethornell">Built-in ethornell-rs reimplementation. Compatibility depends on the game version; Windows plugins are unsupported.</string>
+    <string name="ethornell_nls_title">Graphics text encoding</string>
+    <string name="ethornell_font_title">Custom font</string>
+    <string name="ethornell_font_default">Use engine font fallback</string>
+    <string name="ethornell_settings_note">Encoding affects graphics text only, not resource names. Restart the game after changes. User data is app-private; save management is not yet available.</string>
+    <string name="ethornell_error_root">Cannot read the game directory. Select an accessible local directory and grant access again.</string>
+    <string name="ethornell_error_bootstrap">No supported system.arc index with an ipl._bp bootstrap was found.</string>
+    <string name="ethornell_error_font">Invalid or unreadable font. Import a TTF, TTC, OTF or OTC font again.</string>
+    <string name="ethornell_error_userdata">Cannot create private Ethornell user data. Check available storage space.</string>
 </resources>

@@ -9,6 +9,16 @@ import com.tyranor.next.core.engine.EngineType
  * Context 读取由 [EngineSettingsResolver] 完成后传入。
  */
 object EffectiveEngineSettings {
+    /** Settings preview and launch share the same official Artemis version whitelist. */
+    fun resolveArtVersion(override: String?, global: String): String = resolveAllowed(
+        override, global, EngineSettingsStore.ART_VERSIONS, EngineSettingsStore.ART_ENGINE_AUTO,
+    )
+
+
+    /** KR preview and launch reject stale overrides before selecting a host or its capabilities. */
+    fun resolveKrVersion(override: String?, global: String): String = resolveAllowed(
+        override, global, EngineSettingsStore.KR_VERSIONS, EngineSettingsStore.KR_AUTO,
+    )
 
     /** 通用三级合并：单游戏覆盖优先，null 跟随全局。 */
     fun <T : Any> resolve(override: T?, global: T): T = override ?: global
@@ -30,12 +40,22 @@ object EffectiveEngineSettings {
         return candidate.takeIf { it in allowed } ?: fallback
     }
 
+    /** Ethornell encoding has no auto/UTF-8 mode; normalize spelling before whitelist merging. */
+    fun resolveEthornellNls(override: String?, global: String): String = resolveAllowed(
+        override?.trim()?.lowercase(java.util.Locale.ROOT),
+        global.trim().lowercase(java.util.Locale.ROOT),
+        EngineSettingsStore.ETHORNELL_NLS_VALUES,
+        EngineSettingsStore.ETHORNELL_NLS_SJIS,
+    )
+
     /**
      * KR 内核三级合并：可移动存储不支持 krkrsdl3，命中时强制回退 kirikiri2
      * （与 EngineLauncher/GameSaveManager 原行为一致）。
      */
     fun resolveKrKernel(override: String?, global: String, removableStorage: Boolean): String {
-        val requested = resolve(override, global)
+        val requested = resolveAllowed(
+            override, global, EngineSettingsStore.KR_KERNELS, EngineSettingsStore.KR_AUTO,
+        )
         return if (removableStorage && requested == EngineSettingsStore.KERNEL_KRKRSDL3) {
             EngineSettingsStore.KERNEL_KIRIKIRI2
         } else {
@@ -160,6 +180,13 @@ object EffectiveEngineSettings {
      */
     fun resolveWebShellPort(override: String?, global: Int): Int =
         override?.trim()?.toIntOrNull()?.takeIf { it in 1..65535 } ?: global
+
+    /**
+     * System4 跳字延迟三级合并：单游戏覆盖值命中预设时优先，否则回退全局（全局再经预设归一）。
+     */
+    fun resolveXs4MsgskipDelay(override: String?, global: Int): Int =
+        override?.trim()?.toIntOrNull()?.takeIf { it in EngineSettingsStore.XSYS4_MSGSKIP_DELAY_VALUES }
+            ?: EngineSettingsStore.normalizeXs4MsgskipDelay(global)
 
     /**
      * Winlator 外置启动全局设置 + 单游戏覆盖合并。

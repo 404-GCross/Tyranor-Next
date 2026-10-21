@@ -21,6 +21,8 @@ object PerGameSettingsStore {
     private val PREF_NAME = EnginePrefs.GAME_OVERRIDES_PREFS
 
     // KR 覆盖字段名
+    /** Read-only migration anchor; the removed single-mode UI has no setter. */
+    const val F_ANIME4K_MODE = GameOverridePartitions.KEY_KR_LEGACY_ANIME4K_MODE
     const val F_ENGINE_VERSION = "engine_version"
     const val F_ENGINE_KERNEL = "engine_kernel"
     const val F_SCOPED_SAVE_DIR = "scoped_save_dir"
@@ -38,7 +40,6 @@ object PerGameSettingsStore {
     const val F_FPS_LIMIT = "fps_limit"
     const val F_VCURSOR_SCALE = "vcursor_scale"
     const val F_MENU_HANDLER_OPA = "menu_handler_opa"
-    const val F_ANIME4K_MODE = "anime4k_mode"
     /** KR 渲染偏好覆盖字段清单（由 [KrRenderPrefs] 派生，与全局键一一对应）。 */
     val KR_FIELDS: List<String> = KrRenderPrefs.ALL.map { it.overrideField }
 
@@ -52,6 +53,8 @@ object PerGameSettingsStore {
     const val F_ART_SURFACE_CACHE_SIZE = "art_surface_cache_size"
     const val F_ART_FONT_CACHE_SIZE = "art_font_cache_size"
     const val F_ART_POWER_SAVING = "art_power_saving"
+    const val F_ART_ANIME4K_ENABLED = "art_anime4k_enabled"
+    const val F_ART_ANIME4K_MODE = "art_anime4k_mode"
 
     // RPG Maker MV/MZ
     const val F_RPG_MAKER_MOD_ENABLED = "rpg_maker_mod_enabled"
@@ -108,6 +111,8 @@ object PerGameSettingsStore {
 
     // FVP（文本编码/系统字体回退/HiDPI/自定义字体覆盖；null=跟随全局）
     const val F_FVP_NLS = "fvp_nls"
+    const val F_ETHORNELL_NLS = "ethornell_nls"
+    const val F_ETHORNELL_FONT = "ethornell_font"
     const val F_FVP_SYSTEM_FONT = "fvp_system_font"
     const val F_FVP_TEXT_HIDPI = "fvp_text_hidpi"
     const val F_FVP_FONT = "fvp_font"
@@ -117,6 +122,14 @@ object PerGameSettingsStore {
     const val F_XSYS35_RENDERER = "xsys35_renderer"
     const val F_XSYS35_INTEGER_SCALE = "xsys35_integer_scale"
     const val F_XSYS35_MUTE_UNFOCUS = "xsys35_mute_unfocus"
+
+    // System4（独立存档/文本编码/自定义字体/手柄/跳字延迟覆盖；null=跟随全局）
+    const val F_XSYS4_SCOPED_SAVE_DIR = "xsys4_scoped_save_dir"
+    const val F_XSYS4_ENCODING = "xsys4_encoding"
+    const val F_XSYS4_FONT_GOTHIC_PATH = "xsys4_font_gothic_path"
+    const val F_XSYS4_FONT_MINCHO_PATH = "xsys4_font_mincho_path"
+    const val F_XSYS4_JOYPAD = "xsys4_joypad"
+    const val F_XSYS4_MSGSKIP_DELAY = "xsys4_msgskip_delay"
 
     // Winlator 外置启动（null=跟随全局；字符串 "" = 显式不下发该参数）
     const val F_WINLATOR_CONTAINER_ID = "winlator_container_id"
@@ -166,6 +179,17 @@ object PerGameSettingsStore {
         if (gameId.isBlank()) return JSONObject()
         val row = GameOverridesRepository.loadRowBlocking(context, gameId) ?: return JSONObject()
         return runCatching { GameOverridePartitions.assemble(row) }.getOrDefault(JSONObject())
+    }
+
+    fun getGraphicsOverride(context: Context, gameId: String, family: GraphicsFamily): GraphicsOverride =
+        GraphicsSettingsCodec.readOverride(load(context, gameId), family)
+
+    /** Keeps the version marker even for full inheritance, and preserves every unrelated/legacy key. */
+    fun setGraphicsOverride(context: Context, gameId: String, family: GraphicsFamily, value: GraphicsOverride) {
+        if (gameId.isBlank()) return
+        val json = load(context, gameId)
+        json.put(family.overrideKey, GraphicsSettingsCodec.encode(value))
+        persist(context, gameId, json)
     }
 
     /** 字符串字段覆盖值；null=未覆盖（跟随全局），""=覆盖为空串（如内置字体）。 */

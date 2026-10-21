@@ -1,9 +1,12 @@
 package com.tyranor.next.ui.settings
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import com.tyranor.next.R
 import com.tyranor.next.core.settings.EngineSettingsStore
+import com.tyranor.next.core.settings.GraphicsFilterCatalog
+import com.tyranor.next.core.settings.GraphicsFilterCategory
 
 @Composable
 internal fun engineSettingsKindTitle(kind: EngineSettingsKind): String = stringResource(kind.titleRes)
@@ -28,18 +31,6 @@ internal fun krPatchOverlayOptions(): List<Pair<String, String>> = listOf(
     EngineSettingsStore.KR_PATCH_OVERLAY_AUTO to stringResource(R.string.common_auto),
     EngineSettingsStore.KR_PATCH_OVERLAY_FORCE to stringResource(R.string.engine_option_force_enable),
     EngineSettingsStore.KR_PATCH_OVERLAY_OFF to stringResource(R.string.engine_option_off),
-)
-
-@Composable
-internal fun krAnime4kOptions(): List<Pair<String, String>> = listOf(
-    EngineSettingsStore.ANIME4K_OFF to stringResource(R.string.engine_option_off),
-    EngineSettingsStore.ANIME4K_S to stringResource(R.string.engine_option_anime4k_fast),
-    EngineSettingsStore.ANIME4K_M to stringResource(R.string.engine_option_anime4k_balanced),
-    EngineSettingsStore.ANIME4K_L to stringResource(R.string.engine_option_anime4k_high),
-    EngineSettingsStore.ANIME4K_SOFT_S to stringResource(R.string.engine_option_anime4k_soft_fast),
-    EngineSettingsStore.ANIME4K_SOFT_M to stringResource(R.string.engine_option_anime4k_soft_balanced),
-    EngineSettingsStore.ANIME4K_SOFT_L to stringResource(R.string.engine_option_anime4k_soft_high),
-    EngineSettingsStore.ANIME4K_DEBLUR to stringResource(R.string.engine_option_anime4k_deblur),
 )
 
 @Composable
@@ -168,6 +159,30 @@ internal fun xsys35RendererOptions(): List<Pair<String, String>> = listOf(
     EngineSettingsStore.XSYS35_RENDERER_SOFTWARE to stringResource(R.string.engine_settings_xsys35_renderer_software),
 )
 
+/** System4 文本编码（sjis 日文版 / gbk 中文版；须与游戏版本一致）。 */
+@Composable
+internal fun xsys4EncodingOptions(): List<Pair<String, String>> = listOf(
+    EngineSettingsStore.XSYS4_ENCODING_SJIS to stringResource(R.string.engine_settings_xsys4_encoding_sjis),
+    EngineSettingsStore.XSYS4_ENCODING_GBK to stringResource(R.string.engine_settings_xsys4_encoding_gbk),
+)
+
+/** System4 手柄：auto 不下发 `--joypad`，交由引擎默认。 */
+@Composable
+internal fun xsys4JoypadOptions(): List<Pair<String, String>> = listOf(
+    EngineSettingsStore.XSYS4_JOYPAD_AUTO to stringResource(R.string.engine_settings_xsys4_joypad_auto),
+    EngineSettingsStore.XSYS4_JOYPAD_ON to stringResource(R.string.engine_settings_xsys4_joypad_on),
+    EngineSettingsStore.XSYS4_JOYPAD_OFF to stringResource(R.string.engine_settings_xsys4_joypad_off),
+)
+
+/** System4 跳字延迟预设（0 = 引擎默认）。 */
+@Composable
+internal fun xsys4MsgskipOptions(): List<Pair<String, String>> = listOf(
+    "0" to stringResource(R.string.engine_settings_xsys4_msgskip_default),
+    "100" to stringResource(R.string.engine_settings_xsys4_msgskip_value, 100),
+    "200" to stringResource(R.string.engine_settings_xsys4_msgskip_value, 200),
+    "400" to stringResource(R.string.engine_settings_xsys4_msgskip_value, 400),
+)
+
 @Composable
 internal fun artPatchOptions(): List<Pair<String, String>> = listOf(
     EngineSettingsStore.AUTO_PATCH_ASK to stringResource(R.string.engine_option_auto_patch_ask),
@@ -217,9 +232,6 @@ internal fun krKernelOptionsMap(): Map<String, String> = krKernelOptions().toMap
 internal fun krPatchOverlayOptionsMap(): Map<String, String> = krPatchOverlayOptions().toMap()
 
 @Composable
-internal fun krAnime4kOptionsMap(): Map<String, String> = krAnime4kOptions().toMap()
-
-@Composable
 internal fun krRendererOptionsMap(): Map<String, String> =
     krRendererOptions().filterNot { it.first == "default" }.toMap()
 
@@ -264,6 +276,15 @@ internal fun fvpNlsOptionsMap(): Map<String, String> = fvpNlsOptions().toMap()
 
 @Composable
 internal fun xsys35RendererOptionsMap(): Map<String, String> = xsys35RendererOptions().toMap()
+
+@Composable
+internal fun xsys4EncodingOptionsMap(): Map<String, String> = xsys4EncodingOptions().toMap()
+
+@Composable
+internal fun xsys4JoypadOptionsMap(): Map<String, String> = xsys4JoypadOptions().toMap()
+
+@Composable
+internal fun xsys4MsgskipOptionsMap(): Map<String, String> = xsys4MsgskipOptions().toMap()
 
 /** RealLive / AVG32 / UK2 文本编码（创建引擎时固定）。 */
 @Composable
@@ -436,3 +457,12 @@ internal fun rpgFontScaleOptionsMap(): Map<String, String> = rpgFontScaleOptions
 
 @Composable
 internal fun rpgVerticalAlignOptionsMap(): Map<String, String> = rpgVerticalAlignOptions().toMap()
+
+/** The core catalog adapts engine contributions to UI-only localized labels. */
+@Composable
+internal fun graphicsFilterOptions(): List<Pair<String, String>> =
+    GraphicsFilterCatalog.options(LocalConfiguration.current.locales[0].language)
+
+@Composable
+internal fun graphicsFilterCategoryTitle(category: GraphicsFilterCategory): String =
+    category.title(LocalConfiguration.current.locales[0].language)

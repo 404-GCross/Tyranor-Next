@@ -11,6 +11,7 @@
 
 #include <jni.h>
 #include <android/native_activity.h>
+#include "artemis_official_graphics.h"
 #include <dlfcn.h>
 #include <android/log.h>
 
@@ -68,37 +69,46 @@ std::string getEngineLibName(JNIEnv* env, ANativeActivity* activity) {
     return result;
 }
 
-std::string getFilesDir(JNIEnv* env, ANativeActivity* activity) {
+std::string getEngineLibraryPath(JNIEnv* env, ANativeActivity* activity, const std::string& name) {
     jclass activityCls = env->GetObjectClass(activity->clazz);
     if (activityCls == nullptr) {
         if (env->ExceptionCheck()) env->ExceptionClear();
         return {};
     }
-    jmethodID getFilesDir = env->GetMethodID(
-            activityCls, "getFilesDir", "()Ljava/io/File;");
-    if (getFilesDir == nullptr) {
+    jmethodID resolve = env->GetMethodID(activityCls,
+            "resolveArtemisEngineLibraryPath", "(Ljava/lang/String;)Ljava/lang/String;");
+    if (resolve == nullptr) {
         if (env->ExceptionCheck()) env->ExceptionClear();
+        env->DeleteLocalRef(activityCls);
         return {};
     }
-    jobject file = env->CallObjectMethod(activity->clazz, getFilesDir);
-    if (env->ExceptionCheck() || file == nullptr) {
+    jstring libName = env->NewStringUTF(name.c_str());
+    if (libName == nullptr) {
         if (env->ExceptionCheck()) env->ExceptionClear();
+        env->DeleteLocalRef(activityCls);
         return {};
     }
-    jclass fileCls = env->GetObjectClass(file);
-    jmethodID getPath = env->GetMethodID(fileCls, "getPath", "()Ljava/lang/String;");
-    if (getPath == nullptr) {
-        if (env->ExceptionCheck()) env->ExceptionClear();
-        return {};
-    }
-    jstring path = static_cast<jstring>(env->CallObjectMethod(file, getPath));
+    jstring path = static_cast<jstring>(env->CallObjectMethod(activity->clazz, resolve, libName));
+    env->DeleteLocalRef(libName);
     if (env->ExceptionCheck() || path == nullptr) {
-        if (env->ExceptionCheck()) env->ExceptionClear();
+        if (env->ExceptionCheck()) {
+            env->ExceptionDescribe();
+            env->ExceptionClear();
+        }
+        env->DeleteLocalRef(activityCls);
         return {};
     }
     const char* chars = env->GetStringUTFChars(path, nullptr);
-    std::string result = chars != nullptr ? chars : "";
-    if (chars != nullptr) env->ReleaseStringUTFChars(path, chars);
+    if (chars == nullptr) {
+        if (env->ExceptionCheck()) env->ExceptionClear();
+        env->DeleteLocalRef(path);
+        env->DeleteLocalRef(activityCls);
+        return {};
+    }
+    std::string result(chars);
+    env->ReleaseStringUTFChars(path, chars);
+    env->DeleteLocalRef(path);
+    env->DeleteLocalRef(activityCls);
     return result;
 }
 
@@ -228,17 +238,15 @@ ANativeActivity_onCreate(ANativeActivity* activity, void* savedState, size_t sav
         return;
     }
 
-    const std::string filesDir = getFilesDir(activity->env, activity);
-    if (filesDir.empty()) {
-        LOGE("Artemis plugin: cannot resolve filesDir; aborting startup");
+    // Java prepares a hash-verified immutable derivative for affected Vorbis kernels.
+    // The Activity pins this exact path for the later System.load JNI registration.
+    const std::string libPath = getEngineLibraryPath(activity->env, activity, engineLibName);
+    if (libPath.empty()) {
+        LOGE("Artemis plugin: cannot prepare engine library; aborting startup");
         finishActivity(activity);
         return;
     }
 
-    // 插件目录约定：<filesDir>/engine_plugins/artemis/current/arm64-v8a/lib<engineLibName>.so
-    // engineLibName 已通过白名单校验，此处拼接是安全的。
-    const std::string libPath =
-        filesDir + "/engine_plugins/artemis/current/arm64-v8a/lib" + engineLibName + ".so";
     LOGI("Artemis plugin: dlopen %s", libPath.c_str());
 
     void* handle = dlopen(libPath.c_str(), RTLD_NOW | RTLD_GLOBAL);
@@ -260,6 +268,7 @@ ANativeActivity_onCreate(ANativeActivity* activity, void* savedState, size_t sav
         return;
     }
 
+    if (engineLibName != "artemis-clean") installArtemisOfficialGraphics(handle, activity, libPath);
     LOGI("Artemis plugin: forwarding ANativeActivity_onCreate to %s", libPath.c_str());
     onCreate(activity, savedState, savedStateSize);
 }

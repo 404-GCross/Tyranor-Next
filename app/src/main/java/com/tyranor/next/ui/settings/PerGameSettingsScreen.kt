@@ -39,10 +39,15 @@ import com.tyranor.next.core.engine.external.EmulatorLaunchStyle
 import com.tyranor.next.core.engine.external.ExternalEmulatorRegistry
 import com.tyranor.next.core.engine.external.RpgMakerRuntimeEnvironment
 import com.tyranor.next.core.game.launch.EngineLauncher
+import com.tyranor.next.core.game.model.GamePathUtils
 import com.tyranor.next.core.game.model.ScanGame
 import com.tyranor.next.core.game.save.GameSaveManager
+import com.tyranor.next.core.settings.GraphicsCapabilities
+import com.tyranor.next.core.settings.GraphicsFamily
+import com.tyranor.next.core.settings.GraphicsOverride
 import com.tyranor.next.core.input.InputRemapRepository
 import com.tyranor.next.core.settings.EngineSettingsStore
+import com.tyranor.next.core.settings.EffectiveEngineSettings
 import com.tyranor.next.core.settings.PerGameSettingsStore
 import com.tyranor.next.core.settings.RenPyOverride
 import com.tyranor.next.core.settings.RpgMakerOverride
@@ -65,9 +70,10 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.runInterruptible
 import org.json.JSONObject
 import top.yukonga.miuix.kmp.basic.Card as MiuixCard
-import top.yukonga.miuix.kmp.basic.Scaffold as MiuixScaffold
+import com.tyranor.next.ui.common.MiuixTopBarBlurScaffold
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -80,6 +86,11 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 fun PerGameSettingsScreen(game: ScanGame) {
     val ctx = LocalContext.current
     val gid = game.uri
+    val graphicsFamily = game.engine.graphicsFamily()
+    val globalGraphics = graphicsFamily?.let { EngineSettingsStore.getGraphicsSettings(ctx, it) }
+    var graphicsOverride by remember(gid, graphicsFamily) {
+        mutableStateOf(graphicsFamily?.let { PerGameSettingsStore.getGraphicsOverride(ctx, gid, it) } ?: GraphicsOverride())
+    }
 
     // 覆盖值（null=跟随全局）
     var krVersion by remember(gid) { mutableStateOf(PerGameSettingsStore.getStr(ctx, gid, PerGameSettingsStore.F_ENGINE_VERSION)) }
@@ -87,7 +98,6 @@ fun PerGameSettingsScreen(game: ScanGame) {
     var krScoped by remember(gid) { mutableStateOf(PerGameSettingsStore.getBool(ctx, gid, PerGameSettingsStore.F_SCOPED_SAVE_DIR)) }
     var krSkipStartupDialogs by remember(gid) { mutableStateOf(PerGameSettingsStore.getBool(ctx, gid, PerGameSettingsStore.F_SKIP_STARTUP_DIALOGS)) }
     var krPatchOverlayMode by remember(gid) { mutableStateOf(PerGameSettingsStore.getStr(ctx, gid, PerGameSettingsStore.F_PATCH_OVERLAY_MODE)) }
-    var krAnime4kMode by remember(gid) { mutableStateOf(PerGameSettingsStore.getStr(ctx, gid, PerGameSettingsStore.F_ANIME4K_MODE)) }
     var krFont by remember(gid) { mutableStateOf(PerGameSettingsStore.getStr(ctx, gid, PerGameSettingsStore.F_DEFAULT_FONT)) }
     var krForceFont by remember(gid) { mutableStateOf(PerGameSettingsStore.getBool(ctx, gid, PerGameSettingsStore.F_FORCE_DEFAULT_FONT)) }
     val krRender = PerGameSettingsStore.KR_FIELDS.associateWith { field ->
@@ -107,6 +117,8 @@ fun PerGameSettingsScreen(game: ScanGame) {
     var siglusLanguage by remember { mutableStateOf(PerGameSettingsStore.getStr(ctx, gid, PerGameSettingsStore.F_SIGLUS_LANGUAGE)) }
     var fbNls by remember { mutableStateOf(PerGameSettingsStore.getStr(ctx, gid, PerGameSettingsStore.F_FB_NLS)) }
     var fvpNls by remember { mutableStateOf(PerGameSettingsStore.getStr(ctx, gid, PerGameSettingsStore.F_FVP_NLS)) }
+    var ethornellNls by remember { mutableStateOf(PerGameSettingsStore.getStr(ctx, gid, PerGameSettingsStore.F_ETHORNELL_NLS)) }
+    var ethornellFont by remember { mutableStateOf(PerGameSettingsStore.getStr(ctx, gid, PerGameSettingsStore.F_ETHORNELL_FONT)) }
     var fvpSystemFont by remember { mutableStateOf(PerGameSettingsStore.getBool(ctx, gid, PerGameSettingsStore.F_FVP_SYSTEM_FONT)) }
     var fvpTextHidpi by remember { mutableStateOf(PerGameSettingsStore.getBool(ctx, gid, PerGameSettingsStore.F_FVP_TEXT_HIDPI)) }
     var ppssppVersion by remember { mutableStateOf(PerGameSettingsStore.getStr(ctx, gid, PerGameSettingsStore.F_PPSSPP_VERSION)) }
@@ -116,8 +128,14 @@ fun PerGameSettingsScreen(game: ScanGame) {
     var xs35Renderer by remember(gid) { mutableStateOf(PerGameSettingsStore.getStr(ctx, gid, PerGameSettingsStore.F_XSYS35_RENDERER)) }
     var xs35IntegerScale by remember(gid) { mutableStateOf(PerGameSettingsStore.getBool(ctx, gid, PerGameSettingsStore.F_XSYS35_INTEGER_SCALE)) }
     var xs35MuteUnfocus by remember(gid) { mutableStateOf(PerGameSettingsStore.getBool(ctx, gid, PerGameSettingsStore.F_XSYS35_MUTE_UNFOCUS)) }
-    // System35 生效存档路径：与 GameSaveManager.resolveSaveLocation 同源（IO 读取，避免组合期磁盘/DB 阻塞）
-    var xs35SaveLocation by remember(gid) { mutableStateOf<GameSaveManager.SaveLocation?>(null) }
+    var xs4Scoped by remember(gid) { mutableStateOf(PerGameSettingsStore.getBool(ctx, gid, PerGameSettingsStore.F_XSYS4_SCOPED_SAVE_DIR)) }
+    var xs4Encoding by remember(gid) { mutableStateOf(PerGameSettingsStore.getStr(ctx, gid, PerGameSettingsStore.F_XSYS4_ENCODING)) }
+    var xs4FontGothic by remember(gid) { mutableStateOf(PerGameSettingsStore.getStr(ctx, gid, PerGameSettingsStore.F_XSYS4_FONT_GOTHIC_PATH)) }
+    var xs4FontMincho by remember(gid) { mutableStateOf(PerGameSettingsStore.getStr(ctx, gid, PerGameSettingsStore.F_XSYS4_FONT_MINCHO_PATH)) }
+    var xs4Joypad by remember(gid) { mutableStateOf(PerGameSettingsStore.getStr(ctx, gid, PerGameSettingsStore.F_XSYS4_JOYPAD)) }
+    var xs4Msgskip by remember(gid) { mutableStateOf(PerGameSettingsStore.getStr(ctx, gid, PerGameSettingsStore.F_XSYS4_MSGSKIP_DELAY)) }
+    // System35 / System4 生效存档路径：与 GameSaveManager.resolveSaveLocation 同源（IO 读取，避免组合期磁盘/DB 阻塞）
+    var saveLocation by remember(gid) { mutableStateOf<GameSaveManager.SaveLocation?>(null) }
     var winlatorContainerId by remember { mutableStateOf(PerGameSettingsStore.getStr(ctx, gid, PerGameSettingsStore.F_WINLATOR_CONTAINER_ID)) }
     var winlatorContainerName by remember { mutableStateOf(PerGameSettingsStore.getStr(ctx, gid, PerGameSettingsStore.F_WINLATOR_CONTAINER_NAME)) }
     var winlatorGraphicsDriver by remember { mutableStateOf(PerGameSettingsStore.getStr(ctx, gid, PerGameSettingsStore.F_WINLATOR_GRAPHICS_DRIVER)) }
@@ -215,11 +233,11 @@ fun PerGameSettingsScreen(game: ScanGame) {
             inputProfileLoadFailed = true
         }
     }
-    // System35 生效存档路径展示：resolveSaveLocation 内含游戏目录解析与三级设置合并
+    // System35 / System4 生效存档路径展示：resolveSaveLocation 内含游戏目录解析与三级设置合并
     // （磁盘 + DB 读），挂起在 IO 线程取结果，避免组合期阻塞
     LaunchedEffect(gid) {
-        if (game.engine != EngineType.XSYS35) return@LaunchedEffect
-        xs35SaveLocation = withContext(Dispatchers.IO) {
+        if (game.engine != EngineType.XSYS35 && game.engine != EngineType.XSYS4) return@LaunchedEffect
+        saveLocation = withContext(Dispatchers.IO) {
             GameSaveManager(ctx).resolveSaveLocation(game)
         }
     }
@@ -228,32 +246,86 @@ fun PerGameSettingsScreen(game: ScanGame) {
     }
     val rpgm = rpgmOverride ?: RpgMakerOverride()
 
+    val scope = rememberCoroutineScope()
+    var importingFont by remember(gid) { mutableStateOf(false) }
     val fontLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        if (uri != null) {
-            val p = FontImport.importToPrivate(ctx, uri)
-            if (p != null) krFont = p
-        }
-    }
-    val fvpFontLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        if (uri != null) {
-            val p = FontImport.importToPrivate(ctx, uri)
-            if (p != null) {
-                fvpFont = p
-            } else {
-                android.widget.Toast.makeText(
-                    ctx,
-                    ctx.getString(R.string.engine_settings_fvp_font_import_failed),
-                    android.widget.Toast.LENGTH_SHORT,
-                ).show()
+        if (uri != null && !importingFont) {
+            importingFont = true
+            scope.launch {
+                try {
+                    val p = FontImport.importToPrivate(ctx, uri)
+                    if (p != null) krFont = p
+                } finally { importingFont = false }
             }
         }
     }
-    val scope = rememberCoroutineScope()
+    val fvpFontLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null && !importingFont) {
+            importingFont = true
+            scope.launch {
+                try {
+                    val p = FontImport.importToPrivate(ctx, uri)
+                    if (p != null) fvpFont = p else {
+                        android.widget.Toast.makeText(
+                            ctx,
+                            ctx.getString(R.string.engine_settings_fvp_font_import_failed),
+                            android.widget.Toast.LENGTH_SHORT,
+                        ).show()
+                    }
+                } finally { importingFont = false }
+            }
+        }
+    }
+    val ethornellFontLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null && !importingFont) {
+            importingFont = true
+            scope.launch {
+                try {
+                    val path = FontImport.importToPrivate(ctx, uri)
+                    if (path != null) ethornellFont = path else android.widget.Toast.makeText(ctx, R.string.ethornell_error_font, android.widget.Toast.LENGTH_SHORT).show()
+                } finally { importingFont = false }
+            }
+        }
+    }
+    val xs4GothicFontLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null && !importingFont) {
+            importingFont = true
+            scope.launch {
+                try {
+                    val path = FontImport.importToPrivate(ctx, uri)
+                    if (path != null) xs4FontGothic = path else {
+                        android.widget.Toast.makeText(
+                            ctx,
+                            ctx.getString(R.string.engine_settings_fvp_font_import_failed),
+                            android.widget.Toast.LENGTH_SHORT,
+                        ).show()
+                    }
+                } finally { importingFont = false }
+            }
+        }
+    }
+    val xs4MinchoFontLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null && !importingFont) {
+            importingFont = true
+            scope.launch {
+                try {
+                    val path = FontImport.importToPrivate(ctx, uri)
+                    if (path != null) xs4FontMincho = path else {
+                        android.widget.Toast.makeText(
+                            ctx,
+                            ctx.getString(R.string.engine_settings_fvp_font_import_failed),
+                            android.widget.Toast.LENGTH_SHORT,
+                        ).show()
+                    }
+                } finally { importingFont = false }
+            }
+        }
+    }
     // RPGM 外置插件读不到 App 私有目录，自定义字体必须落共享存储（见 RpgMakerRuntimeEnvironment）
     val rpgFontLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
         scope.launch {
-            val path = withContext(Dispatchers.IO) { RpgMakerRuntimeEnvironment.importCustomFont(ctx, uri) }
+            val path = runInterruptible(Dispatchers.IO) { RpgMakerRuntimeEnvironment.importCustomFont(ctx, uri) }
             if (path != null) rpgmOverride = rpgm.copy(customFont = path)
             val msg = if (path != null) {
                 R.string.engine_settings_rpgm_custom_font_imported
@@ -269,7 +341,6 @@ fun PerGameSettingsScreen(game: ScanGame) {
     val globalKrScoped = EngineSettingsStore.isKrScopedSaveDir(ctx)
     val globalKrSkipStartupDialogs = EngineSettingsStore.isKrSkipStartupDialogs(ctx)
     val globalKrPatchOverlayMode = EngineSettingsStore.getKrPatchOverlayMode(ctx)
-    val globalKrAnime4kMode = EngineSettingsStore.getKrAnime4kMode(ctx)
     val globalKrFont = EngineSettingsStore.getKrDefaultFont(ctx)
     val globalForce = EngineSettingsStore.isKrForceDefaultFont(ctx)
     val configuredGlobalRenderer = EngineSettingsStore.getKrRenderer(ctx)
@@ -283,6 +354,9 @@ fun PerGameSettingsScreen(game: ScanGame) {
     val globalArtSurfaceCache = EngineSettingsStore.getArtSurfaceCacheSize(ctx)
     val globalArtFontCache = EngineSettingsStore.getArtFontCacheSize(ctx)
     val globalArtPowerSaving = EngineSettingsStore.getArtPowerSaving(ctx)
+    val effectiveArtKernel = EffectiveEngineSettings.resolveAllowed(
+        artKernel, globalArtKernel, EngineSettingsStore.ART_KERNELS, EngineSettingsStore.ART_KERNEL_OFFICIAL,
+    )
     val globalTyExternal = EngineSettingsStore.isTyranoExternalNetwork(ctx)
     val globalTyScoped = EngineSettingsStore.isTyranoScopedSaveDir(ctx)
     val globalRpgMakerMod = EngineSettingsStore.isRpgMakerModEnabled(ctx)
@@ -301,6 +375,12 @@ fun PerGameSettingsScreen(game: ScanGame) {
     val globalXs35Renderer = EngineSettingsStore.getXs35Renderer(ctx)
     val globalXs35IntegerScale = EngineSettingsStore.isXs35IntegerScale(ctx)
     val globalXs35MuteUnfocus = EngineSettingsStore.isXs35MuteUnfocus(ctx)
+    val globalXs4Scoped = EngineSettingsStore.isXs4ScopedSaveDir(ctx)
+    val globalXs4Encoding = EngineSettingsStore.getXs4Encoding(ctx)
+    val globalXs4FontGothic = EngineSettingsStore.getXs4FontGothicPath(ctx)
+    val globalXs4FontMincho = EngineSettingsStore.getXs4FontMinchoPath(ctx)
+    val globalXs4Joypad = EngineSettingsStore.getXs4Joypad(ctx)
+    val globalXs4Msgskip = EngineSettingsStore.getXs4MsgskipDelay(ctx)
     val globalWinlator = remember { EngineSettingsStore.loadWinlator(ctx) }
     val globalPpssppVersion = EngineSettingsStore.getPpssppVersion(ctx)
     val globalWebShellPort = EngineSettingsStore.getWebShellPort(ctx)
@@ -335,6 +415,9 @@ fun PerGameSettingsScreen(game: ScanGame) {
     val fbNlsMap = fbNlsOptionsMap()
     val fvpNlsMap = fvpNlsOptionsMap()
     val xs35RendererMap = xsys35RendererOptionsMap()
+    val xs4EncodingMap = xsys4EncodingOptionsMap()
+    val xs4JoypadMap = xsys4JoypadOptionsMap()
+    val xs4MsgskipMap = xsys4MsgskipOptionsMap()
     val artPatchMap = artPatchOptionsMap()
     val artResolutionMap = artResolutionOptionsMap()
     val artToggleMap = artToggleOptionsMap()
@@ -345,11 +428,15 @@ fun PerGameSettingsScreen(game: ScanGame) {
     val auto = stringResource(R.string.common_auto)
     val perGameSettingsSavedMessage = stringResource(R.string.engine_settings_per_game_saved)
 
-    val isSdl3 = (krKernel ?: globalKrKernel) == EngineSettingsStore.KERNEL_KRKRSDL3
+    val effectiveKrKernel = EffectiveEngineSettings.resolveKrKernel(
+        krKernel, globalKrKernel,
+        GamePathUtils.safUriToPath(game.uri)?.let(GamePathUtils::isRemovableStoragePath) == true,
+    )
+    val isSdl3 = effectiveKrKernel == EngineSettingsStore.KERNEL_KRKRSDL3
     val globalRenderer = configuredGlobalRenderer.ifEmpty {
         if (isSdl3) EngineSettingsStore.RENDERER_OPENGL else ""
     }
-    val effVersion = krVersion ?: globalKrVersion
+    val effVersion = EffectiveEngineSettings.resolveKrVersion(krVersion, globalKrVersion)
     val krIs134126 = effVersion == EngineSettingsStore.KR_134 || effVersion == EngineSettingsStore.KR_126
 
     // 渲染相关全局值（跟随全局时展示用）
@@ -365,12 +452,12 @@ fun PerGameSettingsScreen(game: ScanGame) {
     val effRenderer = krRender[PerGameSettingsStore.F_RENDERER]!!.value ?: globalRenderer
 
     fun save() {
+        graphicsFamily?.let { PerGameSettingsStore.setGraphicsOverride(ctx, gid, it, graphicsOverride) }
         PerGameSettingsStore.setStr(ctx, gid, PerGameSettingsStore.F_ENGINE_VERSION, krVersion)
         PerGameSettingsStore.setStr(ctx, gid, PerGameSettingsStore.F_ENGINE_KERNEL, krKernel)
         PerGameSettingsStore.setBool(ctx, gid, PerGameSettingsStore.F_SCOPED_SAVE_DIR, krScoped)
         PerGameSettingsStore.setBool(ctx, gid, PerGameSettingsStore.F_SKIP_STARTUP_DIALOGS, krSkipStartupDialogs)
         PerGameSettingsStore.setStr(ctx, gid, PerGameSettingsStore.F_PATCH_OVERLAY_MODE, krPatchOverlayMode)
-        PerGameSettingsStore.setStr(ctx, gid, PerGameSettingsStore.F_ANIME4K_MODE, krAnime4kMode?.takeIf { it in EngineSettingsStore.ANIME4K_MODES })
         PerGameSettingsStore.setStr(ctx, gid, PerGameSettingsStore.F_DEFAULT_FONT, krFont)
         PerGameSettingsStore.setBool(ctx, gid, PerGameSettingsStore.F_FORCE_DEFAULT_FONT, krForceFont)
         krRender.forEach { (field, st) ->
@@ -397,6 +484,8 @@ fun PerGameSettingsScreen(game: ScanGame) {
         PerGameSettingsStore.setStr(ctx, gid, PerGameSettingsStore.F_SIGLUS_LANGUAGE, siglusLanguage)
         PerGameSettingsStore.setStr(ctx, gid, PerGameSettingsStore.F_FB_NLS, fbNls)
         PerGameSettingsStore.setStr(ctx, gid, PerGameSettingsStore.F_FVP_NLS, fvpNls)
+        PerGameSettingsStore.setStr(ctx, gid, PerGameSettingsStore.F_ETHORNELL_NLS, ethornellNls)
+        PerGameSettingsStore.setStr(ctx, gid, PerGameSettingsStore.F_ETHORNELL_FONT, ethornellFont)
         PerGameSettingsStore.setBool(ctx, gid, PerGameSettingsStore.F_FVP_SYSTEM_FONT, fvpSystemFont)
         PerGameSettingsStore.setBool(ctx, gid, PerGameSettingsStore.F_FVP_TEXT_HIDPI, fvpTextHidpi)
         PerGameSettingsStore.setStr(ctx, gid, PerGameSettingsStore.F_PPSSPP_VERSION, ppssppVersion)
@@ -411,6 +500,27 @@ fun PerGameSettingsScreen(game: ScanGame) {
         )
         PerGameSettingsStore.setBool(ctx, gid, PerGameSettingsStore.F_XSYS35_INTEGER_SCALE, xs35IntegerScale)
         PerGameSettingsStore.setBool(ctx, gid, PerGameSettingsStore.F_XSYS35_MUTE_UNFOCUS, xs35MuteUnfocus)
+        PerGameSettingsStore.setBool(ctx, gid, PerGameSettingsStore.F_XSYS4_SCOPED_SAVE_DIR, xs4Scoped)
+        PerGameSettingsStore.setStr(
+            ctx,
+            gid,
+            PerGameSettingsStore.F_XSYS4_ENCODING,
+            xs4Encoding?.takeIf { it in EngineSettingsStore.XSYS4_ENCODING_VALUES },
+        )
+        PerGameSettingsStore.setStr(ctx, gid, PerGameSettingsStore.F_XSYS4_FONT_GOTHIC_PATH, xs4FontGothic)
+        PerGameSettingsStore.setStr(ctx, gid, PerGameSettingsStore.F_XSYS4_FONT_MINCHO_PATH, xs4FontMincho)
+        PerGameSettingsStore.setStr(
+            ctx,
+            gid,
+            PerGameSettingsStore.F_XSYS4_JOYPAD,
+            xs4Joypad?.takeIf { it in EngineSettingsStore.XSYS4_JOYPAD_VALUES },
+        )
+        PerGameSettingsStore.setStr(
+            ctx,
+            gid,
+            PerGameSettingsStore.F_XSYS4_MSGSKIP_DELAY,
+            xs4Msgskip?.toIntOrNull()?.takeIf { it in EngineSettingsStore.XSYS4_MSGSKIP_DELAY_VALUES }?.toString(),
+        )
         PerGameSettingsStore.setStr(ctx, gid, PerGameSettingsStore.F_WINLATOR_CONTAINER_ID, winlatorContainerId)
         PerGameSettingsStore.setStr(ctx, gid, PerGameSettingsStore.F_WINLATOR_CONTAINER_NAME, winlatorContainerName)
         PerGameSettingsStore.setStr(ctx, gid, PerGameSettingsStore.F_WINLATOR_GRAPHICS_DRIVER, winlatorGraphicsDriver)
@@ -489,10 +599,8 @@ fun PerGameSettingsScreen(game: ScanGame) {
     }
 
     MiuixSettingsTheme {
-        MiuixScaffold(
+        MiuixTopBarBlurScaffold(
             modifier = Modifier.fillMaxSize(),
-            containerColor = ComposeColor.Transparent,
-            contentWindowInsets = WindowInsets(0.dp),
             topBar = {
                 AppTopBar(
                     title = game.title,
@@ -502,9 +610,9 @@ fun PerGameSettingsScreen(game: ScanGame) {
                         TopBarIcon(painterResource(R.drawable.ic_save), stringResource(R.string.common_save), MiuixTheme.colorScheme.primary) {
                             save()
                             // 存档路径展示与实际生效设置同源：保存后按新值重解一次（磁盘 + DB 读，走 IO）
-                            if (game.engine == EngineType.XSYS35) {
+                            if (game.engine == EngineType.XSYS35 || game.engine == EngineType.XSYS4) {
                                 scope.launch {
-                                    xs35SaveLocation = withContext(Dispatchers.IO) {
+                                    saveLocation = withContext(Dispatchers.IO) {
                                         GameSaveManager(ctx).resolveSaveLocation(game)
                                     }
                                 }
@@ -514,13 +622,10 @@ fun PerGameSettingsScreen(game: ScanGame) {
                     },
                 )
             },
-        ) { innerPadding ->
+        ) { topInset ->
             LazyColumn(
-                // 顶栏透明：列表整体垫在顶栏下方（持久 padding），避免滚动时内容穿过顶栏
-                modifier = Modifier.fillMaxSize()
-                    .padding(horizontal = 12.dp)
-                    .padding(top = innerPadding.calculateTopPadding()),
-                contentPadding = PaddingValues(top = 12.dp, bottom = 24.dp),
+                modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
+                contentPadding = PaddingValues(top = 12.dp + topInset, bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 when (game.engine) {
@@ -549,13 +654,6 @@ fun PerGameSettingsScreen(game: ScanGame) {
                                     OverrideChoice(stringResource(R.string.engine_settings_memory_usage), krMemMap, globalMem, krRender[PerGameSettingsStore.F_MEM_USAGE]!!.value, emptyLabel = engineDefault) {
                                         krRender[PerGameSettingsStore.F_MEM_USAGE]!!.value = it
                                     }
-                                    // Anime4K 后处理仅 kirikiri2 内核路径支持（GLSurfaceView 注入）
-                                    OverrideChoice(
-                                        stringResource(R.string.engine_settings_anime4k),
-                                        krAnime4kOptionsMap(),
-                                        globalKrAnime4kMode,
-                                        krAnime4kMode,
-                                    ) { krAnime4kMode = it }
                                 }
                                 OverrideChoice(stringResource(R.string.engine_settings_renderer), krRendererMap, globalRenderer, krRender[PerGameSettingsStore.F_RENDERER]!!.value, emptyLabel = engineDefault) {
                                     krRender[PerGameSettingsStore.F_RENDERER]!!.value = it
@@ -645,7 +743,6 @@ fun PerGameSettingsScreen(game: ScanGame) {
                     EngineType.ARTEMIS -> {
                         item {
                             SectionCard("Artemis") {
-                                val effectiveArtKernel = artKernel ?: globalArtKernel
                                 OverrideChoice(stringResource(R.string.engine_settings_engine_kernel), artKernelMap, globalArtKernel, artKernel) { artKernel = it }
                                 OverrideSwitch(stringResource(R.string.engine_settings_rotate_screen), globalArtRotate, artRotate) { artRotate = it }
                                 if (effectiveArtKernel == EngineSettingsStore.ART_KERNEL_OFFICIAL) {
@@ -668,7 +765,7 @@ fun PerGameSettingsScreen(game: ScanGame) {
                         }
                     }
                     // 官方内核专属的手动补丁动作：与启动前自动补丁同源实现
-                    if ((artKernel ?: globalArtKernel) == EngineSettingsStore.ART_KERNEL_OFFICIAL) {
+                    if (effectiveArtKernel == EngineSettingsStore.ART_KERNEL_OFFICIAL) {
                         item {
                             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                                 val patchRunningSummary = stringResource(R.string.engine_settings_artemis_patch_running)
@@ -795,6 +892,21 @@ fun PerGameSettingsScreen(game: ScanGame) {
                             )
                         }
                     }
+                    EngineType.ETHORNELL -> item {
+                        SectionCard("Ethornell / BGI") {
+                            OverrideChoice(stringResource(R.string.ethornell_nls_title), ethornellNlsOptions().toMap(), EngineSettingsStore.getEthornellNls(ctx), ethornellNls) { ethornellNls = it }
+                            OverrideFontPreference(
+                                label = stringResource(R.string.ethornell_font_title),
+                                globalValue = EngineSettingsStore.getEthornellFont(ctx),
+                                override = ethornellFont,
+                                followGameDefaultLabel = stringResource(R.string.ethornell_font_default),
+                                onSet = { ethornellFont = it },
+                                onPick = { if (!importingFont) ethornellFontLauncher.launch("*/*") },
+                                enabled = !importingFont,
+                            )
+                            Text(stringResource(R.string.ethornell_settings_note), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(16.dp))
+                        }
+                    }
                     EngineType.XSYS35 -> item {
                         SectionCard(stringResource(R.string.engine_settings_xsys35_title)) {
                             OverrideSwitch(stringResource(R.string.engine_settings_scoped_save_dir), globalXs35Scoped, xs35Scoped) { xs35Scoped = it }
@@ -814,7 +926,68 @@ fun PerGameSettingsScreen(game: ScanGame) {
                                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
                             )
                             // 当前生效存档路径（与存档管理同源）：独立存档 = 应用外部存档目录，关闭 = 游戏目录 save/
-                            xs35SaveLocation?.let { location ->
+                            saveLocation?.let { location ->
+                                Text(
+                                    location.description,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+                                )
+                                location.directory?.let { dir ->
+                                    Text(
+                                        dir.absolutePath,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    EngineType.XSYS4 -> item {
+                        SectionCard(stringResource(R.string.engine_settings_xsys4_title)) {
+                            OverrideSwitch(stringResource(R.string.engine_settings_scoped_save_dir), globalXs4Scoped, xs4Scoped) { xs4Scoped = it }
+                            OverrideChoice(stringResource(R.string.engine_settings_xsys4_encoding_title), xs4EncodingMap, globalXs4Encoding, xs4Encoding) { xs4Encoding = it }
+                            OverrideFontPreference(
+                                label = stringResource(R.string.engine_settings_xsys4_font_gothic_title),
+                                globalValue = globalXs4FontGothic,
+                                override = xs4FontGothic,
+                                followGameDefaultLabel = stringResource(R.string.engine_settings_use_builtin_font),
+                                onSet = { xs4FontGothic = it },
+                                onPick = { if (!importingFont) xs4GothicFontLauncher.launch("*/*") },
+                                enabled = !importingFont,
+                            )
+                            OverrideFontPreference(
+                                label = stringResource(R.string.engine_settings_xsys4_font_mincho_title),
+                                globalValue = globalXs4FontMincho,
+                                override = xs4FontMincho,
+                                followGameDefaultLabel = stringResource(R.string.engine_settings_use_builtin_font),
+                                onSet = { xs4FontMincho = it },
+                                onPick = { if (!importingFont) xs4MinchoFontLauncher.launch("*/*") },
+                                enabled = !importingFont,
+                            )
+                            OverrideChoice(stringResource(R.string.engine_settings_xsys4_joypad_title), xs4JoypadMap, globalXs4Joypad, xs4Joypad) { xs4Joypad = it }
+                            OverrideChoice(stringResource(R.string.engine_settings_xsys4_msgskip_title), xs4MsgskipMap, globalXs4Msgskip.toString(), xs4Msgskip) { xs4Msgskip = it }
+                            Text(
+                                stringResource(R.string.engine_settings_xsys4_note),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+                            )
+                            Text(
+                                stringResource(R.string.engine_settings_xsys4_uninstall_hint),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+                            )
+                            Text(
+                                stringResource(R.string.engine_settings_xsys4_compat_hint),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+                            )
+                            // 当前生效存档路径（与存档管理同源）：独立存档 = 应用外部存档目录，关闭 = 游戏根 SaveFolder
+                            saveLocation?.let { location ->
                                 Text(
                                     location.description,
                                     style = MaterialTheme.typography.bodyMedium,
@@ -1071,6 +1244,19 @@ fun PerGameSettingsScreen(game: ScanGame) {
                     }
                 }
 
+                if (graphicsFamily != null && globalGraphics != null) item {
+                    PerGameGraphicsSettings(
+                        global = globalGraphics,
+                        override = graphicsOverride,
+                        capability = GraphicsCapabilities.forSettings(
+                            graphicsFamily, if (graphicsFamily == GraphicsFamily.KR) effectiveKrKernel else effectiveArtKernel,
+                            if (graphicsFamily == GraphicsFamily.KR) effVersion
+                            else EffectiveEngineSettings.resolveArtVersion(artVersion, globalArtVersion),
+                            effRenderer,
+                        ),
+                    ) { graphicsOverride = it }
+                }
+
                 if (game.engine in WINLATOR_LAUNCH_ENGINES) item {
                     SectionCard("Winlator") {
                         OverrideText(
@@ -1243,12 +1429,13 @@ private fun InputProfileOverrideRow(
  *   选中该占位项不产生任何写入；[notReadyLabel] 非空时本参数不生效（加载态下还读不出覆盖）。
  */
 @Composable
-private fun OverrideChoice(
+internal fun OverrideChoice(
     label: String,
     options: Map<String, String>,
     global: String,
     override: String?,
     emptyLabel: String = stringResource(R.string.engine_settings_builtin_font),
+    enabled: Boolean = true,
     notReadyLabel: String? = null,
     missingLabel: String? = null,
     onSet: (String?) -> Unit,
@@ -1283,6 +1470,7 @@ private fun OverrideChoice(
         title = label,
         items = labels,
         selectedIndex = index,
+        enabled = enabled,
         onSelectedIndexChange = { i ->
             if (i == 0) {
                 onSet(null)
@@ -1296,7 +1484,13 @@ private fun OverrideChoice(
 
 /** 覆盖版开关行：Miuix OverlayDropdownPreference，三态（跟随全局 / 开 / 关）。 */
 @Composable
-private fun OverrideSwitch(label: String, global: Boolean, override: Boolean?, onSet: (Boolean?) -> Unit) {
+internal fun OverrideSwitch(
+    label: String,
+    global: Boolean,
+    override: Boolean?,
+    enabled: Boolean = true,
+    onSet: (Boolean?) -> Unit,
+) {
     val onText = stringResource(R.string.common_enabled)
     val offText = stringResource(R.string.common_disabled)
     val labels = listOf(stringResource(R.string.engine_settings_follow_global_bool, if (global) onText else offText), onText, offText)
@@ -1305,6 +1499,7 @@ private fun OverrideSwitch(label: String, global: Boolean, override: Boolean?, o
         title = label,
         items = labels,
         selectedIndex = index,
+        enabled = enabled,
         onSelectedIndexChange = { i -> onSet(if (i == 0) null else i == 1) },
     )
 }
@@ -1321,6 +1516,7 @@ private fun OverrideFontPreference(
     followGameDefaultLabel: String,
     onSet: (String?) -> Unit,
     onPick: () -> Unit,
+    enabled: Boolean = true,
 ) {
     var open by remember { mutableStateOf(false) }
     val globalLabel = globalValue.substringAfterLast('/').ifBlank { followGameDefaultLabel }
@@ -1332,6 +1528,7 @@ private fun OverrideFontPreference(
     ArrowPreference(
         title = label,
         summary = summary,
+        enabled = enabled,
         onClick = { open = true },
     )
     if (open) {
@@ -1347,6 +1544,7 @@ private fun OverrideFontPreference(
                         title = stringResource(R.string.engine_settings_follow_global_with_value, globalLabel),
                         leadingIcon = R.drawable.ic_font_bookmark,
                         containerColor = DialogItemSurface,
+                        indication = null,
                     ) {
                         onSet(null)
                         open = false
@@ -1355,6 +1553,7 @@ private fun OverrideFontPreference(
                         title = followGameDefaultLabel,
                         leadingIcon = R.drawable.ic_font_bookmark,
                         containerColor = DialogItemSurface,
+                        indication = null,
                     ) {
                         onSet("")
                         open = false
@@ -1363,6 +1562,7 @@ private fun OverrideFontPreference(
                         title = stringResource(R.string.engine_settings_select_font_file),
                         leadingIcon = R.drawable.ic_font_bookmark,
                         containerColor = DialogItemSurface,
+                        indication = null,
                     ) {
                         open = false
                         onPick()

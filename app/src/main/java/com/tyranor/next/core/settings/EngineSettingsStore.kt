@@ -45,6 +45,8 @@ object EngineSettingsStore {
     const val KEY_ARTEMIS_SURFACE_CACHE_SIZE = "artemis_surface_cache_size"
     const val KEY_ARTEMIS_FONT_CACHE_SIZE = "artemis_font_cache_size"
     const val KEY_ARTEMIS_POWER_SAVING = "artemis_power_saving"
+    const val KEY_ARTEMIS_ANIME4K_ENABLED = "artemis_anime4k_enabled"
+    const val KEY_ARTEMIS_ANIME4K_MODE = "artemis_anime4k_mode"
 
     // Ren'Py 应用级默认（外置模块版本选择）
     const val KEY_RENPY_ENGINE_VERSION = "renpy_engine_version"
@@ -63,6 +65,8 @@ object EngineSettingsStore {
 
     // FVP（rfvp）应用级默认（文本编码 / 系统字体回退 / 文本高分辨率渲染 / 自定义字体）
     const val KEY_FVP_NLS = "fvp_nls"
+    const val KEY_ETHORNELL_NLS = "ethornell_nls"
+    const val KEY_ETHORNELL_FONT = "ethornell_font"
     const val KEY_FVP_SYSTEM_FONT = "fvp_system_font"
     const val KEY_FVP_TEXT_HIDPI = "fvp_text_hidpi"
     const val KEY_FVP_FONT = "fvp_font"
@@ -72,6 +76,14 @@ object EngineSettingsStore {
     const val KEY_XSYS35_RENDERER = "xsys35_renderer"
     const val KEY_XSYS35_INTEGER_SCALE = "xsys35_integer_scale"
     const val KEY_XSYS35_MUTE_UNFOCUS = "xsys35_mute_unfocus"
+
+    // System4（xsystem4）应用级默认（独立存档 / 文本编码 / 自定义字体 / 手柄 / 跳字延迟）
+    const val KEY_XSYS4_SCOPED_SAVE_DIR = "xsys4_scoped_save_dir"
+    const val KEY_XSYS4_ENCODING = "xsys4_encoding"
+    const val KEY_XSYS4_FONT_GOTHIC_PATH = "xsys4_font_gothic_path"
+    const val KEY_XSYS4_FONT_MINCHO_PATH = "xsys4_font_mincho_path"
+    const val KEY_XSYS4_JOYPAD = "xsys4_joypad"
+    const val KEY_XSYS4_MSGSKIP_DELAY = "xsys4_msgskip_delay"
 
     // Winlator 外置启动（YU-RIS / CatSystem2 / PC 经 Winlator 跳转时的下发参数）
     const val KEY_WINLATOR_CONTAINER_ID = "winlator_container_id"
@@ -135,11 +147,13 @@ object EngineSettingsStore {
     const val KR_126 = "1.2.6"
     const val KERNEL_KIRIKIRI2 = "kirikiri2"
     const val KERNEL_KRKRSDL3 = "krkrsdl3"
+    val KR_VERSIONS = setOf(KR_AUTO, KR_139, KR_134, KR_126)
+    val KR_KERNELS = setOf(KR_AUTO, KERNEL_KIRIKIRI2, KERNEL_KRKRSDL3)
     const val KR_PATCH_OVERLAY_AUTO = "auto"
     const val KR_PATCH_OVERLAY_FORCE = "force"
     const val KR_PATCH_OVERLAY_OFF = "off"
 
-    // Anime4K 画面超分模式（仅 kirikiri2 内核路径生效；取值与引擎侧 Anime4kRuntime 一致）
+    // 历史单模式设置的迁移取值；当前滤镜链的执行能力由原始帧接入门禁决定。
     const val ANIME4K_OFF = "off"
     const val ANIME4K_S = "s"
     const val ANIME4K_M = "m"
@@ -153,6 +167,10 @@ object EngineSettingsStore {
         ANIME4K_OFF, ANIME4K_S, ANIME4K_M, ANIME4K_L,
         ANIME4K_SOFT_S, ANIME4K_SOFT_M, ANIME4K_SOFT_L, ANIME4K_DEBLUR,
     )
+
+    /** Artemis 的启用开关独立于模式，模式不接受 off。 */
+    const val ART_ANIME4K_DEFAULT = ANIME4K_S
+    val ART_ANIME4K_MODES = ANIME4K_MODES - ANIME4K_OFF
 
     const val RENDERER_SOFTWARE = "software"
     const val RENDERER_OPENGL = "opengl"
@@ -286,6 +304,9 @@ object EngineSettingsStore {
 
     // FVP 文本编码取值（创建引擎时固定，改动后需重启本局）
     const val FVP_NLS_SJIS = "sjis"
+    const val ETHORNELL_NLS_SJIS = "sjis"
+    const val ETHORNELL_NLS_GBK = "gbk"
+    val ETHORNELL_NLS_VALUES: Set<String> = linkedSetOf(ETHORNELL_NLS_SJIS, ETHORNELL_NLS_GBK)
     const val FVP_NLS_GBK = "gbk"
     const val FVP_NLS_UTF8 = "utf8"
     val FVP_NLS_VALUES: Set<String> = linkedSetOf(
@@ -303,6 +324,21 @@ object EngineSettingsStore {
         XSYS35_RENDERER_OPENGL,
         XSYS35_RENDERER_SOFTWARE,
     )
+
+    // System4 文本编码（sjis = 日文版默认，gbk = 中文版）
+    const val XSYS4_ENCODING_SJIS = "sjis"
+    const val XSYS4_ENCODING_GBK = "gbk"
+    val XSYS4_ENCODING_VALUES: Set<String> = linkedSetOf(XSYS4_ENCODING_SJIS, XSYS4_ENCODING_GBK)
+
+    // System4 手柄取值（auto 不传 --joypad，交由引擎默认）
+    const val XSYS4_JOYPAD_AUTO = "auto"
+    const val XSYS4_JOYPAD_ON = "on"
+    const val XSYS4_JOYPAD_OFF = "off"
+    val XSYS4_JOYPAD_VALUES: Set<String> = linkedSetOf(XSYS4_JOYPAD_AUTO, XSYS4_JOYPAD_ON, XSYS4_JOYPAD_OFF)
+
+    // System4 跳字延迟预设（毫秒；0 = 引擎默认，不传 --msgskip-delay）
+    const val XSYS4_MSGSKIP_DELAY_DEFAULT = 0
+    val XSYS4_MSGSKIP_DELAY_VALUES: Set<Int> = linkedSetOf(0, 100, 200, 400)
 
     // Winlator 外置启动取值域（空串 = 不下发该参数，跟随容器/快捷方式配置）
     /**
@@ -440,13 +476,6 @@ object EngineSettingsStore {
         normalizeKrPatchOverlayMode(prefs(c).getString(KEY_KR_PATCH_OVERLAY_MODE, KR_PATCH_OVERLAY_AUTO))
     fun setKrPatchOverlayMode(c: Context, v: String) =
         prefs(c).edit().putString(KEY_KR_PATCH_OVERLAY_MODE, normalizeKrPatchOverlayMode(v)).apply()
-
-    fun getKrAnime4kMode(c: Context): String {
-        val v = prefs(c).getString(KEY_KR_ANIME4K_MODE, null)
-        return if (v != null && v in ANIME4K_MODES) v else ANIME4K_OFF
-    }
-    fun setKrAnime4kMode(c: Context, v: String) =
-        prefs(c).edit().putString(KEY_KR_ANIME4K_MODE, if (v in ANIME4K_MODES) v else ANIME4K_OFF).apply()
 
     /** Automatically confirm one-button KRKR information dialogs during the first 30 seconds. */
     fun isKrSkipStartupDialogs(c: Context): Boolean =
@@ -656,6 +685,10 @@ object EngineSettingsStore {
     fun getArtPowerSaving(c: Context): String = artStringPref(c, KEY_ARTEMIS_POWER_SAVING, ART_TOGGLES)
     fun setArtPowerSaving(c: Context, v: String) = setArtStringPref(c, KEY_ARTEMIS_POWER_SAVING, v, ART_TOGGLES)
 
+
+    fun normalizeArtAnime4kMode(mode: String?): String =
+        mode?.trim()?.takeIf { it in ART_ANIME4K_MODES } ?: ART_ANIME4K_DEFAULT
+
     private fun artStringPref(c: Context, key: String, allowed: Set<String>): String {
         val value = prefs(c).getString(key, ART_CACHE_DEFAULT).orEmpty().trim()
         return if (value in allowed) value else ART_CACHE_DEFAULT
@@ -675,6 +708,13 @@ object EngineSettingsStore {
         }
     }
     fun setRenpyVersion(c: Context, v: String) = prefs(c).edit().putString(KEY_RENPY_ENGINE_VERSION, v).apply()
+
+    /** Capture new marker and legacy fields atomically from one SharedPreferences snapshot. */
+    fun getGraphicsSettings(c: Context, family: GraphicsFamily): GraphicsSettings =
+        GraphicsSettingsCodec.readGlobal(prefs(c).all, family)
+
+    fun setGraphicsSettings(c: Context, family: GraphicsFamily, settings: GraphicsSettings) =
+        prefs(c).edit().putString(family.preferenceKey, GraphicsSettingsCodec.encode(settings)).apply()
 
     // ---------- Siglus ----------
     fun getSiglusLanguage(c: Context): String =
@@ -712,6 +752,16 @@ object EngineSettingsStore {
     fun normalizeFbNls(v: String?): String =
         v?.trim()?.lowercase()?.takeIf { it in FB_NLS_VALUES } ?: FB_NLS_AUTO
 
+    // ---------- Ethornell / BGI ----------
+    fun getEthornellNls(c: Context): String =
+        normalizeEthornellNls(prefs(c).getString(KEY_ETHORNELL_NLS, ETHORNELL_NLS_SJIS))
+    fun setEthornellNls(c: Context, value: String) =
+        prefs(c).edit().putString(KEY_ETHORNELL_NLS, normalizeEthornellNls(value)).apply()
+    fun normalizeEthornellNls(value: String?): String =
+        value?.trim()?.lowercase(java.util.Locale.ROOT)?.takeIf { it in ETHORNELL_NLS_VALUES } ?: ETHORNELL_NLS_SJIS
+    fun getEthornellFont(c: Context): String = prefs(c).getString(KEY_ETHORNELL_FONT, "").orEmpty()
+    fun setEthornellFont(c: Context, value: String) = prefs(c).edit().putString(KEY_ETHORNELL_FONT, value.trim()).apply()
+
     // ---------- FVP ----------
     fun getFvpNls(c: Context): String =
         normalizeFvpNls(prefs(c).getString(KEY_FVP_NLS, FVP_NLS_SJIS))
@@ -745,6 +795,39 @@ object EngineSettingsStore {
     fun isXs35MuteUnfocus(c: Context): Boolean = prefs(c).getBoolean(KEY_XSYS35_MUTE_UNFOCUS, false)
     fun setXs35MuteUnfocus(c: Context, b: Boolean) =
         prefs(c).edit().putBoolean(KEY_XSYS35_MUTE_UNFOCUS, b).apply()
+
+    // ---------- System4（xsystem4） ----------
+    fun isXs4ScopedSaveDir(c: Context): Boolean =
+        prefs(c).getBoolean(KEY_XSYS4_SCOPED_SAVE_DIR, true)
+    fun setXs4ScopedSaveDir(c: Context, b: Boolean) =
+        prefs(c).edit().putBoolean(KEY_XSYS4_SCOPED_SAVE_DIR, b).apply()
+    fun getXs4Encoding(c: Context): String =
+        normalizeXs4Encoding(prefs(c).getString(KEY_XSYS4_ENCODING, XSYS4_ENCODING_SJIS))
+    fun setXs4Encoding(c: Context, v: String) =
+        prefs(c).edit().putString(KEY_XSYS4_ENCODING, normalizeXs4Encoding(v)).apply()
+    fun normalizeXs4Encoding(v: String?): String =
+        v?.trim()?.lowercase()?.takeIf { it in XSYS4_ENCODING_VALUES } ?: XSYS4_ENCODING_SJIS
+    fun getXs4FontGothicPath(c: Context): String =
+        normalizeXs4FontPath(prefs(c).getString(KEY_XSYS4_FONT_GOTHIC_PATH, ""))
+    fun setXs4FontGothicPath(c: Context, v: String?) =
+        prefs(c).edit().putString(KEY_XSYS4_FONT_GOTHIC_PATH, normalizeXs4FontPath(v)).apply()
+    fun getXs4FontMinchoPath(c: Context): String =
+        normalizeXs4FontPath(prefs(c).getString(KEY_XSYS4_FONT_MINCHO_PATH, ""))
+    fun setXs4FontMinchoPath(c: Context, v: String?) =
+        prefs(c).edit().putString(KEY_XSYS4_FONT_MINCHO_PATH, normalizeXs4FontPath(v)).apply()
+    fun normalizeXs4FontPath(v: String?): String = v?.trim().orEmpty()
+    fun getXs4Joypad(c: Context): String =
+        normalizeXs4Joypad(prefs(c).getString(KEY_XSYS4_JOYPAD, XSYS4_JOYPAD_AUTO))
+    fun setXs4Joypad(c: Context, v: String) =
+        prefs(c).edit().putString(KEY_XSYS4_JOYPAD, normalizeXs4Joypad(v)).apply()
+    fun normalizeXs4Joypad(v: String?): String =
+        v?.trim()?.lowercase()?.takeIf { it in XSYS4_JOYPAD_VALUES } ?: XSYS4_JOYPAD_AUTO
+    fun getXs4MsgskipDelay(c: Context): Int =
+        normalizeXs4MsgskipDelay(prefs(c).getString(KEY_XSYS4_MSGSKIP_DELAY, null)?.trim()?.toIntOrNull())
+    fun setXs4MsgskipDelay(c: Context, v: Int) =
+        prefs(c).edit().putString(KEY_XSYS4_MSGSKIP_DELAY, normalizeXs4MsgskipDelay(v).toString()).apply()
+    fun normalizeXs4MsgskipDelay(v: Int?): Int =
+        v?.takeIf { it in XSYS4_MSGSKIP_DELAY_VALUES } ?: XSYS4_MSGSKIP_DELAY_DEFAULT
 
     // ---------- Winlator 外置启动 ----------
 

@@ -63,7 +63,7 @@ fun DefaultPageBackgroundLayer(modifier: Modifier = Modifier) {
         return
     }
     val accent = AppThemeColors.primary
-    val accentNear = remember(accent) { shiftHue(accent, AccentNearHueShift) }
+    val accentNear = remember(accent) { accentNearColor(accent) }
     // 深色模式：以黑为主体，对角颜色渐变（底色与主题色/近似色低比例混色），无光晕、无模糊
     if (AppThemeColors.isDark) {
         Box(
@@ -111,6 +111,9 @@ private fun DrawScope.drawGlow(center: Offset, radius: Float, color: Color, alph
         center = center,
     )
 }
+
+/** 主题近似色（色相偏移 +32°、略降饱和）：页面柔光副光斑与其它组件的「近似色」共用这一处定义。 */
+fun accentNearColor(accent: Color): Color = shiftHue(accent, AccentNearHueShift)
 
 /** 色相偏移的近似色（略降饱和，避免抢主题色）。 */
 private fun shiftHue(color: Color, degrees: Float): Color {

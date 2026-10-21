@@ -11,6 +11,7 @@ import com.tyranor.next.core.engine.EngineType
 import com.tyranor.next.core.game.manual.AndroidAppGames
 import com.tyranor.next.core.game.model.GamePathUtils
 import com.tyranor.next.core.game.model.ScanGame
+import com.tyranor.next.core.game.model.Xs4Ini
 import com.tyranor.next.core.game.storage.EngineDetectionRepository
 import com.tyranor.next.core.game.storage.GameLibraryFacade
 import com.tyranor.next.core.game.storage.GameLibraryRepository
@@ -20,9 +21,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.runInterruptible
 import java.io.File
 import java.util.Locale
 
@@ -63,6 +66,11 @@ object EngineScanner {
     /** System3.x 辅助特征扩展名（`.wai` / `.bgi` / `.alk`）。 */
     private val XS35_SUPPORT_EXTENSIONS = listOf(".wai", ".bgi", ".alk")
 
+    /** System4 入口 ini（根目录，大小写不敏感；与 `Xs4Paths.resolveIniFile` 同口径）。 */
+    private const val XS4_SYSTEM40_INI = "system40.ini"
+    private const val XS4_ALICESTART_INI = "alicestart.ini"
+    private const val XS4_AIN_EXTENSION = ".ain"
+
     /** RealLive `SEEN.TXT` 场景头尺寸（`0x1d0`，AVG2000 为 `0x1cc`）。 */
     private val REALLIVE_HEADER_SIZES = intArrayOf(0x1d0, 0x1cc)
 
@@ -78,7 +86,7 @@ object EngineScanner {
         val all = coroutineScope {
             roots.map { root ->
                 async {
-                    gate.withPermit { scanRootInternal(context.applicationContext, root, maxDepth) }
+                    gate.withPermit { runInterruptible { scanRootInternal(context.applicationContext, root, maxDepth) } }
                 }
             }.awaitAll().flatten()
         }
@@ -135,6 +143,66 @@ object EngineScanner {
     }
 
     /**
+     * System4 一次性迁移：只对库中 `engine == XSYS35` 的条目定点重跑识别，不做整库扫描，其它条目不动。
+     * 结果为 XSYS4 的条目经 [Xs4RescanMigration.applyDetection] 改判；未能确定结果的条目
+     * （[Xs4RedetectOutcome.Missing] 暂不可达 / [Xs4RedetectOutcome.Unreadable] 读取失败）原样保留，
+     * 且使 [Xs4RedetectReport.complete] 为假，调用方据此不置位迁移标志，下次启动重试。
+     */
+    suspend fun redetectXs35Games(context: Context): Xs4RedetectReport = withContext(Dispatchers.IO) {
+        val appContext = context.applicationContext
+        val targets = Xs4RescanMigration.targetsOf(GameLibraryFacade.loadGames(appContext))
+        if (targets.isEmpty()) return@withContext Xs4RedetectReport(changed = 0, complete = true)
+        val roots = GameLibraryFacade.loadRoots(appContext)
+        val rootReadable = HashMap<String, Boolean>()
+        val outcomes = ArrayList<Xs4RedetectOutcome>(targets.size)
+        val done = HashMap<String, Xs4RedetectOutcome.Done>()
+        for (game in targets) {
+            ensureActive()
+            val outcome = redetectXs35Game(appContext, game, roots, rootReadable)
+            outcomes += outcome
+            if (outcome is Xs4RedetectOutcome.Done) done[game.uri] = outcome
+        }
+        var changed = 0
+        if (done.isNotEmpty()) {
+            GameLibraryFacade.updateGames(appContext) { games ->
+                games.map { game ->
+                    val result = done[game.uri] ?: return@map game
+                    Xs4RescanMigration.applyDetection(game, result.detection, result.dirName).also { updated ->
+                        if (updated !== game) changed++
+                    }
+                }
+            }
+        }
+        Xs4RedetectReport(changed = changed, complete = Xs4RescanMigration.canMarkDone(outcomes))
+    }
+
+    private fun redetectXs35Game(
+        context: Context,
+        game: ScanGame,
+        roots: List<String>,
+        rootReadable: MutableMap<String, Boolean>,
+    ): Xs4RedetectOutcome {
+        if (!game.uri.startsWith("/")) {
+            val root = roots.firstOrNull { isGameUnderRoot(it, game.uri) } ?: return Xs4RedetectOutcome.Missing
+            val treeUri = Uri.parse(root)
+            val readable = rootReadable.getOrPut(root) {
+                val rootSession = SafScanSession(context, treeUri)
+                rootSession.root()?.let { rootSession.nodeOf(it.uri) } != null
+            }
+            if (!readable) return Xs4RedetectOutcome.Unreadable
+            val session = SafScanSession(context, treeUri)
+            val node = session.nodeOf(Uri.parse(game.uri)) ?: return Xs4RedetectOutcome.Missing
+            val children = session.children(node)
+            if (session.queryFailed) return Xs4RedetectOutcome.Unreadable
+            return Xs4RedetectOutcome.Done(detectEngine(children, session::children, session::readHead), node.name)
+        }
+        val dir = File(game.uri)
+        if (!dir.isDirectory) return Xs4RedetectOutcome.Missing
+        if (dir.listFiles() == null) return Xs4RedetectOutcome.Unreadable
+        return Xs4RedetectOutcome.Done(detectEngine(dir, FileScanSession()), dir.name)
+    }
+
+    /**
      * 重扫合并：手动添加的条目（PC 游戏 / 安卓游戏，[EngineType.isManual]）不参与扫描（不依赖扫描根），
      * 重扫时必须原样保留；安卓条目额外按 uri 前缀识别，避免 engine 字段损坏（回退 UNKNOWN）时被丢弃。
      * 同 uri 若被扫描命中则以扫描结果为准（避免重复条目）。
@@ -152,7 +220,7 @@ object EngineScanner {
      * 增量扫描（游戏库已有数据时调用）：遍历根目录时对已识别游戏目录剪枝跳过，
      * 只发现新游戏；返回 现有游戏 + 新发现游戏（已删除游戏保留，不主动移除）。
      */
-    suspend fun incrementalScan(context: Context): List<ScanGame> = withContext(Dispatchers.IO) {
+    suspend fun incrementalScan(context: Context): List<ScanGame> = runInterruptible(Dispatchers.IO) {
         val existing = GameLibraryFacade.loadGames(context)
         val known = existing.mapTo(HashSet()) { it.uri }
         val seen = HashSet<String>()
@@ -195,7 +263,7 @@ object EngineScanner {
             val coverUri = findLocalCoverUri(children)
             out.add(
                 ScanGame(
-                    title = dir.name.takeIf { it.isNotBlank() } ?: localizedText(context, R.string.scan_unnamed_game),
+                    title = detected.titleHint ?: dir.name.takeIf { it.isNotBlank() } ?: localizedText(context, R.string.scan_unnamed_game),
                     uri = dir.uri.toString(),
                     engine = detected.engine,
                     launchTarget = detected.launchTarget,
@@ -216,7 +284,7 @@ object EngineScanner {
         }
     }
 
-    suspend fun scanRoot(context: Context, rootUriStr: String, maxDepth: Int = 3): List<ScanGame> = withContext(Dispatchers.IO) {
+    suspend fun scanRoot(context: Context, rootUriStr: String, maxDepth: Int = 3): List<ScanGame> = runInterruptible(Dispatchers.IO) {
         scanRootInternal(context.applicationContext, rootUriStr, maxDepth)
     }
 
@@ -256,7 +324,7 @@ object EngineScanner {
             val coverUri = findLocalCoverUri(children)
             out.add(
                 ScanGame(
-                    title = dir.name.takeIf { it.isNotBlank() } ?: localizedText(context, R.string.scan_unnamed_game),
+                    title = detected.titleHint ?: dir.name.takeIf { it.isNotBlank() } ?: localizedText(context, R.string.scan_unnamed_game),
                     uri = dir.uri.toString(),
                     engine = detected.engine,
                     launchTarget = detected.launchTarget,
@@ -302,6 +370,13 @@ object EngineScanner {
             return SafNode(uri, documentId, name, isDirectory = true)
         }
 
+        /** 已知文档 URI → 节点；名称查询失败（文档已不存在或无权限）返回 null。 */
+        fun nodeOf(documentUri: Uri): SafNode? {
+            val documentId = runCatching { DocumentsContract.getDocumentId(documentUri) }.getOrNull() ?: return null
+            val name = queryDisplayName(documentUri) ?: return null
+            return SafNode(documentUri, documentId, name, isDirectory = true)
+        }
+
         fun children(dir: SafNode): List<SafNode> = childrenCache.getOrPut(dir.documentId) {
             val childrenUri = runCatching {
                 DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, dir.documentId)
@@ -326,6 +401,7 @@ object EngineScanner {
                                     documentId = documentId,
                                     name = name,
                                     isDirectory = mimeType == DocumentsContract.Document.MIME_TYPE_DIR,
+                                    size = if (it.isNull(3)) null else it.getLong(3).takeIf { size -> size >= 0 },
                                 )
                             )
                         }
@@ -355,14 +431,18 @@ object EngineScanner {
             }
         }.getOrNull()
 
-        /** 读取文件头字节，用于 AVG32/RealLive 的 `SEEN.TXT` 与 UK2 `.MES` 内容判定。 */
-        fun readHead(node: SafNode, maxBytes: Int = 64 * 1024): ByteArray? = runCatching {
+        /** Bounded content evidence shared by the framebuffer and Ethornell scanners. */
+        fun readHead(node: SafNode, maxBytes: Int = 64 * 1024): ByteArray? = try {
             resolver.openInputStream(node.uri)?.use { input ->
-                val buffer = ByteArray(maxBytes)
-                val count = input.read(buffer)
-                if (count <= 0) null else buffer.copyOf(count)
+                EthornellArchiveProbe.readHead(input, maxBytes)
             }
-        }.getOrNull()
+        } catch (cancelled: java.util.concurrent.CancellationException) {
+            throw cancelled
+        } catch (_: java.io.IOException) {
+            null
+        } catch (_: SecurityException) {
+            null
+        }
     }
 
     private data class SafNode(
@@ -370,12 +450,14 @@ object EngineScanner {
         val documentId: String,
         val name: String,
         val isDirectory: Boolean,
+        val size: Long? = null,
     )
 
     private val SAF_PROJECTION = arrayOf(
         DocumentsContract.Document.COLUMN_DOCUMENT_ID,
         DocumentsContract.Document.COLUMN_DISPLAY_NAME,
         DocumentsContract.Document.COLUMN_MIME_TYPE,
+        DocumentsContract.Document.COLUMN_SIZE,
     )
 
     fun applyLocalCover(context: Context, game: ScanGame): ScanGame {
@@ -538,16 +620,20 @@ object EngineScanner {
             dir.listFiles() ?: emptyArray()
         }
 
-        /** 读取文件头字节，用于 AVG32/RealLive 的 `SEEN.TXT` 与 UK2 `.MES` 内容判定。 */
+        /** Bounded content evidence shared by the framebuffer and Ethornell scanners. */
         fun readHead(file: File, maxBytes: Int = 64 * 1024): ByteArray? =
             headCache.getOrPut(file.absolutePath) {
-                runCatching {
+                try {
                     file.inputStream().use { input ->
-                        val buffer = ByteArray(maxBytes)
-                        val count = input.read(buffer)
-                        if (count <= 0) null else buffer.copyOf(count)
+                        EthornellArchiveProbe.readHead(input, maxBytes)
                     }
-                }.getOrNull()
+                } catch (cancelled: java.util.concurrent.CancellationException) {
+                    throw cancelled
+                } catch (_: java.io.IOException) {
+                    null
+                } catch (_: SecurityException) {
+                    null
+                }
             }
     }
 
@@ -569,7 +655,7 @@ object EngineScanner {
             val coverUri = findLocalCoverUri(children)
             out.add(
                 ScanGame(
-                    title = dir.name.takeIf { it.isNotBlank() } ?: localizedText(context, R.string.scan_unnamed_game),
+                    title = detected.titleHint ?: dir.name.takeIf { it.isNotBlank() } ?: localizedText(context, R.string.scan_unnamed_game),
                     uri = dir.absolutePath,
                     engine = detected.engine,
                     launchTarget = detected.launchTarget,
@@ -603,7 +689,7 @@ object EngineScanner {
             val coverUri = findLocalCoverUri(children)
             out.add(
                 ScanGame(
-                    title = dir.name.takeIf { it.isNotBlank() } ?: localizedText(context, R.string.scan_unnamed_game),
+                    title = detected.titleHint ?: dir.name.takeIf { it.isNotBlank() } ?: localizedText(context, R.string.scan_unnamed_game),
                     uri = dir.absolutePath,
                     engine = detected.engine,
                     launchTarget = detected.launchTarget,
@@ -640,20 +726,34 @@ object EngineScanner {
 
     // ============ 引擎识别（移植自 EngineDetector） ============
 
+    /** [titleHint] 为识别期能从内容读到的标题（当前仅 System4 的 `GameName`），缺省回落目录名。 */
     data class Detection(
         val engine: EngineType,
         val confidence: Int,
         val launchTarget: String,
         val externalModuleAlias: String? = null,
+        val titleHint: String? = null,
     )
 
-    fun detectEngine(dir: DocumentFile): Detection {
+    fun detectEngine(context: Context, dir: DocumentFile): Detection {
         if (!dir.isDirectory) return UNKNOWN_DETECTION
         return detectEngine(
             children = dir.listFiles().asIterable(),
             nameOf = { it.name.orEmpty() },
             isDirectory = { it.isDirectory },
             childrenOf = { it.listFiles().asIterable() },
+            headOf = { file ->
+                try {
+                    context.contentResolver.openInputStream(file.uri)?.use { EthornellArchiveProbe.readHead(it) }
+                } catch (cancelled: java.util.concurrent.CancellationException) {
+                    throw cancelled
+                } catch (_: java.io.IOException) {
+                    null
+                } catch (_: SecurityException) {
+                    null
+                }
+            },
+            sizeOf = { it.length().takeIf { size -> size > 0 } },
         )
     }
 
@@ -668,6 +768,7 @@ object EngineScanner {
         isDirectory = { it.isDirectory },
         childrenOf = { session.children(it).asIterable() },
         headOf = { session.readHead(it) },
+        sizeOf = { it.length() },
     )
 
     private fun detectEngine(
@@ -680,14 +781,16 @@ object EngineScanner {
         isDirectory = { it.isDirectory },
         childrenOf = childrenOf,
         headOf = headOf,
+        sizeOf = { it.size },
     )
 
-    private fun <T> detectEngine(
+    internal fun <T> detectEngine(
         children: Iterable<T>,
         nameOf: (T) -> String,
         isDirectory: (T) -> Boolean,
         childrenOf: (T) -> Iterable<T>,
         headOf: (T) -> ByteArray? = { null },
+        sizeOf: (T) -> Long? = { null },
     ): Detection {
 
         val xp3Files = mutableListOf<String>()
@@ -747,14 +850,21 @@ object EngineScanner {
         var hasAldScript = false
         var aldCount = 0
         var hasXs35Support = false
+        var hasSystem39Marker = false
+        var system40IniNode: T? = null
+        var aliceStartIniNode: T? = null
+        var hasAin = false
         var hasUk2Cfg = false
         var hasSeenSceneAvg32 = false
         var hasSeenSceneReallive = false
         var seenArchiveNode: T? = null
         var seenArchiveIsRoot = false
         var uk2MesNode: T? = null
+        var ethornellSystemNode: T? = null
+        var ambiguousEthornellSystem = false
 
         fun collect(entry: T, rel: String) {
+            if (Thread.currentThread().isInterrupted) throw java.util.concurrent.CancellationException()
             val lower = nameOf(entry).lowercase(Locale.ROOT)
             if (lower.isEmpty()) return
             val childRel = if (rel.isEmpty()) lower else "$rel/$lower"
@@ -791,6 +901,8 @@ object EngineScanner {
                             aldCount++
                         }
                         if (isXs35SupportName(childName)) hasXs35Support = true
+                        // 与根目录分支同口径：精确名 System39.* 是 System 3.x 标记（System 4 判定的护栏）
+                        if (childName in XS35_SUPPORT_EXACT_NAMES) hasSystem39Marker = true
                     }
                 }
                 if (lower in ENGINE_SEARCH_DIRECTORIES) {
@@ -799,6 +911,10 @@ object EngineScanner {
                 return
             }
             when {
+                rel.isEmpty() && lower == "system.arc" -> {
+                    if (ethornellSystemNode != null) ambiguousEthornellSystem = true
+                    ethornellSystemNode = entry
+                }
                 lower == "index.html" || lower == "index.htm" -> hasIndex = true
                 childRel == "js/rpg_core.js" || childRel.endsWith("/js/rpg_core.js") -> hasRpgMvCore = true
                 childRel == "js/rmmz_core.js" || childRel.endsWith("/js/rmmz_core.js") -> hasRpgMzCore = true
@@ -876,7 +992,16 @@ object EngineScanner {
                     hasAldScript = true
                     aldCount++
                 }
-                rel.isEmpty() && isXs35SupportName(lower) -> hasXs35Support = true
+                rel.isEmpty() && isXs35SupportName(lower) -> {
+                    hasXs35Support = true
+                    // 精确名 System39.ini / System39.ain 是 System 3.x 标记（System 4 判定的护栏）
+                    if (lower in XS35_SUPPORT_EXACT_NAMES) hasSystem39Marker = true
+                }
+                // System4（xsystem4）：根目录入口 ini 与 *.ain（ain 只作 ini 的附属条件，不单独成判据；
+                // system39.ain 已由上一分支计入 System 3.x 标记，此处显式排除）
+                rel.isEmpty() && lower == XS4_SYSTEM40_INI -> system40IniNode = entry
+                rel.isEmpty() && lower == XS4_ALICESTART_INI -> aliceStartIniNode = entry
+                rel.isEmpty() && lower.endsWith(XS4_AIN_EXTENSION) && lower !in XS35_SUPPORT_EXACT_NAMES -> hasAin = true
             }
         }
         children.forEach { collect(it, "") }
@@ -897,6 +1022,10 @@ object EngineScanner {
         val uk2Mes = uk2MesNode
         if (uk2Mes != null && hasUk2MesHeader(headOf(uk2Mes))) {
             return Detection(EngineType.UK2, 90, LAUNCH_TARGET_GAME_DIR)
+        }
+        // Preserve explicit UK2 evidence; only outrank its weak generic .mes fallback.
+        if (!ambiguousEthornellSystem && ethornellSystemNode?.let { EthornellArchiveProbe.hasBootstrap(headOf(it), sizeOf(it)) } == true) {
+            return Detection(EngineType.ETHORNELL, 96, LAUNCH_TARGET_GAME_DIR)
         }
         val seenKind = classifySeenArchive(seenArchiveNode?.let { headOf(it) })
         if (hasGameexeIni && seenKind != null) {
@@ -956,18 +1085,25 @@ object EngineScanner {
         if (cs2Score >= CS2_MIN_SCORE) {
             return Detection(EngineType.CATSYSTEM2, cs2Score, LAUNCH_TARGET_GAME_DIR)
         }
+        // System4（xsystem4）：根目录 System40.ini / AliceStart.ini 为硬特征，*.ain 为辅助。
+        // 判定规则放在本函数末尾（所有既有引擎与 ONS 之后），此处只计算 XSYS35 护栏用的 isSystem4。
+        // 护栏用 !hasSystem39Marker 而非 hasXs35Support：后者含 .alk，System 4 同样用 ALK 资源包。
+        // 嵌套目录（data/System40.ini）不构成特征，见 collect 的 rel.isEmpty() 约束。
+        val system4IniNode = system40IniNode ?: aliceStartIniNode
+        val isSystem4 = system4IniNode != null && !hasSystem39Marker
         // System3.x（xsystem35）：场景/图形档 *.ALD 为硬特征，System39.*/.wai/.bgi/.alk 为辅助。
         // 判定置于 CS2 之后、ARTEMIS 之前（即所有既有 native 引擎之后）：既有引擎优先，
         // 防止「既有引擎特征 + 杂散 ALD」被抢判为 XSYS35；XSYS35 真实目录不含既有引擎特征，
         // 召回不受影响。仅含非 S 前缀 ALD 的目录（如只有 GA.ALD，无法启动）会被低分识别为
         // XSYS35，由宿主启动预检（场景档 S*.ALD / adisk.ald 检查，见 Xs35Activity）兜底拦下。
-        if (hasAldScript && hasXs35Support) {
+        // 护栏 !isSystem4：System 4 根目录常含 *.ald（如 Rance6BA.ald），不护栏会被 hasAldScript 规则吞掉。
+        if (!isSystem4 && hasAldScript && hasXs35Support) {
             return Detection(EngineType.XSYS35, 96, LAUNCH_TARGET_GAME_DIR)
         }
-        if (hasAldScript && aldCount >= 2) {
+        if (!isSystem4 && hasAldScript && aldCount >= 2) {
             return Detection(EngineType.XSYS35, 90, LAUNCH_TARGET_GAME_DIR)
         }
-        if (hasAldScript) {
+        if (!isSystem4 && hasAldScript) {
             return Detection(EngineType.XSYS35, 80, LAUNCH_TARGET_GAME_DIR)
         }
         if ((hasSystemIni && hasFirstIet) || hasRootPfs || hasPatchPfs || hasAnyPfs || (hasBootIni && hasObbLikeFile)) {
@@ -1031,6 +1167,18 @@ object EngineScanner {
         }
         if (hasOnsScript || hasOnsArchive) {
             return Detection(EngineType.ONS, if (hasOnsScript) 90 else 70, LAUNCH_TARGET_GAME_DIR)
+        }
+        // System4（xsystem4）：排在所有既有引擎（含 ONS）之后、UNKNOWN 之前。
+        // 既有引擎目录若混入杂散 System40.ini / AliceStart.ini，仍判原引擎；System 4 真实目录不含既有引擎特征，召回不受影响。
+        // 与 XSYS35 的关系见上方 isSystem4 护栏。标题只在判为 XSYS4 时才读取 ini。
+        fun system4Title(): String? = system4IniNode?.let { node ->
+            headOf(node)?.let { Xs4Ini.parse(it).gameName }
+        }
+        if (isSystem4 && hasAin) {
+            return Detection(EngineType.XSYS4, 97, LAUNCH_TARGET_GAME_DIR, titleHint = system4Title())
+        }
+        if (isSystem4) {
+            return Detection(EngineType.XSYS4, 90, LAUNCH_TARGET_GAME_DIR, titleHint = system4Title())
         }
         return UNKNOWN_DETECTION
     }

@@ -19,6 +19,8 @@ enum class MirrorPrepareStage {
     CREATE_FAILED,
 }
 
+enum class EthornellPrepareError { RESOURCE_ROOT, BOOTSTRAP, FONT, USER_DATA, SESSION_BUSY }
+
 /**
  * 引擎启动结果（P0-6 错误协议）：成功 / 失败两类，失败携带可程序化区分的类型，
  * UI 层统一经 `ui/common/LaunchErrorMessages.kt` 映射本地化文案；core 不再拼接展示文案。
@@ -33,6 +35,7 @@ sealed interface LaunchResult {
 
         /** 无法把游戏 URI 解析为本地目录路径。 */
         data object GameDirUnresolved : Failure
+        data class EthornellPrepareFailed(val error: EthornellPrepareError) : Failure
 
         /** 已打开「管理所有文件」系统授权页，用户返回后需再次启动。 */
         data object AllFilesAccessRequested : Failure
@@ -63,6 +66,18 @@ sealed interface LaunchResult {
 
         /** System35 存档目录创建失败；[path] 为 null 表示外部存储不可用（独立存档无法落点）。 */
         data class Xs35SaveDirUnavailable(val path: String?) : Failure
+
+        /** System4 存档路径存在但不是目录。 */
+        data class Xs4SavePathNotDirectory(val path: String) : Failure
+
+        /** System4 存档目录创建失败；[path] 为 null 表示外部存储不可用（独立存档无法落点）。 */
+        data class Xs4SaveDirUnavailable(val path: String?) : Failure
+
+        /** System4 游戏根目录缺少入口 ini（System40.ini / AliceStart.ini，大小写不敏感）。 */
+        data object Xs4IniMissing : Failure
+
+        /** 设备不支持 OpenGL ES 3.0（System4 引擎的渲染要求）。 */
+        data object Xs4Gles3Required : Failure
 
         /** 外置 APK 引擎模块启动失败；携带模块层类型化错误（文案由 UI 映射）。 */
         data class ExternalModuleFailed(val result: ExternalEngineLaunchResult) : Failure

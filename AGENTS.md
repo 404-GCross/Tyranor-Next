@@ -152,6 +152,11 @@
   `contentPadding`），否则滚动内容会从顶栏下方穿过与标题重叠。设置类页面（MiuixScaffold）的
   `innerPadding` 顶部值一律加到列表 modifier 上，`contentPadding` 只保留额外的间距。
 
+- **默认外观风格的渐进模糊（仅默认风格，Android 12+）**：顶部栏背景仍是透明色，但页面经 `ui/common/TopBarBlur.kt` 的 `TopBarBlurHost`（Miuix 页用 `MiuixTopBarBlurScaffold`）托管时，正文铺满整页并垫在顶栏下方，顶栏背景层采样正文做模糊 + 页面底色半透明叠层，整体按竖向渐变遮罩——**顶端最实、底边完全透明**，形成「向上渐模糊」。
+  - 使用方式：`TopBarBlurHost(topBar = { AppTopBar(...) }) { topInset -> … }`；滚动列表把 `topInset` 加到 `contentPadding.top`，非滚动内容用 `padding(top = topInset)`。顶栏下方的固定条（分页/分类栏/搜索框）必须放进 `AppTopBar` 的 `underTitle`，才处于模糊区内。
+  - 玻璃系外观风格（复古/高级）与 Android 12 以下**不启用**：`TopBarBlurHost` 退化为「顶栏在上、正文在下」的 Column，`topInset = 0`，行为与原先一致。
+  - Web 首页（WebView）、解封包页不接入（WebView 不得录入采样层，见 `MainScreen.kt` 的 Web 首页采样降级说明）。
+
 - 禁止使用主题色 `primary` 作为顶部栏背景。
 
 ### 5. 状态栏
@@ -210,7 +215,7 @@ Column(fillMaxSize)                                // 页面根
   `AppComponentShape`（默认 8dp / 玻璃外观风格与悬浮导航一致 32dp）、Miuix 组件用 `AppComponentCornerRadius`、
   抽屉顶部用 `AppSheetTopShape`；禁止再散落圆角字面量。
 
-- **平板侧栏**：`isSideRailLayout()`（`isTabletScreen()` 命中且应用设置「平板侧边栏」开关开启，默认开）命中时主导航移到侧边（`ui/common/AppNavigationRail.kt`）：侧栏形态按外观风格取该主题「默认导航栏」形态，液态玻璃两档与「悬浮按钮」不适配侧栏；侧栏占布局宽度，底部留白归零；高级玻璃侧栏采样单独的纯背景层（`railBackdrop`，不能采样内容层——坐标会越界）。选中态图标动画统一用 `ui/common/NavigationTabIcon.kt`。
+- **平板侧栏**：`isSideRailLayout()`（`isTabletScreen()` 命中且应用设置「平板侧边栏」开关开启，默认开）命中时主导航移到侧边（`ui/common/AppNavigationRail.kt`）：侧栏形态按外观风格取该主题「经典 MD 导航栏」（原「默认导航栏」）形态，液态玻璃两档与「悬浮按钮」不适配侧栏；侧栏占布局宽度，底部留白归零；高级玻璃侧栏采样单独的纯背景层（`railBackdrop`，不能采样内容层——坐标会越界）。选中态图标动画统一用 `ui/common/NavigationTabIcon.kt`。
 
 - **圆角豁免**：液态玻璃导航（`ui/common/LiquidGlassNavigation.kt`）的栏体与导航项胶囊使用 **16dp**（8dp 基础上加大 8dp），为有意设计，不受 8dp 条款约束；其余组件不得援引此豁免。
 

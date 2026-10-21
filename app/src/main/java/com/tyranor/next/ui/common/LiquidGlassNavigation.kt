@@ -297,6 +297,20 @@ private fun LiquidGlassNavItemView(
 }
 
 /**
+ * 当前实际生效的导航栏样式：用户显式选择的样式原样生效；未显式设置时按外观风格解析
+ * （默认外观 → 液态玻璃 · 透镜，玻璃系外观 → 经典 MD），随外观风格切换即时重组。
+ */
+@Composable
+fun effectiveNavStyle(): String {
+    val navStyle by AppSettingsStore.navStyleState.collectAsState()
+    return AppSettingsStore.resolveNavStyle(
+        style = navStyle,
+        enhancedSupported = AppSettingsStore.supportsLiquidGlassEnhanced,
+        glassAppearance = AppThemeColors.isGlass,
+    )
+}
+
+/**
  * 悬浮导航栏的列表底部滚动留白：
  * 内容可滚动经过玻璃后面（沉浸），但列表尾部预留导航高度，保证滚动到底时最后一项完全露出不被遮挡。
  * - 平板侧栏布局：导航在侧边占布局宽度，底部留白为 0（返回 0）；
@@ -310,7 +324,7 @@ private fun LiquidGlassNavItemView(
 fun glassNavBottomInset(): Dp {
     // 平板侧栏：导航在侧边且占布局宽度，底部不需要留白
     if (isSideRailLayout()) return 0.dp
-    val navStyle by AppSettingsStore.navStyleState.collectAsState()
+    val navStyle = effectiveNavStyle()
     val navBarInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     return when (navStyle) {
         AppSettingsStore.NAV_STYLE_LIQUID_GLASS_ENHANCED -> {

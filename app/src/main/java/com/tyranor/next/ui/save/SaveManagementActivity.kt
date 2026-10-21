@@ -19,7 +19,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -50,7 +49,9 @@ import com.tyranor.next.ui.common.AppAlertDialog
 import com.tyranor.next.ui.common.AppNavItem
 import com.tyranor.next.ui.common.AppScreenActivity
 import com.tyranor.next.ui.common.AppTopBar
+import com.tyranor.next.ui.common.TopBarBlurHost
 import com.tyranor.next.ui.common.BottomInsetSpacer
+import com.tyranor.next.ui.common.DialogTextButton
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -180,12 +181,12 @@ private fun SaveManagementScreen(game: ScanGame) {
         }
     }
 
-    Column(Modifier.fillMaxSize()) {
+    TopBarBlurHost(topBar = {
         AppTopBar(title = stringResource(R.string.save_management_title))
-
+    }) { topInset ->
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
-            contentPadding = PaddingValues(top = 16.dp, bottom = 16.dp),
+            contentPadding = PaddingValues(top = 16.dp + topInset, bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item {
@@ -311,9 +312,10 @@ private fun SaveManagementScreen(game: ScanGame) {
         AppAlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
             title = { Text(stringResource(R.string.save_delete_title), style = MaterialTheme.typography.titleMedium) },
-            text = { Text(stringResource(R.string.save_delete_message, game.title)) },
+            text = { Text(stringResource(R.string.save_delete_message, game.title), style = MaterialTheme.typography.bodyMedium) },
             confirmButton = {
-                TextButton(
+                DialogTextButton(
+                    text = stringResource(R.string.common_delete),
                     onClick = {
                         showDeleteConfirm = false
                         runSaveTask {
@@ -321,10 +323,10 @@ private fun SaveManagementScreen(game: ScanGame) {
                             saveDeletedCountFormat.format(count)
                         }
                     },
-                ) { Text(stringResource(R.string.common_delete)) }
+                )
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteConfirm = false }) { Text(stringResource(R.string.common_cancel)) }
+                DialogTextButton(text = stringResource(R.string.common_cancel), onClick = { showDeleteConfirm = false })
             },
         )
     }

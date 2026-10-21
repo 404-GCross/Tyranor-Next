@@ -5,12 +5,20 @@
 ## 引擎与运行时
 
 **引擎（EngineType）**:
-游戏所属的运行时家族，扫描时按目录特征（脚本/资源文件）判定：KIRIKIRI、ONS、TYRANO、RPG Maker（RGSS 系列）、RPG_MV、RPG_MZ、VN、WebOther、ARTEMIS、SIGLUS、REALLIVE、AVG32、XSYS35、UK2、FVP、RENPY、YURIS、CATSYSTEM2、PC、ANDROID_APP、UNKNOWN。
+游戏所属的运行时家族，扫描时按目录特征（脚本/资源文件）判定：KIRIKIRI、ONS、TYRANO、RPG Maker（RGSS 系列）、RPG_MV、RPG_MZ、VN、WebOther、ARTEMIS、SIGLUS、REALLIVE、AVG32、XSYS35、XSYS4、UK2、FVP、ETHORNELL、RENPY、YURIS、CATSYSTEM2、PC、ANDROID_APP、UNKNOWN；类型已接入不等于其游戏兼容性已验收。
 _Avoid_: 游戏类型、格式
 
 **内置引擎**:
-随 App 分发、无需外置安装即可运行的引擎运行时（Kirikiroid2 / krkrsdl3、ONScripter、Artemis、Siglus（siglus_rs Rust 运行时）、RealLive / AVG32 / UK2（siglus_rs game_launcher 软渲染运行时）、FVP（rfvp Rust 运行时）、System35（xsystem35）、Tyrano 网页壳）。RPG Maker MV/MZ 由内置 Web 运行环境承载。
+随 App 分发、无需外置安装的引擎运行时（Kirikiroid2 / krkrsdl3、ONScripter、Artemis、Siglus（siglus_rs Rust 运行时）、RealLive / AVG32 / UK2（siglus_rs game_launcher 软渲染运行时）、FVP（rfvp Rust 运行时）、System35（xsystem35）、System4（xsystem4，与 System35 共用 libSDL2x）、Ethornell / BGI（实验接入，兼容性未验收）、Tyrano 网页壳）。RPG Maker MV/MZ 由内置 Web 运行环境承载。
 _Avoid_: 预制引擎、捆绑引擎
+
+**Ethornell / BGI（ETHORNELL）**:
+以 ethornell-rs 重实现承载的内置引擎家族，已接入扫描、启动与设置，目前仍属实验运行时，不能据此声明全家族可玩。App 存档管理尚未开放，不能把运行时用户数据与已验证的存档镜像或 PC 存档互通等同。
+_Avoid_: Winlator BGI 插件、完整 BGI 支持
+
+**System3.x / System4（XSYS35 / XSYS4）**:
+AliceSoft 的两代引擎，各为独立的引擎类型（XSYS35 对应 System 3.x，XSYS4 对应 System 4）：目录特征、启动参数与设置互不相同，不合并为一类。
+_Avoid_: System3/4、AliceSoft 引擎
 
 **视觉小说引擎组（Framebuffer 引擎）**:
 Siglus 之外由 game_launcher 运行库承载的三个软件渲染引擎（RealLive、AVG32、UK2）的统称：引擎逐帧输出 RGBA 帧缓冲，宿主 `FramebufferGameActivity` 拷进 Bitmap 呈现并转发指针/键盘/文本输入；文本编码（NLS）按全局/单游戏设置。
@@ -44,6 +52,10 @@ _Avoid_: v0/v1/v2（旧编号）
 同一引擎家族下的可替换底层运行时（KiriKiri 家族：Kirikiroid2 与 krkrsdl3），可在引擎设置中选择。
 _Avoid_: 渲染器、后端
 
+**SDL2 共享运行库（libSDL2x / app32）**:
+System35 与 System4 共用的 SDL2 2.32.10 原生库（`libSDL2x.so`）与重命名 Java 层（`org.libsdl.app32`），与 ONS 的 SDL2 2.26.3（`libSDL2.so` / `org.libsdl.app`）并存、互不替代。
+_Avoid_: SDL 补丁版、第二套 SDL
+
 **补丁 overlay（Patch Overlay）**:
 启动 KiriKiri 游戏时为兼容 Steam 插件等场景生成的虚拟 `patch.tjs` overlay 目录；行为由「自动/强制/关闭」模式控制。
 _Avoid_: 补丁、Hook
@@ -53,8 +65,45 @@ Artemis 启动前对必要文件（system.ini、list_windows、movie 等）进�
 _Avoid_: 自动补丁、提问开关
 
 **标题回写（Title Feedback）**:
-引擎宿主在引擎进程内解析游戏标题并写入共享 prefs（`<engine>_title.<pathHash>`），主 App 在库加载时条件导入为游戏标题；仅当标题仍等于启动前登记的目录名（未被用户改名）时覆盖；Siglus 与 System35 均使用该协议。
+引擎宿主在引擎进程内解析游戏标题并写入共享 prefs（`<engine>_title.<pathHash>`），主 App 在库加载时条件导入为游戏标题；仅当标题仍等于启动前登记的目录名（未被用户改名）时覆盖；Siglus 与 System35 均使用该协议；System4 不使用该协议，标题在扫描期解析 ini 的 `GameName`。
 _Avoid_: 自动改名、元数据抓取
+
+**画质滤镜链**:
+各引擎共用的画质处理装配方式，由用户按顺序组合修复、锐化与放大滤镜，并可移除单个滤镜或配置其参数；实际执行能力取决于所选内核的帧输出入口，单游戏自定义链在切换跟随全局时保留。
+_Avoid_: Anime4K 模式（指整条链时）、固定超分预设
+
+**滤镜预设分类**:
+将可装配的滤镜按算法家族分组，带预设的家族提供二级选择，单滤镜直接添加；滤镜链保存具体预设或自定义参数，以及顺序。
+_Avoid_: 滤镜组（指单个算法分类时）、分类节点
+
+**滤镜贡献**:
+一项可独立加入或移除的滤镜能力，包含具体预设、用户可调参数和展示标识；共享滤镜链按照已提供的贡献装配。
+_Avoid_: 注册枚举、模型规模（指整个贡献时）
+
+**游戏原始帧**:
+游戏舞台合成后、按显示区域缩放前的画面，包含当时已合成的文本和界面；获取不到可信尺寸时，不将屏幕帧标为原始帧。
+_Avoid_: 屏幕截图、显示分辨率（指原始输入时）
+
+**尺寸限制舞台输出**:
+以游戏逻辑像素尺度输出完整合成画面，再由显示层执行滤镜链并适配屏幕的接入方式；保留舞台外叠加内容时可包含画布留白，滤镜输入尺寸以实际处理画布为准。尺寸可信前的屏幕帧不计为游戏原始帧。
+_Avoid_: 降采样截图、仅修改监测分辨率
+
+**等比放大目标**:
+按照输入帧比例、在当前屏幕表面范围内容纳的最大处理输出尺寸；适应模式直接使用该尺寸；固定原生倍率的滤镜可由显示层另行缩放。
+_Avoid_: 固定两倍、分别拉伸宽高
+
+**Artemis 画质增强**:
+在受支持的 Artemis 内核已合成的完整舞台帧上执行画质滤镜链的能力；输入包含当时已合成的文本和界面，支持范围按内核版本区分。
+_Avoid_: CNN 超分、素材替换
+
+**Siglus 画质增强**:
+在 Siglus 已合成、尚未按屏幕缩放的完整舞台帧上执行共用画质滤镜链的能力；输入包含文本和界面，舞台尺寸与素材分辨率分别理解。
+_Avoid_: 素材超分、引擎替换
+
+**画质性能监测**:
+显示滤镜输入、实际处理输出和显示区域尺寸，以及显示帧率和可用的处理耗时；仅在当前内核支持且滤镜链启用时可选。
+_Avoid_: 配置分辨率、引擎循环帧率
+
 
 ## 游戏库
 
@@ -101,12 +150,12 @@ _Avoid_: 设置优先级、全局设置
 _Avoid_: 设置合并、覆盖层
 
 **引擎设置种类（EngineSettingsKind）**:
-引擎设置页的分类入口（KRKR / ONS / ARTEMIS / RPG_MAKER / TYRANO / RENPY / SIGLUS / FRAMEBUFFER / FVP / XSYS35 / PPSSPP / WINLATOR），各自提供该引擎族专属参数项。
+引擎设置页的分类入口（KRKR / ONS / ARTEMIS / RPG_MAKER / TYRANO / RENPY / SIGLUS / FRAMEBUFFER / FVP / XSYS35 / XSYS4 / ETHORNELL / PPSSPP / WINLATOR），各自提供该引擎族专属参数项。
 _Avoid_: 引擎设置 Tab
 
 **导航样式（Nav Style）**:
-底部导航栏样式的四档取值：「默认」（Material3 导航栏；玻璃系外观风格下为悬浮圆角玻璃条，高级玻璃在 Android 12+ 叠加真采样模糊）、「液态玻璃 · 经典」（原版小圆角方形玻璃栏 + 模糊）、「液态玻璃 · 透镜」（见下）、「悬浮按钮」（见下）；内存态即时切换。平板/大窗口下主导航移到侧边（见「平板侧栏」，悬浮按钮同液态玻璃两档不适配）。
-_Avoid_: 底部栏外观、主题
+底部导航栏样式的四档取值：「经典 MD」（原「默认」，Material3 导航栏；玻璃系外观下为悬浮圆角玻璃条）、「液态玻璃 · 经典」（小圆角玻璃栏）、「液态玻璃 · 透镜」（折射透镜）、「悬浮按钮」；未手动选择时，仅默认外观采用透镜（Android 13 以下回退液态玻璃经典），复古/高级玻璃保留经典 MD 的玻璃条形态。手动选择优先于外观风格，切换外观不覆盖选择；平板/大窗口的侧边形态见「平板侧栏」。
+_Avoid_: 底部栏外观、主题、默认导航（已更名为「经典 MD」）
 
 **外观风格（Appearance Style）**:
 应用设置的视觉风格选择：「默认」、「复古玻璃」（原「玻璃」）、「高级玻璃」三档；两档玻璃均使用深色背景、半透明毛玻璃容器与 0.5dp 描边，并禁用外观模式/色调切换（色调轮盘可用），以 `AppThemeColors.appearanceStyle` / `isGlass` 为唯一事实源。
@@ -151,7 +200,7 @@ _Avoid_: 下载封面、封面更新
 _Avoid_: 选封面、替换
 
 **两级封面选择（Cover Drill-down）**:
-部分来源（未萌NextMoe）一个作品有多张封面时，先在作品候选列表选中作品、再从其全部封面中挑选的流程（CoverScraperService.searchWorkCovers）；不支持该流程的来源点选候选即直接绑定。
+部分来源（未萌NextMoe）一个作品有多张封面时，先在作品候选列表选中作品、再从可获取的封面中挑选的流程；不支持该流程的来源点选候选即直接绑定。
 _Avoid_: 二段选择、多图选择
 
 **封面缓存（CoverImageCache / CoverThumbnailLoader）**:
@@ -222,6 +271,10 @@ _Avoid_: KSD 解包功能（不存在独立功能）
 
 ## 界面规范
 
+**性能分析器**:
+可置于顶部或底部居中的单行浮层，显示输入与最终显示尺寸，滤镜简称和倍率置于按类别固定配色的占比条，默认后级缩放以相连的 Resize 灰色色卡呈现，数据按选定的预设间隔刷新；仅统计 GPU 用时，GPU 测量不可用时保留未取得数据的状态。
+_Avoid_: 调试数据（指尺寸与接入状态诊断时）、CPU 耗时冒充 GPU 耗时
+
 **功能跳转条目（AppNavItem）**:
 统一的「功能跳转列」组件（左侧图标 + 标题/摘要 + 右箭头），禁止手写 Row/Column 拼装；页面条目容器用 NavWhite（灰底白卡），弹窗内条目传 DialogItemSurface（与弹窗背景反色，玻璃风格下为亮玻璃面）。
 _Avoid_: ListItem、手写条目
@@ -231,7 +284,7 @@ _Avoid_: ListItem、手写条目
 _Avoid_: 随意字号、item 用 title
 
 **标签栏（SlidingTabRow）**:
-横向单选标签栏的统一组件：选中项为独立背景指示器，切换时 200ms 线性滑动（宽度同步动画）；等分宽度与内容宽度横向滚动两种形态；指示器颜色/圆角/描边按外观风格由组件内部分派，调用方不传色值。引擎页玻璃系与首页「分类仓库」分类栏使用；新增标签/分类栏必须复用。
+横向单选标签栏的统一组件：选中项为独立背景指示器，切换时 200ms 线性滑动（宽度同步动画）；等分宽度与内容宽度横向滚动两种形态；指示器颜色/圆角/描边按外观风格由组件内部分派，调用方不传色值；弹窗内由 AppAlertDialog 提供颜色上下文，指示器取动态 DialogItemSurface，与面板形成反差。引擎页玻璃系与首页「分类仓库」分类栏使用；新增标签/分类栏必须复用。
 _Avoid_: 手写指示器、自拼 TabRow
 
 **液态玻璃导航（LiquidGlassNavigationBar）**:

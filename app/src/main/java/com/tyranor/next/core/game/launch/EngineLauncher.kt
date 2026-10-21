@@ -12,20 +12,16 @@ import android.provider.Settings
 import android.util.Log
 import androidx.documentfile.provider.DocumentFile
 import bridge.KrSafMirror
-import com.akira.tyranoemu.remote.ArtemisActivityV1
-import com.akira.tyranoemu.remote.ArtemisActivityV2
-import com.akira.tyranoemu.remote.ArtemisActivityV3
-import com.akira.tyranoemu.remote.ArtemisActivityV4
-import com.akira.tyranoemu.remote.ArtemisActivityV5
-import com.akira.tyranoemu.remote.ArtemisActivityV6
 import com.akira.tyranoemu.remote.ArtemisActivityClean
 import com.akira.tyranoemu.remote.Kirikiroid126
 import com.akira.tyranoemu.remote.Kirikiroid134
 import com.akira.tyranoemu.remote.Kirikiroid139
+import com.core.engine.ArtemisVersion
 import com.core.engine.EnginePrefs
 import com.core.engine.EngineSessionRegistry
 import com.core.engine.KrkrStartupDialogPolicy
 import com.core.engine.LaunchContract
+import com.tyranor.next.core.i18n.AppLocaleController
 import com.tyranor.next.core.engine.external.EmulatorLaunchStyle
 import com.tyranor.next.core.engine.external.EmulatorTarget as ExternalEmulatorTarget
 import com.core.fvp.FvpActivity
@@ -36,6 +32,10 @@ import com.core.rpgmaker.RpgMakerActivity
 import com.core.siglus.SiglusActivity
 import com.core.tyrano.TyranoActivity
 import com.core.xsys35.Xs35Activity
+import com.core.xsys4.Xs4Activity
+import com.tyranor.next.core.engine.graphics.GraphicsLaunchPolicy
+import com.tyranor.next.core.engine.graphics.putDisabledGraphicsRequest
+import com.tyranor.next.core.engine.graphics.putGraphicsExtras
 import com.tyranor.next.core.engine.EngineType
 import com.tyranor.next.core.engine.external.ExternalEmulatorLauncher
 import com.tyranor.next.core.engine.external.ExternalEmulatorRegistry
@@ -46,8 +46,10 @@ import com.tyranor.next.core.engine.external.ExternalEngineModuleRegistry
 import com.tyranor.next.core.engine.plugin.EnginePluginBootstrap
 import com.tyranor.next.core.game.manual.AndroidAppGames
 import com.tyranor.next.core.game.model.GamePathUtils
+import com.tyranor.next.core.game.model.EthornellPaths
 import com.tyranor.next.core.game.model.ScanGame
 import com.tyranor.next.core.game.model.Xs35Paths
+import com.tyranor.next.core.game.model.Xs4Paths
 import com.tyranor.next.core.game.save.GameSaveException
 import com.tyranor.next.core.game.save.GameSaveManager
 import com.tyranor.next.core.game.save.RpgSaveFormat
@@ -60,6 +62,9 @@ import com.tyranor.next.core.game.scan.EngineScanner
 import com.tyranor.next.core.game.storage.GameLibraryFacade
 import com.tyranor.next.core.game.storage.EngineDetectionRepository
 import com.tyranor.next.core.game.scan.GameDirFingerprint
+import com.tyranor.next.core.settings.GraphicsCapabilities
+import com.tyranor.next.core.settings.GraphicsFamily
+import com.tyranor.next.core.settings.GraphicsSettings
 import com.tyranor.next.core.input.InputRemapRepository
 import com.tyranor.next.core.settings.EffectiveEngineSettings
 import com.tyranor.next.core.settings.EngineSettingsResolver
@@ -126,8 +131,10 @@ object EngineLauncher {
         EngineType.REALLIVE,
         EngineType.AVG32,
         EngineType.XSYS35,
+        EngineType.XSYS4,
         EngineType.UK2,
         EngineType.FVP,
+        EngineType.ETHORNELL,
         EngineType.RENPY,
         // YURIS / CatSystem2 / PC 由外置 Winlator 承载（GAL 分组），引擎页条目点击进入引擎专属弹窗
         EngineType.YURIS,
@@ -186,6 +193,11 @@ object EngineLauncher {
                 Intent(app, Kirikiroid139::class.java).apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     putExtra(LaunchContract.ORIGIN_MODE, true)
+                    putExtra(LaunchContract.UI_LANGUAGE_TAG, AppLocaleController.engineUiLanguageTag(app))
+                    putGraphicsSettings(
+                        EngineSettingsStore.getGraphicsSettings(app, GraphicsFamily.KR),
+                        GraphicsCapabilities.forRuntime(GraphicsFamily.KR, EngineSettingsStore.KERNEL_KIRIKIRI2),
+                    )
                     putExtra(LaunchContract.ORIENTATION, 6)
                     putExtra(LaunchContract.FOCUS, "true")
                 },
@@ -206,6 +218,23 @@ object EngineLauncher {
         Collections.newSetFromMap(ConcurrentHashMap<String, Boolean>())
 
     private suspend fun launchInternal(context: Context, game: ScanGame, patchChoice: ArtemisPatchChoice?): LaunchResult {
+        if (game.engine == EngineType.ETHORNELL) {
+            return EthornellOperationGate.exclusive {
+                try {
+                    launchTracked(context, game, patchChoice)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: java.io.IOException) {
+                    LaunchResult.Failure.EthornellPrepareFailed(EthornellPrepareError.SESSION_BUSY)
+                } catch (_: SecurityException) {
+                    LaunchResult.Failure.EthornellPrepareFailed(EthornellPrepareError.SESSION_BUSY)
+                }
+            }
+        }
+        return launchTracked(context, game, patchChoice)
+    }
+
+    private suspend fun launchTracked(context: Context, game: ScanGame, patchChoice: ArtemisPatchChoice?): LaunchResult {
         launchingUris.add(game.uri)
         try {
             return launchInternalChecked(context, game, patchChoice)
@@ -215,6 +244,19 @@ object EngineLauncher {
     }
 
     private suspend fun launchInternalChecked(context: Context, game: ScanGame, patchChoice: ArtemisPatchChoice?): LaunchResult {
+        if (game.engine == EngineType.ETHORNELL) {
+            currentCoroutineContext().ensureActive()
+            val live = EngineSessionRegistry.currentLiveGame(context, EngineSessionRegistry.HOST_ETHORNELL)
+            val alive = EngineSessionRegistry.isHostAlive(context, EngineSessionRegistry.HOST_ETHORNELL)
+            val busy = EthornellOperationGate.isBusy(context)
+            when (EthornellLaunchPolicy.decide(game.uri, live, alive)) {
+                EthornellLaunchPolicy.Action.RESTORE_EXISTING -> return restoreEthornell(context, game)
+                EthornellLaunchPolicy.Action.BUSY -> return LaunchResult.Failure.EthornellPrepareFailed(EthornellPrepareError.SESSION_BUSY)
+                EthornellLaunchPolicy.Action.START_NEW -> if (busy) {
+                    return LaunchResult.Failure.EthornellPrepareFailed(EthornellPrepareError.SESSION_BUSY)
+                }
+            }
+        }
         // 手动添加的安卓游戏：无引擎会话/存档/权限前置，按包名直接跳转（必须在目录解析之前分流）
         if (AndroidAppGames.isAndroidApp(game)) {
             return launchAndroidApp(context, game)
@@ -280,6 +322,9 @@ object EngineLauncher {
             return LaunchResult.Failure.GameDirUnresolved
         }
         requestAllFilesAccessIfNeeded(context, game, path)?.let { return it }
+        if (game.engine == EngineType.ETHORNELL) {
+            prepareEthornell(context, game, path, settings)?.let { return it }
+        }
         EnginePluginBootstrap.ensureForLaunch(context, game.engine)?.let {
             return LaunchResult.Failure.PluginBootstrapFailed(it)
         }
@@ -355,6 +400,11 @@ object EngineLauncher {
         if (game.engine == EngineType.XSYS35) {
             ensureXs35SaveDir(context, path, settings)?.let { return it }
         }
+        // System4（xsystem4）：预检（入口 ini / GLES 3.0）先于存档目录副作用；同款预创建，不回退游戏根
+        if (game.engine == EngineType.XSYS4) {
+            preflightXs4(context, path)?.let { return it }
+            ensureXs4SaveDir(context, path, settings)?.let { return it }
+        }
         // “总是/不再”持久化为全局补丁策略；“本次”不落盘，仅本次按 auto 生效
         if (game.engine == EngineType.ARTEMIS) {
             when (patchChoice) {
@@ -384,6 +434,9 @@ object EngineLauncher {
             // Intent 组装后、真正拉起引擎前最后一次确认，取消后不 startActivity
             currentCoroutineContext().ensureActive()
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            if (game.engine == EngineType.ETHORNELL) {
+                intent.putExtra(LaunchContract.ETHORNELL_DISPATCH_TOKEN, EthornellOperationGate.issue(context, game.uri))
+            }
             context.startActivity(intent)
             GameLibraryFacade.recordRecentGame(context, game)
             LaunchResult.Success
@@ -836,7 +889,10 @@ object EngineLauncher {
 
             EngineType.XSYS35 -> buildXs35Intent(context, path, game, settings)
 
+            EngineType.XSYS4 -> buildXs4Intent(context, path, game, settings)
+
             EngineType.FVP -> buildFvpIntent(context, path, game, settings)
+            EngineType.ETHORNELL -> buildEthornellIntent(context, path, game, settings)
 
             EngineType.RPGMAKER,
             EngineType.RENPY -> error("${engine.displayName} is handled by external engine launcher")
@@ -864,6 +920,8 @@ object EngineLauncher {
                 putExtra(LaunchContract.RPG_MAKER_MOD_GAME_ID, game.uri)
             }
         }
+        if (!intent.hasExtra(LaunchContract.GRAPHICS_FILTER_CHAIN)) intent.putDisabledGraphicsRequest()
+        intent.putExtra(LaunchContract.UI_LANGUAGE_TAG, AppLocaleController.engineUiLanguageTag(context))
         // 注入 App 统一主题色与深浅色：引擎壳自绘 UI（确认/输入弹窗按钮等）经
         // EngineThemeColors.fromIntent / KrDialogStyle 读取，缺失时回落默认绿。
         // 主题色来自 ui 层写入的纯数据快照（ThemeColorPayloadStore），core 不反向依赖 theme。
@@ -893,6 +951,7 @@ object EngineLauncher {
         return try {
             currentCoroutineContext().ensureActive()
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            intent.putDisabledGraphicsRequest()
             context.startActivity(intent)
             // 应用已拉起即成功；最近记录写失败不改变启动结果（独立兜底）
             runCatching { GameLibraryFacade.recordRecentGame(context, game) }
@@ -962,6 +1021,7 @@ object EngineLauncher {
         game: ScanGame,
         settings: ResolvedEngineSettings,
     ): Intent = Intent(context, SiglusActivity::class.java).apply {
+        putGraphicsSettings(settings.siglusGraphics, GraphicsCapabilities.forRuntime(GraphicsFamily.SIGLUS))
         putExtra(LaunchContract.PATH, path)
         putExtra(LaunchContract.GAME_PATH, path)
         putExtra(LaunchContract.PROJECT_ROOT, path)
@@ -1018,10 +1078,85 @@ object EngineLauncher {
         else -> null
     }
 
-    /**
-     * FVP（rfvp）启动：真实路径 + 文本编码 + 字体/HiDPI 生效设置。
-     * 存档目录由引擎固定为 `<游戏根>/save`（一期不支持独立存档）。
-     */
+    /** Restore a live task without re-reading changed settings/resources or sending a new game payload. */
+    private fun restoreEthornell(context: Context, game: ScanGame): LaunchResult {
+        return try {
+            val manager = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+            val task = manager?.appTasks?.firstOrNull { candidate ->
+                val base = candidate.taskInfo?.baseIntent ?: return@firstOrNull false
+                base.component?.packageName == context.packageName &&
+                    base.component?.className == "com.core.ethornell.EthornellActivity" &&
+                    base.getStringExtra(LaunchContract.ROOT_URI) == game.uri
+            } ?: return LaunchResult.Failure.EthornellPrepareFailed(EthornellPrepareError.SESSION_BUSY)
+            // moveToFront cannot create a new Activity or deliver a mismatched onNewIntent payload.
+            task.moveToFront()
+            runCatching { GameLibraryFacade.recordRecentGame(context, game) }
+            LaunchResult.Success
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            LaunchResult.Failure.StartFailed(error.message)
+        }
+    }
+
+    /** Ethornell preflight never writes to the resource root or guesses a save subdirectory. */
+    private fun ethornellStorageRoot(path: String): File? {
+        if (path == "/storage/emulated/0" || path.startsWith("/storage/emulated/0/")) return File("/storage/emulated/0")
+        if (!path.startsWith("/storage/")) return null
+        val volume = path.removePrefix("/storage/").substringBefore('/')
+        if (!Regex("[A-Za-z0-9_-]+").matches(volume)) return null
+        return File("/storage/$volume")
+    }
+
+    private fun prepareEthornell(
+        context: Context, game: ScanGame, path: String, settings: ResolvedEngineSettings,
+    ): LaunchResult.Failure? {
+        fun failed(error: EthornellPrepareError) = LaunchResult.Failure.EthornellPrepareFailed(error)
+        var stage = EthornellPrepareError.RESOURCE_ROOT
+        return try {
+            val root = File(path).canonicalFile
+            if (Uri.parse(game.uri).scheme == "content") {
+                val allowed = ethornellStorageRoot(path)?.canonicalFile ?: return failed(EthornellPrepareError.RESOURCE_ROOT)
+                if (!root.toPath().startsWith(allowed.toPath())) return failed(EthornellPrepareError.RESOURCE_ROOT)
+            }
+            if (!root.isDirectory || !root.canRead()) return failed(EthornellPrepareError.RESOURCE_ROOT)
+            if (EngineScanner.detectEngine(root).engine != EngineType.ETHORNELL) return failed(EthornellPrepareError.BOOTSTRAP)
+            stage = EthornellPrepareError.FONT
+            if (EthornellPaths.validatedFont(context.filesDir, settings.ethornellFont) == null) {
+                return failed(EthornellPrepareError.FONT)
+            }
+            stage = EthornellPrepareError.USER_DATA
+            com.tyranor.next.core.game.save.EthornellSaveStore(context.filesDir, game.uri).recoverForLaunch()
+            val dir = EthornellPaths.userDataDir(context.filesDir, game.uri)
+            EthornellPaths.validateUserDataDir(context.filesDir, game.uri, dir.absolutePath)
+            if ((!dir.isDirectory && !dir.mkdirs()) || !dir.canWrite() ||
+                !dir.canonicalFile.toPath().startsWith(context.filesDir.canonicalFile.toPath())) {
+                return failed(EthornellPrepareError.USER_DATA)
+            }
+            null
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: java.io.IOException) {
+            failed(stage)
+        } catch (_: SecurityException) {
+            failed(stage)
+        }
+    }
+
+    private fun buildEthornellIntent(
+        context: Context, path: String, game: ScanGame, settings: ResolvedEngineSettings,
+    ): Intent = Intent().setClassName(context, "com.core.ethornell.EthornellActivity").apply {
+        putExtra(LaunchContract.PATH, File(path).canonicalPath)
+        putExtra(LaunchContract.GAME_PATH, File(path).canonicalPath)
+        putExtra(LaunchContract.ROOT_URI, game.uri)
+        putExtra(LaunchContract.LAUNCH_MODE, LaunchContract.LAUNCH_MODE_ETHORNELL)
+        putExtra(LaunchContract.ETHORNELL_NLS, settings.ethornellNls)
+        putExtra(LaunchContract.ETHORNELL_FONT_PATH, EthornellPaths.validatedFont(context.filesDir, settings.ethornellFont))
+        putExtra(LaunchContract.ETHORNELL_USER_DATA_DIR, EthornellPaths.userDataDir(context.filesDir, game.uri).absolutePath)
+        putExtra(LaunchContract.UI_LANGUAGE_TAG, com.tyranor.next.core.i18n.AppLocaleController.wrap(context).resources.configuration.locales[0].toLanguageTag())
+    }
+
+    /** FVP uses its own fixed `<resource root>/save` protocol. */
     private fun buildFvpIntent(
         context: Context,
         path: String,
@@ -1122,6 +1257,90 @@ object EngineLauncher {
     }
 
     /**
+     * System4（xsystem4）启动：游戏根经 PATH 系列下发，入口 ini 由宿主大小写不敏感解析（见 `Xs4Paths.resolveIniFile`）；
+     * 存档目录按「独立存档」生效值解析（与存档镜像同源，推导只在 [Xs4Paths]）；
+     * 字体仅下发用户设置且存在的绝对路径，内置映射（按编码）由 engine 侧 `Xs4Fonts` 负责。
+     */
+    private fun buildXs4Intent(
+        context: Context,
+        path: String,
+        game: ScanGame,
+        settings: ResolvedEngineSettings,
+    ): Intent {
+        // ensureXs4SaveDir 已在上游保证独立存档开启时外部存储可用；此处为不可达分支：
+        // 不复用游戏根兜底，由 launch 外层 try/catch 收口为 StartFailed。
+        val saveDir = resolveXs4SaveDir(context, path, settings)
+            ?: throw IllegalStateException("xs4 scoped save dir unavailable after ensure")
+        return Intent(context, Xs4Activity::class.java).apply {
+            putExtra(LaunchContract.PATH, path)
+            putExtra(LaunchContract.GAME_PATH, path)
+            putExtra(LaunchContract.PROJECT_ROOT, path)
+            putExtra(LaunchContract.GAME_DIR, path)
+            putExtra(LaunchContract.ROOT_URI, game.uri)
+            putExtra(LaunchContract.LAUNCH_TARGET, game.launchTarget)
+            putExtra(LaunchContract.LAUNCH_MODE, LaunchContract.LAUNCH_MODE_XSYS4)
+            putExtra(LaunchContract.XS4_SAVE_DIR, saveDir.absolutePath)
+            putExtra(LaunchContract.XS4_SCOPED_SAVE_DIR, settings.xs4ScopedSaveDir)
+            putExtra(LaunchContract.XS4_ENCODING, settings.xs4Encoding)
+            xs4CustomFontPath(settings.xs4FontGothicPath)?.let { putExtra(LaunchContract.XS4_FONT_GOTHIC_PATH, it) }
+            xs4CustomFontPath(settings.xs4FontMinchoPath)?.let { putExtra(LaunchContract.XS4_FONT_MINCHO_PATH, it) }
+            if (settings.xs4Joypad != EngineSettingsStore.XSYS4_JOYPAD_AUTO) {
+                putExtra(LaunchContract.XS4_JOYPAD, settings.xs4Joypad)
+            }
+            if (settings.xs4MsgskipDelay > 0) {
+                putExtra(LaunchContract.XS4_MSGSKIP_DELAY, settings.xs4MsgskipDelay)
+            }
+            // 契约保留（对齐 System35）：朝向由 manifest 的 sensorLandscape 固定，不消费该 extra。
+            putExtra(LaunchContract.ORIENTATION, 6)
+        }
+    }
+
+    /** System4 自定义字体：仅用户设置了路径且文件存在时下发；否则宿主回落内置映射。 */
+    private fun xs4CustomFontPath(raw: String): String? =
+        raw.takeIf { it.isNotBlank() && File(it).isFile }
+
+    /**
+     * System4 生效存档目录（与 [ensureXs4SaveDir]、`GameSaveManager.resolveSaveLocation` 同源，
+     * 推导只在 [Xs4Paths]）：独立存档开 = 外部存档目录，外部存储不可用返回 null（调用方按
+     * 类型化失败处理，绝不回退游戏根）；关闭 = `<游戏根>/<SaveFolder>`。
+     */
+    private fun resolveXs4SaveDir(context: Context, path: String, settings: ResolvedEngineSettings): File? {
+        if (settings.xs4ScopedSaveDir) {
+            val external = context.getExternalFilesDir(null) ?: return null
+            return Xs4Paths.scopedSaveDir(external, path)
+        }
+        return Xs4Paths.gameDirSaveDir(File(path))
+    }
+
+    /** System4 启动预检（IO 线程）：入口 ini 大小写不敏感查找 + GLES 3.0；判定见 [Xs4Preflight]。 */
+    private fun preflightXs4(context: Context, path: String): LaunchResult.Failure? {
+        val reqGlEsVersion = context.getSystemService(ActivityManager::class.java)
+            ?.deviceConfigurationInfo?.reqGlEsVersion
+        return Xs4Preflight.check(
+            iniFound = Xs4Paths.resolveIniFile(File(path)) != null,
+            reqGlEsVersion = reqGlEsVersion,
+        )
+    }
+
+    /**
+     * System4 存档目录预创建（仿 [ensureXs35SaveDir]，**不回退游戏根**）：
+     * 独立存档开（默认）= 应用外部存档目录，外部存储不可用即类型化失败（path = null）；
+     * 关闭 = `<游戏根>/<SaveFolder>`。
+     */
+    private fun ensureXs4SaveDir(
+        context: Context,
+        path: String,
+        settings: ResolvedEngineSettings,
+    ): LaunchResult.Failure? {
+        val saveDir = resolveXs4SaveDir(context, path, settings)
+            ?: return LaunchResult.Failure.Xs4SaveDirUnavailable(path = null)
+        if (saveDir.isDirectory) return null
+        if (saveDir.exists()) return LaunchResult.Failure.Xs4SavePathNotDirectory(saveDir.absolutePath)
+        if (saveDir.mkdirs() || saveDir.isDirectory) return null
+        return LaunchResult.Failure.Xs4SaveDirUnavailable(saveDir.absolutePath)
+    }
+
+    /**
      * KRKR 启动：按设置页选择的内核（krkrsdl3 / 吉里吉里2）与引擎版本（auto/1.3.9/1.3.4/1.2.6）
      * 路由到对应引擎宿主，并注入字体、独立存档与渲染/内存偏好。
      */
@@ -1143,6 +1362,7 @@ object EngineLauncher {
             Log.i(TAG, "krkrsdl3 launch root=$path entry=$pickedLaunchEntry args=$args")
             // krkrsdl3 内核：gameargs 首项为启动文件绝对路径，后续为 TVP 命令行参数
             return Intent(context, Krkrsdl3Activity::class.java).apply {
+                putGraphicsSettings(settings.krGraphics, GraphicsCapabilities.forRuntime(GraphicsFamily.KR, kernel, settings.krEngineVersion, settings.krRenderer))
                 putStringArrayListExtra(LaunchContract.GAME_ARGS, args)
                 putExtra(LaunchContract.PATH, path)
                 putExtra(LaunchContract.GAME_PATH, pickedLaunchEntry)
@@ -1217,8 +1437,7 @@ object EngineLauncher {
             // 的根因：残留的 force_default_font=1 一直压住新设置的字体）。
             putExtra(LaunchContract.DEFAULT_FONT, defaultFont)
             putExtra(LaunchContract.FORCE_DEFAULT_FONT, forceFont)
-            // Anime4K 画面超分（单游戏覆盖 > 全局；仅 kirikiri2 内核路径支持）
-            putExtra(com.core.gl.Anime4kRuntime.EXTRA_MODE, settings.krAnime4kMode)
+            putGraphicsSettings(settings.krGraphics, GraphicsCapabilities.forRuntime(GraphicsFamily.KR, kernel, settings.krEngineVersion, settings.krRenderer))
             // 渲染/内存偏好 JSON：单游戏覆盖 与 全局 逐键合并；字段映射由 KrRenderPrefs 单一来源提供
             runCatching {
                 putExtra(LaunchContract.KR_ENGINE_PREFS, EngineSettingsStore.buildKrEnginePrefsJson(context) { pref ->
@@ -1414,6 +1633,8 @@ object EngineLauncher {
             putExtra(LaunchContract.LAUNCH_MODE, LaunchContract.LAUNCH_MODE_ARTEMIS)
             putExtra(LaunchContract.ORIENTATION, if (rotate) 8 else 6)
             putExtra(LaunchContract.SCOPED_SAVE_DIR, false)
+            // 按实际首选库设置门禁，保留原始请求供后续候选重新判定。
+            putArtemisGraphicsSettings(settings, version)
             // artemis_loader 按 "lib<engineLibName>.so" 拼路径，需传库名（不带 lib 前缀）
             putExtra(LaunchContract.ENGINE_LIB_NAME, libName)
             putExtra(LaunchContract.ARTEMIS_AUTO_FALLBACK, auto)
@@ -1449,28 +1670,24 @@ object EngineLauncher {
         putExtra(LaunchContract.ARTEMIS_CURRENT_VERSION, "clean")
     }
 
+    /** 官方内核携带滤镜请求，不通过增强选项隐式改写版本或回退链。 */
+    private fun Intent.putArtemisGraphicsSettings(settings: ResolvedEngineSettings, version: String = "") {
+        putGraphicsExtras(GraphicsLaunchPolicy.artemisExtras(settings.artGraphics,
+            GraphicsCapabilities.forRuntime(GraphicsFamily.ARTEMIS, settings.artKernel, version)))
+    }
+
+    private fun Intent.putGraphicsSettings(settings: GraphicsSettings, capability: GraphicsCapabilities) {
+        putGraphicsExtras(GraphicsLaunchPolicy.extras(settings, capability))
+    }
+
     private fun fallbackChainStartingWith(version: String): List<String> =
         (listOf(version) + ARTEMIS_DEFAULT_FALLBACK_CHAIN.filterNot { it == version }).distinct()
 
     private fun artemisFallbackStage(version: String): Int =
-        when (version) {
-            EngineSettingsStore.ART_ENGINE_V2 -> 1
-            EngineSettingsStore.ART_ENGINE_V3 -> 2
-            EngineSettingsStore.ART_ENGINE_V4 -> 3
-            EngineSettingsStore.ART_ENGINE_V5 -> 4
-            EngineSettingsStore.ART_ENGINE_V6 -> 5
-            else -> 0
-        }
+        (ArtemisVersion.requested(version) ?: ArtemisVersion.V1).fallbackStage()
 
     private fun artemisActivityAndLib(version: String): Pair<Class<*>, String> =
-        when (version) {
-            EngineSettingsStore.ART_ENGINE_V2 -> ArtemisActivityV2::class.java to "artemis-compatible"
-            EngineSettingsStore.ART_ENGINE_V3 -> ArtemisActivityV3::class.java to "artemis-compatible-v2"
-            EngineSettingsStore.ART_ENGINE_V4 -> ArtemisActivityV4::class.java to "artemis-v4"
-            EngineSettingsStore.ART_ENGINE_V5 -> ArtemisActivityV5::class.java to "artemis-v5"
-            EngineSettingsStore.ART_ENGINE_V6 -> ArtemisActivityV6::class.java to "artemis-v6"
-            else -> ArtemisActivityV1::class.java to "artemis"
-        }
+        (ArtemisVersion.requested(version) ?: ArtemisVersion.V1).let { it.activityClass to it.engineLibraryName }
 
     private fun buildWebIntent(
         context: Context,
@@ -2036,6 +2253,30 @@ object EngineLauncher {
      */
     private fun resolveGameDirectory(context: Context, game: ScanGame): String? {
         val uriText = game.uri
+        if (game.engine == EngineType.ETHORNELL) {
+            return try {
+                val uri = Uri.parse(uriText)
+                if (uri.scheme == "content" && uri.authority != "com.android.externalstorage.documents") return null
+                val mapped = GamePathUtils.safUriToPath(uriText) ?: return null
+                val file = File(mapped)
+                // Resolve identity/provider/containment first. Actual access is tested only after
+                // requestAllFilesAccessIfNeeded, so an unreadable directory can reach the grant UI.
+                if (!file.isAbsolute) return null
+                // Provider/path validation is lexical until the storage permission gate. Canonical
+                // containment and actual readability are checked in prepareEthornell afterwards.
+                if (uri.scheme == "content") {
+                    val allowed = ethornellStorageRoot(mapped) ?: return null
+                    if (!file.toPath().normalize().startsWith(allowed.toPath())) return null
+                }
+                file.absolutePath
+            } catch (_: java.io.IOException) {
+                null
+            } catch (_: SecurityException) {
+                null
+            } catch (_: IllegalArgumentException) {
+                null
+            }
+        }
 
         // 1) 首选 SAF documentId → 文件路径映射（兼容 child 子目录 document uri）
         GamePathUtils.safUriToPath(uriText)?.let { mapped ->

@@ -11,38 +11,29 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.Image
-import androidx.compose.ui.node.DelegatableNode
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.LocalIndication
-import androidx.compose.foundation.IndicationNodeFactory
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -67,13 +58,16 @@ import androidx.documentfile.provider.DocumentFile
 import com.tyranor.next.R
 import com.tyranor.next.core.game.launch.EngineLauncher
 import com.tyranor.next.core.settings.AppSettingsStore
+import com.tyranor.next.core.settings.GraphicsCapabilities
+import com.tyranor.next.core.settings.GraphicsFamily
+import com.tyranor.next.core.settings.GraphicsSettings
 import com.tyranor.next.core.settings.EngineSettingsStore
 import com.tyranor.next.core.game.storage.GameLibraryFacade
 import com.tyranor.next.theme.AppThemeColors
 import com.tyranor.next.theme.glassShadow
 import com.tyranor.next.theme.DialogItemSurface
 import com.tyranor.next.theme.MiuixSettingsTheme
-import com.tyranor.next.theme.NavWhite
+import com.tyranor.next.theme.NoticeDotRed
 import com.tyranor.next.theme.TextColor
 import com.tyranor.next.theme.glassBorder
 import com.tyranor.next.theme.AppComponentShape
@@ -86,7 +80,9 @@ import com.tyranor.next.ui.common.BottomInsetSpacer
 import com.tyranor.next.ui.common.ByteFormats
 import com.tyranor.next.ui.common.DialogTextButton
 import com.tyranor.next.ui.common.NoIndication
+import com.tyranor.next.ui.common.MiuixTopBarBlurScaffold
 import com.tyranor.next.ui.common.TopBarIcon
+import com.tyranor.next.ui.common.formatUiDecimal
 import com.tyranor.next.ui.common.glassNavBottomInset
 import com.tyranor.next.core.updater.GitHubUpdateChecker
 import com.tyranor.next.core.updater.UpdateApkDownloader
@@ -105,7 +101,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.basic.Card as MiuixCard
 import top.yukonga.miuix.kmp.basic.LinearProgressIndicator
-import top.yukonga.miuix.kmp.basic.Scaffold as MiuixScaffold
 import top.yukonga.miuix.kmp.basic.Slider
 import top.yukonga.miuix.kmp.basic.SliderDefaults
 import top.yukonga.miuix.kmp.preference.ArrowPreference
@@ -133,6 +128,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
     // 已知行为：以下更新弹窗状态均为 remember 持有，Activity 重建（旋转/语言切换）会丢失并静默取消下载；
     // 更新检查是低频操作，接受该取舍，未上 ViewModel 持久化。
     var checkingUpdate by remember { mutableStateOf(false) }
+    val hasUpdate by GitHubUpdateChecker.hasUpdate.collectAsState()
     var updateAvailable by remember { mutableStateOf<UpdateCheckResult.UpdateAvailable?>(null) }
     var activeCandidate by remember { mutableStateOf<UpdateCandidate?>(null) }
     var updateDownloadPhase by remember { mutableStateOf<UpdateDownloadPhase?>(null) }
@@ -252,18 +248,14 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
     }
 
     MiuixSettingsTheme {
-        MiuixScaffold(
+        // 默认风格下列表铺到顶栏下方并渐进模糊；其余风格退化为顶栏在上、列表在下
+        MiuixTopBarBlurScaffold(
             modifier = modifier,
-            containerColor = Color.Transparent,
-            contentWindowInsets = WindowInsets(0.dp),
             topBar = { SettingsTopBar(stringResource(R.string.nav_settings)) },
-        ) { innerPadding ->
+        ) { topInset ->
             LazyColumn(
-                // 顶栏透明：列表整体垫在顶栏下方（持久 padding），避免滚动时内容穿过顶栏
-                modifier = Modifier.fillMaxSize()
-                    .padding(horizontal = 12.dp)
-                    .padding(top = innerPadding.calculateTopPadding()),
-                contentPadding = PaddingValues(top = 12.dp, bottom = 24.dp + glassNavBottomInset()),
+                modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
+                contentPadding = PaddingValues(top = 12.dp + topInset, bottom = 24.dp + glassNavBottomInset()),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 item {
@@ -352,7 +344,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                             ArrowPreference(
                                 title = if (checkingUpdate) stringResource(R.string.settings_update_checking) else stringResource(R.string.settings_update_check),
                                 summary = stringResource(R.string.settings_update_check_summary),
-                                startAction = { SettingsItemIcon(R.drawable.ic_settings_update) },
+                                startAction = { SettingsItemIcon(R.drawable.ic_settings_update, showBadge = hasUpdate) },
                                 onClick = { checkUpdate() },
                             )
                             ArrowPreference(
@@ -703,7 +695,16 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
 
 @Composable
 internal fun EngineSettingsDetailScreen(kind: EngineSettingsKind) {
+    if (kind == EngineSettingsKind.ETHORNELL) {
+        EthornellSettingsScreen()
+        return
+    }
     val ctx = LocalContext.current
+    val graphicsFamily = kind.graphicsFamily()
+    var graphics by remember(kind) {
+        mutableStateOf(graphicsFamily?.let { EngineSettingsStore.getGraphicsSettings(ctx, it) }
+            ?: GraphicsSettings.defaults(GraphicsFamily.KR))
+    }
     val engineSettingsSavedMessage = stringResource(R.string.engine_settings_saved)
 
     var krVersion by remember { mutableStateOf(EngineSettingsStore.getKrEngineVersion(ctx)) }
@@ -723,7 +724,6 @@ internal fun EngineSettingsDetailScreen(kind: EngineSettingsKind) {
     var krFps by remember { mutableStateOf(EngineSettingsStore.getKrFpsLimit(ctx)) }
     var krVCursorScale by remember { mutableStateOf(EngineSettingsStore.getKrVCursorScale(ctx)) }
     var krMenuOpa by remember { mutableStateOf(EngineSettingsStore.getKrMenuHandlerOpa(ctx)) }
-    var krAnime4k by remember { mutableStateOf(EngineSettingsStore.getKrAnime4kMode(ctx)) }
 
     var ons by remember { mutableStateOf(EngineSettingsStore.loadOns(ctx)) }
 
@@ -757,29 +757,77 @@ internal fun EngineSettingsDetailScreen(kind: EngineSettingsKind) {
     var xs35Renderer by remember { mutableStateOf(EngineSettingsStore.getXs35Renderer(ctx)) }
     var xs35IntegerScale by remember { mutableStateOf(EngineSettingsStore.isXs35IntegerScale(ctx)) }
     var xs35MuteUnfocus by remember { mutableStateOf(EngineSettingsStore.isXs35MuteUnfocus(ctx)) }
+    var xs4Scoped by remember { mutableStateOf(EngineSettingsStore.isXs4ScopedSaveDir(ctx)) }
+    var xs4Encoding by remember { mutableStateOf(EngineSettingsStore.getXs4Encoding(ctx)) }
+    var xs4FontGothic by remember { mutableStateOf(EngineSettingsStore.getXs4FontGothicPath(ctx)) }
+    var xs4FontMincho by remember { mutableStateOf(EngineSettingsStore.getXs4FontMinchoPath(ctx)) }
+    var xs4Joypad by remember { mutableStateOf(EngineSettingsStore.getXs4Joypad(ctx)) }
+    var xs4MsgskipDelay by remember { mutableStateOf(EngineSettingsStore.getXs4MsgskipDelay(ctx)) }
     var winlator by remember { mutableStateOf(EngineSettingsStore.loadWinlator(ctx)) }
     var ppssppVersion by remember { mutableStateOf(EngineSettingsStore.getPpssppVersion(ctx)) }
     var webShellPort by remember { mutableStateOf(EngineSettingsStore.getWebShellPort(ctx)) }
 
+    val fontImportScope = rememberCoroutineScope()
+    var importingFont by remember { mutableStateOf(false) }
     val fontLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        if (uri != null) {
-            val path = FontImport.importToPrivate(ctx, uri)
-            if (path != null) {
-                krFont = path
+        if (uri != null && !importingFont) {
+            importingFont = true
+            fontImportScope.launch {
+                try {
+                    val path = FontImport.importToPrivate(ctx, uri)
+                    if (path != null) krFont = path
+                } finally { importingFont = false }
             }
         }
     }
     val fvpFontLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        if (uri != null) {
-            val path = FontImport.importToPrivate(ctx, uri)
-            if (path != null) {
-                fvpFont = path
-            } else {
-                android.widget.Toast.makeText(
-                    ctx,
-                    ctx.getString(R.string.engine_settings_fvp_font_import_failed),
-                    android.widget.Toast.LENGTH_SHORT,
-                ).show()
+        if (uri != null && !importingFont) {
+            importingFont = true
+            fontImportScope.launch {
+                try {
+                    val path = FontImport.importToPrivate(ctx, uri)
+                    if (path != null) fvpFont = path else {
+                        android.widget.Toast.makeText(
+                            ctx,
+                            ctx.getString(R.string.engine_settings_fvp_font_import_failed),
+                            android.widget.Toast.LENGTH_SHORT,
+                        ).show()
+                    }
+                } finally { importingFont = false }
+            }
+        }
+    }
+    val xs4GothicFontLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null && !importingFont) {
+            importingFont = true
+            fontImportScope.launch {
+                try {
+                    val path = FontImport.importToPrivate(ctx, uri)
+                    if (path != null) xs4FontGothic = path else {
+                        android.widget.Toast.makeText(
+                            ctx,
+                            ctx.getString(R.string.engine_settings_fvp_font_import_failed),
+                            android.widget.Toast.LENGTH_SHORT,
+                        ).show()
+                    }
+                } finally { importingFont = false }
+            }
+        }
+    }
+    val xs4MinchoFontLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null && !importingFont) {
+            importingFont = true
+            fontImportScope.launch {
+                try {
+                    val path = FontImport.importToPrivate(ctx, uri)
+                    if (path != null) xs4FontMincho = path else {
+                        android.widget.Toast.makeText(
+                            ctx,
+                            ctx.getString(R.string.engine_settings_fvp_font_import_failed),
+                            android.widget.Toast.LENGTH_SHORT,
+                        ).show()
+                    }
+                } finally { importingFont = false }
             }
         }
     }
@@ -789,6 +837,7 @@ internal fun EngineSettingsDetailScreen(kind: EngineSettingsKind) {
 
     // 编辑→保存模型：控件仅更新本地状态，点顶部保存按钮才统一写盘
     fun saveAll() {
+        graphicsFamily?.let { EngineSettingsStore.setGraphicsSettings(ctx, it, graphics) }
         EngineSettingsStore.setKrEngineVersion(ctx, krVersion)
         EngineSettingsStore.setKrKernel(ctx, krKernel)
         EngineSettingsStore.setKrScopedSaveDir(ctx, krScoped)
@@ -806,7 +855,6 @@ internal fun EngineSettingsDetailScreen(kind: EngineSettingsKind) {
         EngineSettingsStore.setKrFpsLimit(ctx, krFps)
         EngineSettingsStore.setKrVCursorScale(ctx, krVCursorScale)
         EngineSettingsStore.setKrMenuHandlerOpa(ctx, krMenuOpa)
-        EngineSettingsStore.setKrAnime4kMode(ctx, krAnime4k)
         EngineSettingsStore.saveOns(ctx, ons)
         EngineSettingsStore.setArtKernel(ctx, artKernel)
         EngineSettingsStore.setArtEngineVersion(ctx, artVersion)
@@ -837,16 +885,20 @@ internal fun EngineSettingsDetailScreen(kind: EngineSettingsKind) {
         EngineSettingsStore.setXs35Renderer(ctx, xs35Renderer)
         EngineSettingsStore.setXs35IntegerScale(ctx, xs35IntegerScale)
         EngineSettingsStore.setXs35MuteUnfocus(ctx, xs35MuteUnfocus)
+        EngineSettingsStore.setXs4ScopedSaveDir(ctx, xs4Scoped)
+        EngineSettingsStore.setXs4Encoding(ctx, xs4Encoding)
+        EngineSettingsStore.setXs4FontGothicPath(ctx, xs4FontGothic)
+        EngineSettingsStore.setXs4FontMinchoPath(ctx, xs4FontMincho)
+        EngineSettingsStore.setXs4Joypad(ctx, xs4Joypad)
+        EngineSettingsStore.setXs4MsgskipDelay(ctx, xs4MsgskipDelay)
         EngineSettingsStore.saveWinlator(ctx, winlator)
         EngineSettingsStore.setPpssppVersion(ctx, ppssppVersion)
         EngineSettingsStore.setWebShellPort(ctx, webShellPort)
     }
 
     MiuixSettingsTheme {
-        MiuixScaffold(
+        MiuixTopBarBlurScaffold(
             modifier = Modifier.fillMaxSize(),
-            containerColor = Color.Transparent,
-            contentWindowInsets = WindowInsets(0.dp),
             topBar = {
                 AppTopBar(
                     title = engineSettingsKindTitle(kind),
@@ -860,18 +912,28 @@ internal fun EngineSettingsDetailScreen(kind: EngineSettingsKind) {
                     },
                 )
             },
-        ) { innerPadding ->
+        ) { topInset ->
             LazyListPlaceholder(
                 kind,
                 krVersion, krKernel, krScoped, krSkipStartupDialogs, krFont, krForceFont, krRenderer, krDrawThread,
                 krSwCompress, krOglCompress, krMem, krTexsize, krAccurate, krFps, isSdl3, krIs134126,
-                krVCursorScale, krMenuOpa, krPatchOverlayMode, krAnime4k,
+                krVCursorScale, krMenuOpa, krPatchOverlayMode,
                 ons, artKernel, artVersion, artRotate, artPatch, artResolution, artSideCut, artSurfaceCache,
                 artFontCache, artPowerSaving, tyExternal, tyScoped, rpgMakerMod, rpgLegacyRenderer, rpgSaveInterop, rpgMvVersion, rpgMzVersion, rpg, renpyVersion, renpy, siglusLanguage, fbNls,
                 fvpNls, fvpSystemFont, fvpTextHidpi, fvpFont,
                 xs35Scoped, xs35Renderer, xs35IntegerScale, xs35MuteUnfocus,
-                fontLauncher, fvpFontLauncher, winlator, ppssppVersion, webShellPort,
-                topInset = innerPadding.calculateTopPadding(),
+                xs4Scoped, xs4Encoding, xs4FontGothic, xs4FontMincho, xs4Joypad, xs4MsgskipDelay,
+                fontLauncher, fvpFontLauncher, xs4GothicFontLauncher, xs4MinchoFontLauncher,
+                winlator, ppssppVersion, webShellPort,
+                topInset = topInset,
+                graphicsContent = {
+                    graphicsFamily?.let { family ->
+                        GlobalGraphicsSettings(
+                            settings = graphics,
+                            capability = GraphicsCapabilities.forSettings(family, if (family == GraphicsFamily.KR) krKernel else artKernel, if (family == GraphicsFamily.KR) krVersion else artVersion, krRenderer),
+                        ) { graphics = it }
+                    }
+                },
                 onKrVersion = { krVersion = it },
                 onKrKernel = { krKernel = it },
                 onKrScoped = { krScoped = it },
@@ -888,7 +950,6 @@ internal fun EngineSettingsDetailScreen(kind: EngineSettingsKind) {
                 onKrFps = { krFps = it },
                 onKrVCursorScale = { krVCursorScale = it },
                 onKrMenuOpa = { krMenuOpa = it },
-                onKrAnime4k = { krAnime4k = it },
                 onResetKrFont = { krFont = "" },
                 onOns = { ons = it },
                 onArtKernel = { artKernel = it },
@@ -921,6 +982,14 @@ internal fun EngineSettingsDetailScreen(kind: EngineSettingsKind) {
                 onXs35Renderer = { xs35Renderer = it },
                 onXs35IntegerScale = { xs35IntegerScale = it },
                 onXs35MuteUnfocus = { xs35MuteUnfocus = it },
+                onXs4Scoped = { xs4Scoped = it },
+                onXs4Encoding = { xs4Encoding = it },
+                onXs4FontGothicFollow = { xs4FontGothic = "" },
+                onXs4FontGothicPick = { xs4GothicFontLauncher.launch("*/*") },
+                onXs4FontMinchoFollow = { xs4FontMincho = "" },
+                onXs4FontMinchoPick = { xs4MinchoFontLauncher.launch("*/*") },
+                onXs4Joypad = { xs4Joypad = it },
+                onXs4MsgskipDelay = { xs4MsgskipDelay = it },
                 onWinlator = { winlator = it },
                 onPpssppVersion = { ppssppVersion = it },
                 onWebShellPort = { webShellPort = it },
@@ -930,14 +999,26 @@ internal fun EngineSettingsDetailScreen(kind: EngineSettingsKind) {
 }
 
 @Composable
-private fun SettingsItemIcon(@DrawableRes iconRes: Int) {
-    Image(
-        painter = painterResource(iconRes),
-        contentDescription = null,
-        // 深色模式下整体染白，保证低亮度背景上的可读性
-        colorFilter = if (AppThemeColors.isDark) ColorFilter.tint(Color.White) else null,
-        modifier = Modifier.padding(end = 6.dp).size(24.dp),
-    )
+private fun SettingsItemIcon(@DrawableRes iconRes: Int, showBadge: Boolean = false) {
+    Box(modifier = Modifier.padding(end = 6.dp).size(24.dp)) {
+        Image(
+            painter = painterResource(iconRes),
+            contentDescription = null,
+            // 深色模式下整体染白，保证低亮度背景上的可读性
+            colorFilter = if (AppThemeColors.isDark) ColorFilter.tint(Color.White) else null,
+            modifier = Modifier.fillMaxSize(),
+        )
+        if (showBadge) {
+            // 红点提醒：固定亮红，不随主题色变化
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .offset(x = 5.dp, y = (-5).dp)
+                    .size(8.dp)
+                    .background(NoticeDotRed, CircleShape),
+            )
+        }
+    }
 }
 
 /** 顶部栏：统一复用 AppTopBar（Miuix 页面背景取色）。 */
@@ -963,28 +1044,33 @@ private fun LazyListPlaceholder(
     krFont: String, krForceFont: Boolean,
     krRenderer: String, krDrawThread: String, krSwCompress: String, krOglCompress: String,
     krMem: String, krTexsize: String, krAccurate: String, krFps: String, isSdl3: Boolean, krIs134126: Boolean,
-    krVCursorScale: String, krMenuOpa: String, krPatchOverlayMode: String, krAnime4k: String,
+    krVCursorScale: String, krMenuOpa: String, krPatchOverlayMode: String,
     ons: EngineSettingsStore.Ons, artKernel: String, artVersion: String, artRotate: Boolean, artPatch: String,
     artResolution: String, artSideCut: String, artSurfaceCache: String, artFontCache: String,
-    artPowerSaving: String, tyExternal: Boolean, tyScoped: Boolean, rpgMakerMod: Boolean,
+    artPowerSaving: String,
+    tyExternal: Boolean, tyScoped: Boolean, rpgMakerMod: Boolean,
     rpgLegacyRenderer: Boolean, rpgSaveInterop: Boolean, rpgMvVersion: String, rpgMzVersion: String,
     rpg: EngineSettingsStore.RpgMaker,
     renpyVersion: String, renpy: EngineSettingsStore.RenPy, siglusLanguage: String,
     fbNls: String,
     fvpNls: String, fvpSystemFont: Boolean, fvpTextHidpi: Boolean, fvpFont: String,
     xs35Scoped: Boolean, xs35Renderer: String, xs35IntegerScale: Boolean, xs35MuteUnfocus: Boolean,
+    xs4Scoped: Boolean, xs4Encoding: String, xs4FontGothic: String, xs4FontMincho: String,
+    xs4Joypad: String, xs4MsgskipDelay: Int,
     fontLauncher: FontPickerLauncher, fvpFontLauncher: FontPickerLauncher,
+    xs4GothicFontLauncher: FontPickerLauncher, xs4MinchoFontLauncher: FontPickerLauncher,
     winlator: EngineSettingsStore.Winlator,
     ppssppVersion: String,
     webShellPort: Int,
     topInset: Dp,
+    graphicsContent: @Composable () -> Unit,
     onKrVersion: (String) -> Unit, onKrKernel: (String) -> Unit, onKrScoped: (Boolean) -> Unit,
     onKrSkipStartupDialogs: (Boolean) -> Unit,
     onKrPatchOverlayMode: (String) -> Unit,
     onKrForceFont: (Boolean) -> Unit, onKrRenderer: (String) -> Unit, onKrDrawThread: (String) -> Unit,
     onKrSwCompress: (String) -> Unit, onKrOglCompress: (String) -> Unit, onKrMem: (String) -> Unit,
     onKrTexsize: (String) -> Unit, onKrAccurate: (String) -> Unit, onKrFps: (String) -> Unit,
-    onKrVCursorScale: (String) -> Unit, onKrMenuOpa: (String) -> Unit, onKrAnime4k: (String) -> Unit,
+    onKrVCursorScale: (String) -> Unit, onKrMenuOpa: (String) -> Unit,
     onResetKrFont: () -> Unit, onOns: (EngineSettingsStore.Ons) -> Unit,
     onArtKernel: (String) -> Unit,
     onArtVersion: (String) -> Unit, onArtRotate: (Boolean) -> Unit, onArtPatch: (String) -> Unit,
@@ -1007,6 +1093,14 @@ private fun LazyListPlaceholder(
     onXs35Renderer: (String) -> Unit,
     onXs35IntegerScale: (Boolean) -> Unit,
     onXs35MuteUnfocus: (Boolean) -> Unit,
+    onXs4Scoped: (Boolean) -> Unit,
+    onXs4Encoding: (String) -> Unit,
+    onXs4FontGothicFollow: () -> Unit,
+    onXs4FontGothicPick: () -> Unit,
+    onXs4FontMinchoFollow: () -> Unit,
+    onXs4FontMinchoPick: () -> Unit,
+    onXs4Joypad: (String) -> Unit,
+    onXs4MsgskipDelay: (Int) -> Unit,
     onWinlator: (EngineSettingsStore.Winlator) -> Unit,
     onPpssppVersion: (String) -> Unit,
     onWebShellPort: (Int) -> Unit,
@@ -1034,11 +1128,8 @@ private fun LazyListPlaceholder(
     val artFontCacheMap = artFontCacheOptions()
 
     LazyColumn(
-        // 顶栏透明：列表整体垫在顶栏下方（持久 padding），避免滚动时内容穿过顶栏
-        modifier = Modifier.fillMaxSize()
-            .padding(horizontal = 12.dp)
-            .padding(top = topInset),
-        contentPadding = PaddingValues(top = 12.dp, bottom = 24.dp),
+        modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
+        contentPadding = PaddingValues(top = 12.dp + topInset, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         if (kind == EngineSettingsKind.KRKR) item {
@@ -1063,8 +1154,6 @@ private fun LazyListPlaceholder(
                 if (!isSdl3) {
                     SwitchPreference(title = stringResource(R.string.engine_settings_opengl_accurate_render), checked = krAccurate == "1", onCheckedChange = { b -> onKrAccurate(if (b) "1" else "0") })
                     SliderRow(stringResource(R.string.engine_settings_memory_usage), krMemMap, krMem, onSelect = onKrMem)
-                    // Anime4K 后处理仅 kirikiri2 内核路径支持（GLSurfaceView 注入），krkrsdl3 不提供
-                    DropdownRow(stringResource(R.string.engine_settings_anime4k), krAnime4kOptions(), krAnime4k, onKrAnime4k)
                 }
                 val rendererOptions = if (isSdl3) krSdl3RendererMap else krRendererMap
                 val selectedRenderer = if (isSdl3) {
@@ -1318,6 +1407,66 @@ private fun LazyListPlaceholder(
             }
         }
 
+        if (kind == EngineSettingsKind.XSYS4) item {
+            EngineCard(stringResource(R.string.engine_settings_xsys4_title)) {
+                SwitchPreference(
+                    title = stringResource(R.string.engine_settings_scoped_save_dir),
+                    checked = xs4Scoped,
+                    onCheckedChange = onXs4Scoped,
+                )
+                DropdownRow(
+                    stringResource(R.string.engine_settings_xsys4_encoding_title),
+                    xsys4EncodingOptions(),
+                    xs4Encoding,
+                    onXs4Encoding,
+                )
+                FontPreference(
+                    label = stringResource(R.string.engine_settings_xsys4_font_gothic_title),
+                    value = xs4FontGothic.ifBlank { stringResource(R.string.engine_settings_builtin_font) },
+                    followLabel = stringResource(R.string.engine_settings_use_builtin_font),
+                    onFollow = onXs4FontGothicFollow,
+                    onPick = onXs4FontGothicPick,
+                )
+                FontPreference(
+                    label = stringResource(R.string.engine_settings_xsys4_font_mincho_title),
+                    value = xs4FontMincho.ifBlank { stringResource(R.string.engine_settings_builtin_font) },
+                    followLabel = stringResource(R.string.engine_settings_use_builtin_font),
+                    onFollow = onXs4FontMinchoFollow,
+                    onPick = onXs4FontMinchoPick,
+                )
+                Text(
+                    stringResource(R.string.engine_settings_xsys4_font_hint),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MiuixTheme.colorScheme.onBackground,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+                DropdownRow(
+                    stringResource(R.string.engine_settings_xsys4_joypad_title),
+                    xsys4JoypadOptions(),
+                    xs4Joypad,
+                    onXs4Joypad,
+                )
+                DropdownRow(
+                    stringResource(R.string.engine_settings_xsys4_msgskip_title),
+                    xsys4MsgskipOptions(),
+                    xs4MsgskipDelay.toString(),
+                    { onXs4MsgskipDelay(it.toIntOrNull() ?: EngineSettingsStore.XSYS4_MSGSKIP_DELAY_DEFAULT) },
+                )
+                Text(
+                    stringResource(R.string.engine_settings_xsys4_note),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MiuixTheme.colorScheme.onBackground,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+                Text(
+                    stringResource(R.string.engine_settings_xsys4_compat_hint),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MiuixTheme.colorScheme.onBackground,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+            }
+        }
+
         if (kind == EngineSettingsKind.PPSSPP) item {
             EngineCard("PPSSPP") {
                 DropdownRow(
@@ -1397,6 +1546,7 @@ private fun LazyListPlaceholder(
             }
         }
 
+        if (kind.graphicsFamily() != null) item { graphicsContent() }
         item { BottomInsetSpacer() }
     }
 
@@ -1583,7 +1733,7 @@ internal fun krkrPercentOptions(): List<Pair<String, String>> =
 internal fun krkrVcursorOptions(): List<Pair<String, String>> =
     listOf("" to stringResource(R.string.engine_option_engine_default)) +
         (1..150).map {
-            val v = String.format(java.util.Locale.US, "%.2f", it / 100.0)
+            val v = formatUiDecimal(it / 100.0, fractionDigits = 2)
             v to v
         }
 /** 游戏目录 URI → 可读目录名（取 SAF documentId 的最后一段，失败回退原 uri）。 */

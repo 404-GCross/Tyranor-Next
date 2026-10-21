@@ -5,6 +5,7 @@ import com.tyranor.next.R
 import com.tyranor.next.core.engine.external.ExternalEngineErrorCode
 import com.tyranor.next.core.engine.plugin.EnginePluginBootstrap
 import com.tyranor.next.core.game.launch.LaunchResult
+import com.tyranor.next.core.game.launch.EthornellPrepareError
 import com.tyranor.next.core.game.launch.MirrorPrepareStage
 import com.tyranor.next.core.i18n.AppLocaleController
 
@@ -24,6 +25,14 @@ private fun LaunchResult.Failure.toUserMessage(context: Context): String {
     return when (this) {
         LaunchResult.Failure.GameDirUnresolved ->
             localized.getString(R.string.launch_resolve_local_dir_failed)
+
+        is LaunchResult.Failure.EthornellPrepareFailed -> localized.getString(when (error) {
+            EthornellPrepareError.RESOURCE_ROOT -> R.string.ethornell_error_root
+            EthornellPrepareError.BOOTSTRAP -> R.string.ethornell_error_bootstrap
+            EthornellPrepareError.FONT -> R.string.ethornell_error_font
+            EthornellPrepareError.USER_DATA -> R.string.ethornell_error_userdata
+            EthornellPrepareError.SESSION_BUSY -> R.string.ethornell_error_session_busy
+        })
 
         LaunchResult.Failure.AllFilesAccessRequested ->
             localized.getString(R.string.launch_all_files_access_request)
@@ -72,6 +81,22 @@ private fun LaunchResult.Failure.toUserMessage(context: Context): String {
             } else {
                 localized.getString(R.string.launch_error_xs35_save_dir_unavailable, path)
             }
+
+        is LaunchResult.Failure.Xs4SavePathNotDirectory ->
+            localized.getString(R.string.launch_error_xs4_save_path_not_directory, path)
+
+        is LaunchResult.Failure.Xs4SaveDirUnavailable ->
+            if (path == null || path.isEmpty()) {
+                localized.getString(R.string.launch_error_xs4_external_unavailable)
+            } else {
+                localized.getString(R.string.launch_error_xs4_save_dir_unavailable, path)
+            }
+
+        LaunchResult.Failure.Xs4IniMissing ->
+            localized.getString(R.string.launch_error_xs4_ini_missing)
+
+        LaunchResult.Failure.Xs4Gles3Required ->
+            localized.getString(R.string.launch_error_xs4_gles3_required)
 
         is LaunchResult.Failure.ExternalModuleFailed -> {
             val moduleName = result.moduleNameRes?.let { localized.getString(it) }

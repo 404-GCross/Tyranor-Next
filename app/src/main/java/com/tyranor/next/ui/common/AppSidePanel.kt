@@ -71,8 +71,11 @@ private val SidePanelStartMargin = 10.dp
 private val SidePanelTopMargin = 35.dp
 private val SidePanelBottomMargin = 25.dp
 
-/** 左半屏右滑识别区起点内缩（与屏幕左缘留出的距离）。 */
+/** 右滑识别区起点内缩（与屏幕左缘留出的距离）。 */
 private val SidePanelSwipeStartInset = 5.dp
+
+/** 识别区右边界占屏幕宽度的比例（自屏幕左缘起算，取 1/4 屏宽）。 */
+private const val SidePanelSwipeWidthFraction = 0.25f
 
 /** 左缘系统返回手势排除条宽度（从 [SidePanelSwipeStartInset] 起算，覆盖系统返回手势边缘区）。 */
 private val SidePanelEdgeExclusionWidth = 25.dp
@@ -81,7 +84,7 @@ private val SidePanelEdgeExclusionWidth = 25.dp
 private val SidePanelSwipeThreshold = 40.dp
 
 /**
- * 应用侧边栏（空白骨架 + 顶部标题）：主界面四大页面通过**左半屏右滑**唤出，自左侧滑入的浮动面板。
+ * 应用侧边栏（空白骨架 + 顶部标题）：主界面四大页面通过**左缘右滑**唤出，自左侧滑入的浮动面板。
  *
  * 几何与材质约定：
  * - 四边圆角（[AppComponentShape]）；与屏幕边缘间距：左 [SidePanelStartMargin]、
@@ -205,17 +208,17 @@ internal fun AppSidePanel(
 }
 
 /**
- * 左半屏右滑唤出侧边栏的指针手势（挂给**页面根布局**的 Modifier，而不是覆盖层）：
- * 起点在屏幕左缘 [SidePanelSwipeStartInset] 到水平居中之间、且位于 [bottomBarTopY] 之上
+ * 左缘区域右滑唤出侧边栏的指针手势（挂给**页面根布局**的 Modifier，而不是覆盖层）：
+ * 起点在屏幕左缘 [SidePanelSwipeStartInset] 到屏宽 [SidePanelSwipeWidthFraction] 之间、且位于 [bottomBarTopY] 之上
  * （底部导航栏区域不参与识别），向右滑过 [SidePanelSwipeThreshold] 即回调 [onOpen]。
  *
  * 实现要点：
  * - 挂在根布局而不是做覆盖层：Compose 重叠的兄弟节点默认只有最上层能收到指针事件，覆盖层会让
- *   覆盖范围内（左半屏）的点击/滚动全部失效；挂在祖先节点上则子内容优先，不遮挡任何交互；
+ *   覆盖范围内（识别区）的点击/滚动全部失效；挂在祖先节点上则子内容优先，不遮挡任何交互；
  * - 在 **Initial 传递**上取事件（父节点先于子内容处理）：只认「横向位移占优且向右」的手势，
  *   判定后立即消费，子内容（行内左滑删除、横向分页器、封面流）不会再响应这一次右滑；
  *   纵向滑动与向左的横向滑动一律不消费，原样交还给子内容。
- *   也就是说：左半屏内**向右**的横滑会被本手势占用（这是用户要求的宽识别区取舍），
+ *   也就是说：左缘识别区内**向右**的横滑会被本手势占用（这是用户要求的宽识别区取舍），
  *   其余方向完全不受影响。
  * - **底部导航栏排除**：起点落在 [bottomBarTopY]（导航栏顶边，根布局坐标 px）及以下的手势
  *   一律放行（不消费、不唤出），由导航栏自行处理；无底栏时传 `Float.POSITIVE_INFINITY`。
@@ -242,9 +245,9 @@ internal fun rememberSidePanelSwipeModifier(
                     requireUnconsumed = false,
                     pass = PointerEventPass.Initial,
                 )
-                // 起点必须在识别区内：左缘内缩起、到屏幕水平居中为止
+                // 起点必须在识别区内：左缘内缩起、到屏宽 1/4 为止
                 val startX = down.position.x
-                if (startX < startInsetPx || startX > size.width / 2f) return@awaitEachGesture
+                if (startX < startInsetPx || startX > size.width * SidePanelSwipeWidthFraction) return@awaitEachGesture
                 // 底部导航栏区域不参与：起点落在导航栏顶边（含）之下直接放行，
                 // 避免在底栏上滑动（切页/误触）被本手势占用而唤出侧边栏
                 if (down.position.y >= currentBottomBarTopY()) return@awaitEachGesture

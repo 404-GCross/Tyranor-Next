@@ -34,6 +34,7 @@ class EngineTypeAbbrTest {
         assertEquals("UK", EngineType.UK2.abbr)
         assertEquals("FVP", EngineType.FVP.abbr)
         assertEquals("S3X", EngineType.XSYS35.abbr)
+        assertEquals("S4X", EngineType.XSYS4.abbr)
         assertEquals("NS", EngineType.NINTENDO_SWITCH.abbr)
         assertEquals("VN", EngineType.VN.abbr)
         // 未在约定清单中的引擎：补全映射，避免角标空文案

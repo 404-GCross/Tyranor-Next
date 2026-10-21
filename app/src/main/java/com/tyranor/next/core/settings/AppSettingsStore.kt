@@ -21,6 +21,9 @@ object AppSettingsStore {
     const val KEY_TONE_SWITCH = "tone_switch"
     const val KEY_GAME_SORT = "game_sort"
 
+    /** System4 一次性定点重检测迁移标志（纠正旧库中被误判为 XSYS35 的 System4 游戏）。 */
+    private const val KEY_MIGRATION_XSYS4_RESCAN_DONE = "migration_xsys4_rescan_done"
+
     /** 首页样式：原生（最近打开/快捷启动）/ 网页 / 分类仓库。 */
     const val KEY_HOME_STYLE = "home_style"
 
@@ -121,8 +124,11 @@ object AppSettingsStore {
     /** 默认主题渐变默认值：开（应用设置可关闭，回退纯色页面背景）。 */
     const val DEFAULT_DEFAULT_THEME_GRADIENT = true
 
-    /** 底部导航栏样式：默认（Material3 导航栏）。 */
-    const val NAV_STYLE_DEFAULT = "default"
+    /**
+     * 底部导航栏样式：经典 MD（Material3 导航栏）。
+     * 持久化值沿用历史的 `"default"`：此前显式选过「默认」的用户升级后保持原样，不被静默改样式。
+     */
+    const val NAV_STYLE_CLASSIC_MD = "default"
 
     /** 底部导航栏样式：液态玻璃（圆角玻璃栏，Android 12+ 生效）。 */
     const val NAV_STYLE_LIQUID_GLASS = "liquid_glass"
@@ -132,6 +138,13 @@ object AppSettingsStore {
 
     /** 底部导航栏样式：悬浮按钮（右下角圆形玻璃按钮，点击沿 1/4 圆弧展开四项）。 */
     const val NAV_STYLE_FLOATING_BUTTON = "floating_button"
+
+    /**
+     * 导航栏样式「未显式设置」：仅作内存态 / 归一化结果，**不会持久化**。
+     * 实际样式由 [resolveNavStyle] 按外观风格解析——默认外观风格为液态玻璃 · 透镜，
+     * 玻璃系外观风格（复古 / 高级）保持经典 MD（其悬浮玻璃条形态）。
+     */
+    const val NAV_STYLE_AUTO = "auto"
 
     /** 首页样式：原生首页（最近打开 + 快捷启动）。 */
     const val HOME_STYLE_NATIVE = "native"
@@ -159,7 +172,8 @@ object AppSettingsStore {
         get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
 
     /** 导航栏样式内存态：随设置页切换即时广播，供 MainScreen 重组切换样式。 */
-    val navStyleState: MutableStateFlow<String> = MutableStateFlow(NAV_STYLE_DEFAULT)
+    val navStyleState: MutableStateFlow<String> =
+        MutableStateFlow(NAV_STYLE_AUTO)
 
     /** 引擎页分类显示默认关闭：关闭时平铺展示全部引擎项，开启后按 GAL/RPGM/主机/网页 分页。 */
     const val DEFAULT_ENGINE_TABS_ENABLED = false
@@ -225,7 +239,7 @@ object AppSettingsStore {
         // 用 contains 而不是 getBoolean：旧键存在但值为 false 时也要清掉，否则它永远留在磁盘上
         if (!p.contains(KEY_LIQUID_GLASS_ENHANCE)) return
         val legacyEnhanced = p.getBoolean(KEY_LIQUID_GLASS_ENHANCE, false)
-        val stored = p.getString(KEY_NAV_STYLE, NAV_STYLE_DEFAULT)
+        val stored = p.getString(KEY_NAV_STYLE, null)
         val editor = p.edit().remove(KEY_LIQUID_GLASS_ENHANCE)
         if (legacyEnhanced && stored == NAV_STYLE_LIQUID_GLASS) {
             // 与 setNavStyle 一致地归一化：低版本设备读到备份里的透镜档时降为经典档
@@ -258,6 +272,14 @@ object AppSettingsStore {
     private fun prefs(context: Context) =
         context.applicationContext.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
 
+    /** System4 一次性定点重检测迁移：读取标志。 */
+    fun isXs4RescanMigrationDone(c: Context): Boolean =
+        prefs(c).getBoolean(KEY_MIGRATION_XSYS4_RESCAN_DONE, false)
+
+    /** 同步写（commit）：迁移在 IO 线程执行，标志落盘后才视为完成。 */
+    fun markXs4RescanMigrationDone(c: Context): Boolean =
+        prefs(c).edit().putBoolean(KEY_MIGRATION_XSYS4_RESCAN_DONE, true).commit()
+
     /** 当前主题色 HEX（#RRGGBB）。 */
     fun getThemeColorHex(c: Context): String =
         prefs(c).getString(KEY_THEME_COLOR, DEFAULT_THEME_COLOR) ?: DEFAULT_THEME_COLOR
@@ -274,11 +296,14 @@ object AppSettingsStore {
         languageState.value = normalized
     }
 
-    /** 当前底部导航栏样式（默认 / 经典 / 透镜）。 */
+    /**
+     * 用户显式选择的底部导航栏样式（经典 MD / 液态玻璃经典 / 透镜 / 悬浮按钮）；
+     * 从未设置过时为 [NAV_STYLE_AUTO]，须经 [resolveNavStyle] 按外观风格解析后使用。
+     */
     fun getNavStyle(c: Context): String =
         synchronized(navStyleLock) {
             normalizeNavStyle(
-                stored = prefs(c).getString(KEY_NAV_STYLE, NAV_STYLE_DEFAULT),
+                stored = prefs(c).getString(KEY_NAV_STYLE, null),
                 enhancedSupported = supportsLiquidGlassEnhanced,
             )
         }
@@ -286,25 +311,44 @@ object AppSettingsStore {
     fun setNavStyle(c: Context, style: String) {
         val normalized = normalizeNavStyle(style, supportsLiquidGlassEnhanced)
         synchronized(navStyleLock) {
-            prefs(c).edit().putString(KEY_NAV_STYLE, normalized).apply()
+            // AUTO 不落盘：清掉显式选择，回到「跟随外观风格」
+            prefs(c).edit().apply {
+                if (normalized == NAV_STYLE_AUTO) remove(KEY_NAV_STYLE) else putString(KEY_NAV_STYLE, normalized)
+            }.apply()
             navStyleState.value = normalized
         }
     }
 
     /**
      * 导航样式归一化（纯函数，便于单元测试）：
-     * 未知值回退默认；透镜档在不支持的版本（< Android 13）回退普通档——
+     * 缺省 / 未知值归为 [NAV_STYLE_AUTO]（未显式设置）；透镜档在不支持的版本（< Android 13）回退普通档——
      * 这样即使从更新的设备备份恢复数据，旧设备也只会得到普通档而不是降级画面。
      * 悬浮按钮在低版本走实底降级（组件内处理），不参与归一化降级。
      */
     fun normalizeNavStyle(stored: String?, enhancedSupported: Boolean): String =
         when (stored) {
+            NAV_STYLE_CLASSIC_MD -> NAV_STYLE_CLASSIC_MD
             NAV_STYLE_LIQUID_GLASS -> NAV_STYLE_LIQUID_GLASS
             NAV_STYLE_LIQUID_GLASS_ENHANCED ->
                 if (enhancedSupported) NAV_STYLE_LIQUID_GLASS_ENHANCED else NAV_STYLE_LIQUID_GLASS
             NAV_STYLE_FLOATING_BUTTON -> NAV_STYLE_FLOATING_BUTTON
-            else -> NAV_STYLE_DEFAULT
+            else -> NAV_STYLE_AUTO
         }
+
+    /**
+     * 把「未显式设置」解析为实际样式（纯函数，便于单元测试）：
+     * 默认外观风格 → 液态玻璃 · 透镜（Android 13 以下回退液态玻璃 · 经典）；
+     * 玻璃系外观风格（复古 / 高级）→ 经典 MD（其悬浮玻璃条形态）。显式选择只做版本兼容归一化，不随外观风格改变。
+     */
+    fun resolveNavStyle(style: String, enhancedSupported: Boolean, glassAppearance: Boolean): String {
+        val normalized = normalizeNavStyle(style, enhancedSupported)
+        return when {
+            normalized != NAV_STYLE_AUTO -> normalized
+            glassAppearance -> NAV_STYLE_CLASSIC_MD
+            enhancedSupported -> NAV_STYLE_LIQUID_GLASS_ENHANCED
+            else -> NAV_STYLE_LIQUID_GLASS
+        }
+    }
 
     /** 悬浮按钮导航位置键：归一化 "x,y"（0..1，相对安全区内可拖动范围）。 */
     const val KEY_FLOATING_NAV_POS = "floating_nav_pos"

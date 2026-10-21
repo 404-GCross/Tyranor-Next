@@ -27,7 +27,19 @@ object EngineSettingsResolver {
 
         return ResolvedEngineSettings(
             ons = EffectiveEngineSettings.mergeOns(onsGlobal, onsOverride),
-            krEngineVersion = EffectiveEngineSettings.resolve(
+            krGraphics = GraphicsSettingsCodec.resolve(
+                EngineSettingsStore.getGraphicsSettings(app, GraphicsFamily.KR),
+                GraphicsSettingsCodec.readOverride(override, GraphicsFamily.KR),
+            ),
+            artGraphics = GraphicsSettingsCodec.resolve(
+                EngineSettingsStore.getGraphicsSettings(app, GraphicsFamily.ARTEMIS),
+                GraphicsSettingsCodec.readOverride(override, GraphicsFamily.ARTEMIS),
+            ),
+            siglusGraphics = GraphicsSettingsCodec.resolve(
+                EngineSettingsStore.getGraphicsSettings(app, GraphicsFamily.SIGLUS),
+                GraphicsSettingsCodec.readOverride(override, GraphicsFamily.SIGLUS),
+            ),
+            krEngineVersion = EffectiveEngineSettings.resolveKrVersion(
                 str(PerGameSettingsStore.F_ENGINE_VERSION),
                 EngineSettingsStore.getKrEngineVersion(app),
             ),
@@ -58,21 +70,12 @@ object EngineSettingsResolver {
                 bool(PerGameSettingsStore.F_SKIP_STARTUP_DIALOGS),
                 EngineSettingsStore.isKrSkipStartupDialogs(app),
             ),
-            krAnime4kMode = EffectiveEngineSettings.resolveAllowed(
-                str(PerGameSettingsStore.F_ANIME4K_MODE),
-                EngineSettingsStore.getKrAnime4kMode(app),
-                EngineSettingsStore.ANIME4K_MODES,
-                EngineSettingsStore.ANIME4K_OFF,
-            ),
             krRenderer = EffectiveEngineSettings.resolve(
                 str(PerGameSettingsStore.F_RENDERER),
                 EngineSettingsStore.getKrRenderer(app),
             ),
-            artVersion = EffectiveEngineSettings.resolveAllowed(
-                str(PerGameSettingsStore.F_ART_VERSION),
-                EngineSettingsStore.getArtEngineVersion(app),
-                EngineSettingsStore.ART_VERSIONS,
-                EngineSettingsStore.ART_ENGINE_AUTO,
+            artVersion = EffectiveEngineSettings.resolveArtVersion(
+                str(PerGameSettingsStore.F_ART_VERSION), EngineSettingsStore.getArtEngineVersion(app),
             ),
             artKernel = EffectiveEngineSettings.resolveAllowed(
                 str(PerGameSettingsStore.F_ART_KERNEL),
@@ -181,6 +184,14 @@ object EngineSettingsResolver {
                 EngineSettingsStore.FVP_NLS_VALUES,
                 EngineSettingsStore.FVP_NLS_SJIS,
             ),
+            ethornellNls = EffectiveEngineSettings.resolveEthornellNls(
+                str(PerGameSettingsStore.F_ETHORNELL_NLS),
+                EngineSettingsStore.getEthornellNls(app),
+            ),
+            ethornellFont = EffectiveEngineSettings.resolve(
+                str(PerGameSettingsStore.F_ETHORNELL_FONT),
+                EngineSettingsStore.getEthornellFont(app),
+            ),
             fvpSystemFont = EffectiveEngineSettings.resolveBool(
                 bool(PerGameSettingsStore.F_FVP_SYSTEM_FONT),
                 EngineSettingsStore.isFvpSystemFont(app),
@@ -210,6 +221,34 @@ object EngineSettingsResolver {
             xs35MuteUnfocus = EffectiveEngineSettings.resolveBool(
                 bool(PerGameSettingsStore.F_XSYS35_MUTE_UNFOCUS),
                 EngineSettingsStore.isXs35MuteUnfocus(app),
+            ),
+            xs4ScopedSaveDir = EffectiveEngineSettings.resolveBool(
+                bool(PerGameSettingsStore.F_XSYS4_SCOPED_SAVE_DIR),
+                EngineSettingsStore.isXs4ScopedSaveDir(app),
+            ),
+            xs4Encoding = EffectiveEngineSettings.resolveAllowed(
+                str(PerGameSettingsStore.F_XSYS4_ENCODING),
+                EngineSettingsStore.getXs4Encoding(app),
+                EngineSettingsStore.XSYS4_ENCODING_VALUES,
+                EngineSettingsStore.XSYS4_ENCODING_SJIS,
+            ),
+            xs4FontGothicPath = EffectiveEngineSettings.resolve(
+                str(PerGameSettingsStore.F_XSYS4_FONT_GOTHIC_PATH),
+                EngineSettingsStore.getXs4FontGothicPath(app),
+            ),
+            xs4FontMinchoPath = EffectiveEngineSettings.resolve(
+                str(PerGameSettingsStore.F_XSYS4_FONT_MINCHO_PATH),
+                EngineSettingsStore.getXs4FontMinchoPath(app),
+            ),
+            xs4Joypad = EffectiveEngineSettings.resolveAllowed(
+                str(PerGameSettingsStore.F_XSYS4_JOYPAD),
+                EngineSettingsStore.getXs4Joypad(app),
+                EngineSettingsStore.XSYS4_JOYPAD_VALUES,
+                EngineSettingsStore.XSYS4_JOYPAD_AUTO,
+            ),
+            xs4MsgskipDelay = EffectiveEngineSettings.resolveXs4MsgskipDelay(
+                str(PerGameSettingsStore.F_XSYS4_MSGSKIP_DELAY),
+                EngineSettingsStore.getXs4MsgskipDelay(app),
             ),
             rpg = EffectiveEngineSettings.mergeRpgMaker(
                 EngineSettingsStore.loadRpgMaker(app),
@@ -241,6 +280,9 @@ object EngineSettingsResolver {
 /** 三级合并后的启动期生效设置（纯数据）。 */
 data class ResolvedEngineSettings(
     val ons: EngineSettingsStore.Ons,
+    val krGraphics: GraphicsSettings = GraphicsSettings.defaults(GraphicsFamily.KR),
+    val artGraphics: GraphicsSettings = GraphicsSettings.defaults(GraphicsFamily.ARTEMIS),
+    val siglusGraphics: GraphicsSettings = GraphicsSettings.defaults(GraphicsFamily.SIGLUS),
     val krEngineVersion: String,
     val krKernel: String,
     val krScopedSaveDir: Boolean,
@@ -248,7 +290,6 @@ data class ResolvedEngineSettings(
     val krForceDefaultFont: Boolean,
     val krPatchOverlayMode: String,
     val krSkipStartupDialogs: Boolean,
-    val krAnime4kMode: String,
     val krRenderer: String,
     val artVersion: String,
     /** Artemis 内核生效值（官方多 revision / 自研 clean-room）。 */
@@ -278,6 +319,10 @@ data class ResolvedEngineSettings(
     val fbNls: String,
     /** FVP 生效文本编码（sjis/gbk/utf8；创建引擎时固定，改动需重启本局）。 */
     val fvpNls: String,
+    /** Graphics text only, sjis/gbk; resource names and UI locale are independent. */
+    val ethornellNls: String,
+    /** Empty = engine fallback; nonempty paths must pass the private-font launch preflight. */
+    val ethornellFont: String,
     /** FVP 生效系统字体回退开关。 */
     val fvpSystemFont: Boolean,
     /** FVP 生效文本高分辨率渲染开关。 */
@@ -292,6 +337,18 @@ data class ResolvedEngineSettings(
     val xs35IntegerScale: Boolean,
     /** System35 生效失焦静音开关（`-mute_on_unfocus`）。 */
     val xs35MuteUnfocus: Boolean,
+    /** System4 生效「独立存档」开关（默认开；目录 = `<外部存储>/save/<safeSaveName>`，关闭 = 游戏根 `SaveFolder`）。 */
+    val xs4ScopedSaveDir: Boolean,
+    /** System4 生效文本编码（sjis / gbk；映射为 `--encoding`）。 */
+    val xs4Encoding: String,
+    /** System4 生效自定义 gothic 字体绝对路径（空 = 用 engine 侧内置映射；非空仍需启动前校验存在）。 */
+    val xs4FontGothicPath: String,
+    /** System4 生效自定义 mincho 字体绝对路径（语义同 [xs4FontGothicPath]）。 */
+    val xs4FontMinchoPath: String,
+    /** System4 生效手柄（auto 不下发；on / off 映射为 `--joypad`）。 */
+    val xs4Joypad: String,
+    /** System4 生效跳字延迟毫秒（0 = 引擎默认，不下发）。 */
+    val xs4MsgskipDelay: Int,
     /** RPG Maker RGSS 外置模块生效配置（三级合并结果，启动时经 settings extra 下发）。 */
     val rpg: EngineSettingsStore.RpgMaker,
     /** Ren'Py 外置模块生效配置（三级合并结果，启动时经 settings extra 下发）。 */

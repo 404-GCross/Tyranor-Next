@@ -30,6 +30,11 @@ object LaunchContract {
     /** Web 壳默认固定端口（与 Tyranor 原版 webGamePort 默认值一致，便于沿用既有存档域）。 */
     const val WEB_SHELL_PORT_DEFAULT = 23333
     const val UI_LANGUAGE_TAG = "uiLanguageTag"
+    const val GRAPHICS_FILTER_CHAIN = "graphicsFilterChain"
+    const val GRAPHICS_FILTER_ENABLED = "graphicsFilterEnabled"
+    const val GRAPHICS_FILTER_ANALYZER = "graphicsFilterAnalyzer"
+    const val GRAPHICS_FILTER_ANALYZER_POSITION = "graphicsFilterAnalyzerPosition"
+    const val GRAPHICS_FILTER_REFRESH_INTERVAL_MS = "graphicsFilterRefreshIntervalMs"
 
     // ---------- 主题 ----------
 
@@ -73,12 +78,16 @@ object LaunchContract {
 
     // ---------- Artemis ----------
 
+    /** 官方 Artemis 自动候选与回退协议，不通过画质设置改写候选顺序。 */
     const val ARTEMIS_AUTO_FALLBACK = "artemisAutoFallback"
     const val ARTEMIS_FALLBACK_STAGE = "artemisFallbackStage"
     const val ARTEMIS_CURRENT_VERSION = "artemisCurrentVersion"
     const val ARTEMIS_FALLBACK_VERSIONS = "artemisFallbackVersions"
     const val ARTEMIS_FALLBACK_INDEX = "artemisFallbackIndex"
     const val ARTEMIS_AUTO_PLAN_REASON = "artemisAutoPlanReason"
+    // 原始画质请求跨候选保留；实际 enabled/analyzer 每次按加载库重算。
+    const val ARTEMIS_GRAPHICS_REQUESTED_ENABLED = "artemisGraphicsRequestedEnabled"
+    const val ARTEMIS_GRAPHICS_REQUESTED_ANALYZER = "artemisGraphicsRequestedAnalyzer"
     const val ENGINE_LIB_NAME = "engineLibName"
 
     // ---------- RPG Maker Web ----------
@@ -110,6 +119,17 @@ object LaunchContract {
     /** 自定义字体路径（App 私有目录绝对路径；不传表示跟随游戏默认/不强制）。 */
     const val FVP_FONT_PATH = "fvp_font_path"
 
+    // ---------- Ethornell / BGI ----------
+
+    /** Graphics text encoding only: sjis (default) or gbk. ROOT_URI is identity; PATH is a real directory. */
+    const val ETHORNELL_NLS = "ETHORNELL_NLS"
+    /** Optional imported font inside the app-private files/fonts directory. */
+    const val ETHORNELL_FONT_PATH = "ETHORNELL_FONT_PATH"
+    /** Explicit private writable user root, separate from the read-only game resource root. */
+    const val ETHORNELL_USER_DATA_DIR = "ETHORNELL_USER_DATA_DIR"
+    /** Durable one-shot launch dispatch lease; issued/claimed through EthornellDispatchRegistry. */
+    const val ETHORNELL_DISPATCH_TOKEN = "ETHORNELL_DISPATCH_TOKEN"
+
     // ---------- System35 (xsystem35) ----------
 
     /** 生效存档目录**绝对路径**（由 App 按「独立存档开关」解析，禁止宿主自行推导）。 */
@@ -133,6 +153,29 @@ object LaunchContract {
      */
     const val XS35_PATH_HASH = "xs35_path_hash"
 
+    // ---------- System4 (xsystem4) ----------
+
+    /** 生效存档目录**绝对路径**（由 App 解析，宿主不推导；非绝对路径时宿主忽略并记日志）。 */
+    const val XS4_SAVE_DIR = "xs4_save_dir"
+
+    /** 独立存档布尔（供宿主日志/诊断用；路径以 [XS4_SAVE_DIR] 为准）。 */
+    const val XS4_SCOPED_SAVE_DIR = "xs4_scoped_save_dir"
+
+    /** 文本编码：`sjis`（默认）| `gbk`，映射为 `--encoding`；非白名单值由宿主回落 `sjis`。 */
+    const val XS4_ENCODING = "xs4_encoding"
+
+    /** 自定义 gothic 字体**绝对路径**（仅用户导入时下发；宿主校验失败回落内置映射）。 */
+    const val XS4_FONT_GOTHIC_PATH = "xs4_font_gothic_path"
+
+    /** 自定义 mincho 字体**绝对路径**（同 [XS4_FONT_GOTHIC_PATH]）。 */
+    const val XS4_FONT_MINCHO_PATH = "xs4_font_mincho_path"
+
+    /** 手柄：`auto`（默认，不传 `--joypad`）| `on` | `off`。 */
+    const val XS4_JOYPAD = "xs4_joypad"
+
+    /** 跳字延迟（int 毫秒；0 = 引擎默认，不传 `--msgskip-delay`）。 */
+    const val XS4_MSGSKIP_DELAY = "xs4_msgskip_delay"
+
     // ---------- framebuffer 引擎（RealLive / AVG32 / UK2） ----------
 
     /** 引擎 id：`reallive` | `avg32` | `uk2`（不传时引擎库自行探测）。 */
@@ -152,6 +195,8 @@ object LaunchContract {
     const val LAUNCH_MODE_ARTEMIS = "internal.artemis"
     const val LAUNCH_MODE_SIGLUS = "internal.siglus"
     const val LAUNCH_MODE_FVP = "internal.fvp"
+    const val LAUNCH_MODE_ETHORNELL = "internal.ethornell"
     const val LAUNCH_MODE_FRAMEBUFFER = "internal.framebuffer"
     const val LAUNCH_MODE_XSYS35 = "internal.xsys35"
+    const val LAUNCH_MODE_XSYS4 = "internal.xsys4"
 }

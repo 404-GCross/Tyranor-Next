@@ -5,7 +5,10 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.Rect;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.SystemClock;
 import android.util.DisplayMetrics;
 import android.util.Log;
@@ -16,6 +19,8 @@ import android.view.MotionEvent;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
+import android.graphics.SurfaceTexture;
+import android.view.TextureView;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.inputmethod.InputMethodManager;
@@ -37,18 +42,25 @@ import com.core.engine.EnginePrefs;
 import com.core.engine.R;
 import com.core.engine.EngineUiText;
 import com.core.engine.LaunchContract;
+import com.core.gl.GraphicsFilterChain;
+import com.core.gl.ArtemisPerformanceOverlay;
 
 import java.io.File;
+import java.lang.ref.WeakReference;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * SiglusEngine（siglus_rs）宿主 Activity。
  *
- * <p>宿主模型与上游一致：Java 持有 SurfaceView 生命周期与 Choreographer 主循环，Rust 引擎
+ * <p>关闭滤镜时沿用 SurfaceView + 主线程同步驱动；开启有效滤镜链时使用 TextureView
+ * 显示窗口租约、私有 producer 与独立引擎线程。两种模式共用输入、IME 和生命周期外壳。
  * 经 {@code siglus_android_*} C ABI 被逐步驱动。差异点：游戏路径/语言/回写键取自
  * {@link LaunchContract} extras，消息框复用 engine 既有文案资源，IME 与键事件按
  * TyranorNext 契约转发。
  */
 public final class SiglusActivity extends AppCompatActivity implements
+        TextureView.SurfaceTextureListener,
         SurfaceHolder.Callback,
         Choreographer.FrameCallback,
         View.OnTouchListener,
@@ -73,11 +85,22 @@ public final class SiglusActivity extends AppCompatActivity implements
     private static final int MAX_FRAME_DT_MS = 250;
 
     private FrameLayout rootLayout;
-    private SurfaceView surfaceView;
+    private View surfaceView;
+    private boolean filterMode;
+    private GraphicsFilterChain requestedChain;
+    private final Handler main = new Handler(Looper.getMainLooper());
+    private SurfaceTexture displayTexture;
+    private SiglusWindowLease displayWindow;
+    private final Runnable capacityAvailable = this::acquireDisplayWindow;
     private SiglusTextInputView textInputView;
     private View loadingOverlay;
 
-    private long handle = 0L;
+    private SiglusHost engine;
+    private SiglusEngineThread filteredEngine;
+    private SiglusDirectHost directEngine;
+    private boolean engineReady, engineCreating, windowAvailable;
+    private int surfaceGeneration;
+    private long surfaceConnectionRequest;
     private boolean running = false;
     private volatile boolean surfaceReady = false;
     private long lastFrameNs = 0L;
@@ -89,11 +112,23 @@ public final class SiglusActivity extends AppCompatActivity implements
     private String pathHash;
 
     private long lastBackMs = 0L;
-
+    private boolean resumed, destroying, faulted, proxyPreparing, proxyAttached, proxyFailed;
+    private boolean pointerActive;
+    private double lastTouchX, lastTouchY;
+    private SiglusGraphicsProxy graphicsProxy;
+    private SiglusGraphicsProxy pendingGraphicsProxy;
+    private ArtemisPerformanceOverlay graphicsOverlay;
+    private final Set<Long> messageboxRequests = new HashSet<>();
+    private Thread stageSizeWorker;
+    private int stageSizeRequest;
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        requestedChain = SiglusHostPolicy.requestedChain(
+                getIntent().getBooleanExtra(LaunchContract.GRAPHICS_FILTER_ENABLED, false),
+                getIntent().getStringExtra(LaunchContract.GRAPHICS_FILTER_CHAIN));
+        filterMode = requestedChain != null;
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         setContentView(buildContentView());
 
@@ -112,8 +147,75 @@ public final class SiglusActivity extends AppCompatActivity implements
         pathHash = getIntent().getStringExtra(LaunchContract.SIGLUS_PATH_HASH);
 
         NativeSiglus.setMessageboxListener(this);
+        try {
+            SiglusHost.Listener listener = new SiglusHost.Listener() {
+                @Override public void onCreated(boolean success, boolean cancelled, int generation) {
+                    engineCreating = false;
+                    if (!success) {
+                        Log.e(TAG, "Engine creation failed");
+                        failInitialization();
+                        return;
+                    }
+                    engineReady = true;
+                    if (!filterMode) {
+                        surfaceReady = windowAvailable && generation == surfaceGeneration;
+                        writeBackGameTitleAsync();
+                        maybeStartFrameLoop();
+                        return;
+                    }
+                    graphicsProxy.activate();
+                    attachDisplay();
+                    prepareGraphics();
+                    writeBackGameTitleAsync();
+                    maybeStartFrameLoop();
+                }
+                @Override public void onConnected(long request, boolean success, int generation) {
+                    if (!filterMode) {
+                        // Direct JNI and its ACK complete inside the UI callback;
+                        // there is no pending request-number assignment to race.
+                        surfaceReady = success && windowAvailable && generation == surfaceGeneration;
+                        if (!success) Toast.makeText(SiglusActivity.this, uiString(R.string.engine_launch_failed),
+                                Toast.LENGTH_LONG).show();
+                        maybeStartFrameLoop();
+                    } else completeSurfaceConnection(request, success);
+                }
+                @Override public void onStepped(int status, boolean imeNeeded, int[] area) {
+                    if (status > 0) { stopFrameLoop(); finish(); return; }
+                    if (status < 0) { faulted = true; stopFrameLoop(); return; }
+                    if (!filterMode) hideLoadingOverlay();
+                    if (resumed) updateImeState(imeNeeded, area);
+                }
+                @Override public void onBlocked() {
+                    // A native call may still own the private producer. Its
+                    // admission is independently bounded; never reconnect it
+                    // to a revoked UI window when merely reporting slow work.
+                    Log.w(TAG, "Native owner is busy; presentation remains privately owned");
+                    // Keep the UI clock: admission already bounds in-flight work,
+                    // and normal completion resumes without a lifecycle callback.
+                }
+                @Override public void onFailure(RuntimeException failure) {
+                    Log.e(TAG, "Engine owner operation failed", failure);
+                    faulted = true;
+                    stopFrameLoop();
+                }
+            };
+            if (filterMode) {
+                filteredEngine = new SiglusEngineThread(this, listener);
+                engine = filteredEngine;
+            } else {
+                directEngine = new SiglusDirectHost(this, listener);
+                engine = directEngine;
+            }
+        } catch (RuntimeException failure) {
+            Log.e(TAG, "Engine owner unavailable", failure);
+            finish();
+            return;
+        }
 
-        surfaceView.getHolder().addCallback(this);
+        if (filterMode) {
+            SiglusWindowLease.observeCapacity(capacityAvailable);
+            ((TextureView) surfaceView).setSurfaceTextureListener(this);
+        } else ((SurfaceView) surfaceView).getHolder().addCallback(this);
         surfaceView.setOnTouchListener(this);
         surfaceView.setFocusable(true);
         surfaceView.setFocusableInTouchMode(true);
@@ -127,7 +229,9 @@ public final class SiglusActivity extends AppCompatActivity implements
         rootLayout = new FrameLayout(this);
         rootLayout.setBackgroundColor(Color.BLACK);
 
-        surfaceView = new SurfaceView(this);
+        // Android 16 may retain this View through a SurfaceTexture frame-rate listener.
+        // The display is unthemed; its Context must not keep the Activity alive.
+        surfaceView = filterMode ? new TextureView(getApplicationContext()) : new SurfaceView(this);
         rootLayout.addView(surfaceView, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
@@ -180,23 +284,50 @@ public final class SiglusActivity extends AppCompatActivity implements
     @Override
     protected void onResume() {
         super.onResume();
+        resumed = true;
         applyImmersive();
+        if (filterMode) {
+            acquireDisplayWindow();
+            attachDisplay();
+        }
         maybeStartFrameLoop();
     }
 
     @Override
     protected void onPause() {
+        resumed = false;
         stopFrameLoop();
+        cancelPointer();
+        if (graphicsOverlay != null) graphicsOverlay.hide();
+        if (graphicsProxy != null) graphicsProxy.detachOutput();
         super.onPause();
     }
 
     @Override
     protected void onDestroy() {
+        destroying = true;
+        resumed = false;
+        if (filterMode) SiglusWindowLease.stopObservingCapacity(capacityAvailable);
+        stageSizeRequest++;
+        if (stageSizeWorker != null) { stageSizeWorker.interrupt(); stageSizeWorker = null; }
         stopFrameLoop();
+        if (graphicsOverlay != null) graphicsOverlay.hide();
         hideIme();
-        destroyEngine();
         NativeSiglus.setMessageboxListener(null);
+        if (filterMode) detachFilteredDisplay();
+        destroyEngine(); // Native producer destruction precedes consumer disposal.
         super.onDestroy();
+    }
+
+    private void detachFilteredDisplay() {
+        TextureView display = (TextureView) surfaceView;
+        // Keep the callback until normal detach returns the UI lease. Removing
+        // the child also clears its Activity-owned parent and window AttachInfo.
+        rootLayout.removeView(display);
+        display.setSurfaceTextureListener(null);
+        display.setOnTouchListener(null);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) display.setContentCaptureSession(null);
+        // Do not release the texture: pending/retained EGL work still owns its lease.
     }
 
     @Override
@@ -228,7 +359,7 @@ public final class SiglusActivity extends AppCompatActivity implements
                     return;
                 }
                 lastBackMs = now;
-                if (handle != 0L) {
+                if (engineReady) {
                     forwardKey(VK_ESCAPE, null, false);
                 }
                 Toast.makeText(SiglusActivity.this,
@@ -238,99 +369,336 @@ public final class SiglusActivity extends AppCompatActivity implements
         });
     }
 
-    // ---------- Surface ----------
+    // ---------- Original direct SurfaceView path ----------
 
-    @Override
-    public void surfaceCreated(@NonNull SurfaceHolder holder) {
-        if (handle != 0L) {
-            // 后台恢复：Android 换了新的 ANativeWindow，保留运行中的引擎并重挂窗口。
-            Surface surface = holder.getSurface();
-            int width = surfaceWidth(holder);
-            int height = surfaceHeight(holder);
-            surfaceReady = NativeSiglus.setSurface(handle, surface, width, height);
-            if (!surfaceReady) {
-                Toast.makeText(this, uiString(R.string.engine_launch_failed),
-                        Toast.LENGTH_LONG).show();
-                return;
-            }
-        } else {
-            ensureEngine(holder);
-        }
+    @Override public void surfaceCreated(@NonNull SurfaceHolder holder) {
+        if (filterMode || destroying || directEngine == null) return;
+        surfaceGeneration++;
+        windowAvailable = true;
+        surfaceReady = false;
+        stopFrameLoop();
+        if (engineReady) directEngine.connect(holder.getSurface(), surfaceWidth(holder), surfaceHeight(holder), surfaceGeneration);
+        else ensureDirectEngine(holder);
         maybeStartFrameLoop();
     }
 
-    @Override
-    public void surfaceChanged(@NonNull SurfaceHolder holder, int format, int width, int height) {
-        if (handle == 0L) {
-            ensureEngine(holder);
-        } else {
-            NativeSiglus.resize(handle, Math.max(1, width), Math.max(1, height));
-        }
+    @Override public void surfaceChanged(@NonNull SurfaceHolder holder, int format, int width, int height) {
+        if (filterMode || destroying || directEngine == null) return;
+        if (!engineReady) ensureDirectEngine(holder);
+        else directEngine.resize(Math.max(1, width), Math.max(1, height));
     }
 
-    @Override
-    public void surfaceDestroyed(@NonNull SurfaceHolder holder) {
-        // ANativeWindow 即将失效，但引擎必须存活：切后台不重启游戏，onDestroy 才销毁。
-        surfaceReady = false;
+    @Override public void surfaceDestroyed(@NonNull SurfaceHolder holder) {
+        if (filterMode) return;
+        surfaceGeneration++;
+        windowAvailable = surfaceReady = false;
         stopFrameLoop();
+        cancelPointer();
+        // Every JNI render/create/set_surface/resize completed on this same UI
+        // thread before this callback; the worker never receives this window.
     }
 
     private int surfaceWidth(SurfaceHolder holder) {
         Rect frame = holder.getSurfaceFrame();
-        int width = frame != null ? frame.width() : surfaceView.getWidth();
-        return Math.max(1, width);
+        return Math.max(1, frame == null ? surfaceView.getWidth() : frame.width());
     }
-
     private int surfaceHeight(SurfaceHolder holder) {
         Rect frame = holder.getSurfaceFrame();
-        int height = frame != null ? frame.height() : surfaceView.getHeight();
-        return Math.max(1, height);
+        return Math.max(1, frame == null ? surfaceView.getHeight() : frame.height());
     }
 
-    private void ensureEngine(@NonNull SurfaceHolder holder) {
-        if (handle != 0L) {
+    private void ensureDirectEngine(SurfaceHolder holder) {
+        if (filterMode || engineReady || engineCreating || destroying || directEngine == null || !windowAvailable) return;
+        engineCreating = true;
+        directEngine.create(holder.getSurface(), surfaceWidth(holder), surfaceHeight(holder),
+                getResources().getDisplayMetrics().density, gameRoot,
+                getIntent().getStringExtra(LaunchContract.SIGLUS_LANGUAGE), surfaceGeneration);
+    }
+
+    // ---------- Display leases and private producer ----------
+
+    @Override public void onSurfaceTextureAvailable(@NonNull SurfaceTexture texture, int width, int height) {
+        surfaceGeneration++;
+        displayTexture = texture;
+        windowAvailable = true;
+        acquireDisplayWindow();
+    }
+
+    private void acquireDisplayWindow() {
+        if (!filterMode || destroying || !windowAvailable || displayTexture == null || displayWindow != null) return;
+        try { displayWindow = SiglusWindowLease.acquire(displayTexture); }
+        catch (RuntimeException failure) { Log.w(TAG, "Display lease unavailable", failure); return; }
+        if (displayWindow == null) {
+            // A failed driver may retain four windows. Slot-release notification
+            // retries the current live texture, without an unbounded timer queue.
+            Log.w(TAG, "Display window capacity exhausted; waiting for owner release");
             return;
         }
-        NativeSiglus.nativeInitContext(getApplicationContext());
+        if (graphicsProxy == null) prepareStartupProducer();
+        else attachDisplay();
+    }
 
-        String language = getIntent().getStringExtra(LaunchContract.SIGLUS_LANGUAGE);
-        if (language != null && !language.trim().isEmpty()) {
-            NativeSiglus.nativeSetLanguage(language.trim());
+    @Override public void onSurfaceTextureSizeChanged(@NonNull SurfaceTexture texture, int width, int height) {
+        if (displayTexture != texture) return;
+        cancelPointer();
+        surfaceReady = false;
+        attachDisplay();
+    }
+
+    @Override public boolean onSurfaceTextureDestroyed(@NonNull SurfaceTexture texture) {
+        if (displayTexture != texture) return true;
+        surfaceGeneration++;
+        windowAvailable = false;
+        displayTexture = null;
+        surfaceReady = false;
+        stopFrameLoop();
+        cancelPointer();
+        if (graphicsOverlay != null) graphicsOverlay.hide();
+        if (graphicsProxy != null) graphicsProxy.detachOutput();
+        boolean owned = displayWindow != null;
+        // A retained EGL lease needs the native window, not TextureView's UI listener.
+        if (owned) texture.setOnFrameAvailableListener(null);
+        releaseDisplayWindow();
+        // TextureView.SurfaceTextureListener permits false only when the client
+        // assumes SurfaceTexture.release(). Pending/in-flight/attached EGL work
+        // retains a lease, so the callback never waits or revokes its window.
+        // A capacity-rejected texture was never passed to EGL: let the view free it.
+        return !owned;
+    }
+
+    @Override public void onSurfaceTextureUpdated(@NonNull SurfaceTexture texture) { }
+
+    private void releaseDisplayWindow() {
+        SiglusWindowLease previous = displayWindow;
+        displayWindow = null;
+        if (previous != null) previous.release();
+    }
+
+    private int surfaceWidth() { return Math.max(1, surfaceView.getWidth()); }
+    private int surfaceHeight() { return Math.max(1, surfaceView.getHeight()); }
+
+    private void attachDisplay() {
+        if (!resumed || destroying || !windowAvailable || displayWindow == null
+                || graphicsProxy == null || !engineReady || proxyPreparing || proxyFailed) return;
+        surfaceReady = false;
+        graphicsProxy.attachOutput(displayWindow, surfaceWidth(), surfaceHeight());
+    }
+
+    private void failInitialization() {
+        if (destroying || isFinishing()) return;
+        Toast.makeText(this, uiString(R.string.engine_siglus_init_failed), Toast.LENGTH_LONG).show();
+        finish();
+    }
+
+    private void prepareStartupProducer() {
+        if (!filterMode || filteredEngine == null || graphicsProxy != null || destroying || displayWindow == null) return;
+        try {
+            // Only enabled filter mode uses this producer, even before a trusted stage is available.
+            // Its screen-sized copy is never advertised as a measured raw stage.
+            graphicsProxy = createProxy(GraphicsFilterChain.parse("v1:"), surfaceWidth(), surfaceHeight(), false);
+            proxyPreparing = true;
+            graphicsProxy.prepare();
+        } catch (RuntimeException failure) {
+            Log.e(TAG, "Private graphics consumer unavailable", failure);
+            failInitialization(); // No unsafe direct-native screen fallback.
         }
+    }
 
-        int width = surfaceWidth(holder);
-        int height = surfaceHeight(holder);
-        DisplayMetrics metrics = getResources().getDisplayMetrics();
-        double scale = metrics.density;
+    private SiglusGraphicsProxy createProxy(GraphicsFilterChain chain, int width, int height, boolean analyzer) {
+        return new SiglusGraphicsProxy(this, chain, width, height, analyzer, new SiglusGraphicsProxy.Listener() {
+            @Override public void onPrepared(SiglusGraphicsProxy proxy, Surface producer) {
+                if (destroying || engine == null) return;
+                if (proxy == graphicsProxy && !engineReady && !engineCreating) {
+                    engineCreating = true;
+                    proxyPreparing = false;
+                    DisplayMetrics metrics = getResources().getDisplayMetrics();
+                    filteredEngine.create(producer, width, height, metrics.density, gameRoot,
+                            getIntent().getStringExtra(LaunchContract.SIGLUS_LANGUAGE), surfaceGeneration);
+                } else if (proxy == pendingGraphicsProxy && engineReady) {
+                    // Only the old GLES owner can disconnect its display EGL
+                    // surface. The latest window is attached after producer ACK,
+                    // independently of the generation which began this handoff.
+                    WeakReference<SiglusActivity> owner = new WeakReference<>(SiglusActivity.this);
+                    graphicsProxy.detachOutput(detached -> {
+                        SiglusActivity activity = owner.get();
+                        if (activity != null) activity.connectStageProducer(proxy, producer, width, height, detached);
+                    });
+                }
+            }
+            @Override public void onPreparationTimeout(SiglusGraphicsProxy proxy) {
+                if (destroying) return;
+                if (proxy == graphicsProxy && !engineReady) { failInitialization(); return; }
+                if (proxy == pendingGraphicsProxy && !proxyAttached) {
+                    pendingGraphicsProxy = null;
+                    proxyPreparing = false;
+                    attachDisplay();
+                    maybeStartFrameLoop();
+                }
+            }
+            @Override public void onOutputReady(SiglusGraphicsProxy proxy, SiglusWindowLease window) {
+                if (destroying || graphicsProxy != proxy || displayWindow != window || !windowAvailable) return;
+                surfaceReady = true;
+                if (resumed && graphicsOverlay != null) graphicsOverlay.show();
+                maybeStartFrameLoop();
+            }
+            @Override public void onFirstFrame(SiglusGraphicsProxy proxy) {
+                if (!destroying && graphicsProxy == proxy) hideLoadingOverlay();
+            }
+            @Override public void onFailure(SiglusGraphicsProxy proxy, RuntimeException failure) {
+                if (!destroying && (graphicsProxy == proxy || pendingGraphicsProxy == proxy))
+                    handleProxyFailure(proxy);
+            }
+        });
+    }
 
-        long created = NativeSiglus.create(holder.getSurface(), width, height, scale, gameRoot);
-        if (created == 0L) {
-            Toast.makeText(this, uiString(R.string.engine_siglus_init_failed),
-                    Toast.LENGTH_LONG).show();
-            finish();
+    private void connectStageProducer(SiglusGraphicsProxy proxy, Surface producer, int width, int height,
+                                      boolean detached) {
+        if (destroying || pendingGraphicsProxy != proxy || engine == null) return;
+        if (!detached) { pausePresentation(proxy); return; }
+        proxyAttached = true; // May reach native before the ACK.
+        surfaceConnectionRequest = filteredEngine.setSurface(producer, width, height, surfaceGeneration);
+    }
+
+    private void handleProxyFailure(SiglusGraphicsProxy proxy) {
+        if (pendingGraphicsProxy == proxy && !proxyAttached) {
+            pendingGraphicsProxy = null;
+            proxyPreparing = false;
+            proxy.release(); // No native operation could have received this producer.
+            attachDisplay();
+            maybeStartFrameLoop();
+        } else if (graphicsProxy == proxy && !engineReady) failInitialization();
+        else pausePresentation(proxy);
+    }
+
+    private void completeSurfaceConnection(long request, boolean success) {
+        if (destroying || request != surfaceConnectionRequest || pendingGraphicsProxy == null) return;
+        SiglusGraphicsProxy candidate = pendingGraphicsProxy;
+        if (!success) {
+            // set_surface returned false: the old producer is still owned by
+            // native; discard only the confirmed unbound candidate.
+            pendingGraphicsProxy = null;
+            candidate.release();
+            proxyPreparing = proxyAttached = false;
+            attachDisplay();
+            maybeStartFrameLoop();
             return;
         }
-        handle = created;
-        surfaceReady = true;
-        NativeSiglus.setNativeMessageboxCallback(handle);
-        writeBackGameTitleAsync();
+        SiglusGraphicsProxy previous = graphicsProxy;
+        graphicsProxy = candidate;
+        pendingGraphicsProxy = null;
+        proxyPreparing = proxyAttached = false;
+        candidate.activate();
+        previous.release(); // Old producer is now confirmed detached by native.
+        if (graphicsOverlay != null) graphicsOverlay.hide();
+        graphicsOverlay = new ArtemisPerformanceOverlay(this, candidate);
+        attachDisplay();
+    }
+
+    private void pausePresentation(SiglusGraphicsProxy failed) {
+        Log.e(TAG, "Graphics owner unavailable; keeping the VM and private producer owned");
+        proxyFailed = true;
+        surfaceReady = false;
+        stopFrameLoop();
+        cancelPointer();
+        if (graphicsOverlay != null) graphicsOverlay.hide();
+        // The consumer keeps draining until ordered native destruction. Never
+        // reconnect the engine to the screen or release a possibly bound producer.
+    }
+
+    private void prepareGraphics() {
+        if (!filterMode || filteredEngine == null) return;
+        GraphicsFilterChain chain = requestedChain;
+        // create() may have generated key.toml. Decode only after it succeeds,
+        // off the engine/UI thread; the VM keeps its private copy producer meanwhile.
+        final File directory = new File(gameRoot);
+        final SiglusEngineThread engineOwner = filteredEngine;
+        final int request = ++stageSizeRequest;
+        final Handler main = new Handler(Looper.getMainLooper());
+        final WeakReference<SiglusActivity> owner = new WeakReference<>(this);
+        stageSizeWorker = new Thread(() -> {
+            SiglusStageSize.Size result = null;
+            try { result = SiglusStageSize.read(directory); }
+            catch (RuntimeException failure) { Log.w(TAG, "Stage configuration unavailable", failure); }
+            if (Thread.currentThread().isInterrupted()) return;
+            final SiglusStageSize.Size size = result;
+            main.post(() -> {
+                SiglusActivity activity = owner.get();
+                if (activity == null || activity.destroying || activity.faulted || activity.isFinishing()
+                        || activity.isDestroyed() || activity.engine != engineOwner || !activity.engineReady
+                        || activity.stageSizeRequest != request) return;
+                activity.stageSizeWorker = null;
+                if (size == null) {
+                    Log.w(TAG, "No trusted configured stage size; keeping private copy presentation");
+                    return;
+                }
+                activity.prepareGraphics(chain, size, engineOwner);
+            });
+        }, "Siglus-stage-size");
+        try { stageSizeWorker.start(); }
+        catch (RuntimeException failure) {
+            stageSizeWorker = null;
+            Log.w(TAG, "Stage configuration worker unavailable; keeping private copy presentation", failure);
+        }
+    }
+
+    private void prepareGraphics(GraphicsFilterChain chain, SiglusStageSize.Size size, SiglusEngineThread engineOwner) {
+        if (engine != engineOwner || pendingGraphicsProxy != null || destroying) return;
+        SiglusGraphicsProxy candidate;
+        try {
+            candidate = createProxy(chain, size.width, size.height,
+                    getIntent().getBooleanExtra(LaunchContract.GRAPHICS_FILTER_ANALYZER, false));
+        } catch (RuntimeException failure) {
+            Log.w(TAG, "Stage proxy unavailable; keeping private copy presentation", failure);
+            return;
+        }
+        stopFrameLoop();
+        cancelPointer();
+        proxyPreparing = true;
+        surfaceReady = false;
+        pendingGraphicsProxy = candidate;
+        candidate.prepare();
+    }
+
+    private void cancelPointer() {
+        if (pointerActive && engineReady && engine != null) engine.touch(3, lastTouchX, lastTouchY);
+        pointerActive = false;
     }
 
     private void destroyEngine() {
-        if (handle != 0L) {
-            NativeSiglus.destroy(handle);
-            handle = 0L;
+        SiglusGraphicsProxy producerOwner = graphicsProxy;
+        SiglusGraphicsProxy candidateOwner = pendingGraphicsProxy;
+        graphicsProxy = pendingGraphicsProxy = null;
+        SiglusHost owner = engine;
+        engine = null;
+        filteredEngine = null;
+        directEngine = null;
+        engineReady = engineCreating = false;
+        if (producerOwner != null) {
+            producerOwner.stopObserving();
+            producerOwner.detachOutput();
         }
+        if (candidateOwner != null) candidateOwner.stopObserving();
+        Runnable release = () -> {
+            if (producerOwner != null) producerOwner.release();
+            if (candidateOwner != null) candidateOwner.release();
+        };
+        if (owner != null) owner.close(release);
+        else release.run();
     }
 
     // ---------- 帧循环 ----------
 
     private void maybeStartFrameLoop() {
-        if (!running && handle != 0L && surfaceReady) {
+        if (!running && canStep()) {
             running = true;
             lastFrameNs = 0L;
             Choreographer.getInstance().postFrameCallback(this);
         }
+    }
+
+    private boolean canStep() {
+        return resumed && !destroying && !isFinishing() && !faulted && engineReady && engine != null && surfaceReady
+                && !proxyPreparing && !proxyFailed;
     }
 
     private void stopFrameLoop() {
@@ -343,7 +711,17 @@ public final class SiglusActivity extends AppCompatActivity implements
 
     @Override
     public void doFrame(long frameTimeNanos) {
-        if (!running || handle == 0L) {
+        if (!running || !canStep()) {
+            stopFrameLoop();
+            return;
+        }
+        if (!messageboxRequests.isEmpty()) {
+            lastFrameNs = 0L;
+            Choreographer.getInstance().postFrameCallback(this);
+            return;
+        }
+        if (graphicsProxy != null && graphicsProxy.hasFailed()) {
+            pausePresentation(graphicsProxy);
             return;
         }
         if (lastFrameNs == 0L) {
@@ -359,26 +737,18 @@ public final class SiglusActivity extends AppCompatActivity implements
             dtMs = MAX_FRAME_DT_MS;
         }
 
-        int status = NativeSiglus.step(handle, dtMs);
-        if (status > 0) {
-            finish();
-            return;
-        }
-        if (status < 0) {
-            // VM 错误不是正常退出：停帧循环保留最后一帧供 logcat 排查。
-            running = false;
-            return;
-        }
-        hideLoadingOverlay();
-        updateImeState();
-        Choreographer.getInstance().postFrameCallback(this);
+        // Filter mode admits at most one queued/in-flight owner step; direct
+        // mode completes the upstream synchronous step before this call returns.
+        engine.step(dtMs);
+        // Direct step/IME callbacks run synchronously and may stop the loop.
+        if (running && canStep()) Choreographer.getInstance().postFrameCallback(this);
     }
 
     // ---------- 输入 ----------
 
     @Override
     public boolean onTouch(View view, MotionEvent event) {
-        if (handle == 0L || event == null) {
+        if (!engineReady || event == null) {
             return false;
         }
         int phase;
@@ -398,14 +768,31 @@ public final class SiglusActivity extends AppCompatActivity implements
             default:
                 return false;
         }
+        if (!canStep()) {
+            if (phase == 2 || phase == 3) cancelPointer();
+            return true;
+        }
+        double x = event.getX(), y = event.getY();
+        if (graphicsProxy != null) {
+            SiglusViewport v = graphicsProxy.viewport();
+            if (v == null) return true;
+            x *= (double) v.surfaceWidth / Math.max(1, surfaceView.getWidth());
+            y *= (double) v.surfaceHeight / Math.max(1, surfaceView.getHeight());
+            if (phase == 0 && !v.contains(x, y)) { pointerActive = false; return true; }
+            x = v.sourceX(x); y = v.sourceY(y);
+        }
+        if (phase == 0) pointerActive = true;
+        else if (!pointerActive) return true;
         hideIme();
-        NativeSiglus.touch(handle, phase, event.getX(), event.getY());
+        lastTouchX = x; lastTouchY = y;
+        engine.touch(phase, x, y);
+        if (phase == 2 || phase == 3) pointerActive = false;
         return true;
     }
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
-        if (handle != 0L && event != null) {
+        if (engineReady && event != null) {
             int action = event.getAction();
             if (action == KeyEvent.ACTION_DOWN || action == KeyEvent.ACTION_MULTIPLE) {
                 int keyCode = event.getKeyCode();
@@ -428,10 +815,10 @@ public final class SiglusActivity extends AppCompatActivity implements
     }
 
     private void forwardKey(int vk, @Nullable String text, boolean repeat) {
-        if (handle == 0L) {
+        if (!engineReady) {
             return;
         }
-        NativeSiglus.keyEvent(handle, vk, text, repeat);
+        engine.keyEvent(vk, text, repeat);
     }
 
     /** Android KeyEvent → Windows 虚拟键码（与引擎 host.rs::vm_key_from_platform_code 对齐）。 */
@@ -491,12 +878,8 @@ public final class SiglusActivity extends AppCompatActivity implements
 
     // ---------- IME ----------
 
-    private void updateImeState() {
-        if (handle == 0L) {
-            return;
-        }
-        int[] area = new int[4];
-        boolean needed = NativeSiglus.imeArea(handle, area);
+    private void updateImeState(boolean needed, int[] area) {
+        if (!engineReady || engine == null || !canStep()) return;
         if (needed) {
             if (!imeVisible) {
                 textInputView.requestFocus();
@@ -512,7 +895,18 @@ public final class SiglusActivity extends AppCompatActivity implements
                 });
                 imeVisible = true;
             }
-            textInputView.updateCursorAnchor(new Rect(area[0], area[1], area[0] + area[2], area[1] + area[3]));
+            SiglusViewport v = graphicsProxy == null ? null : graphicsProxy.viewport();
+            double x0 = area[0], y0 = area[1], x1 = (double) area[0] + area[2], y1 = (double) area[1] + area[3];
+            if (v != null) {
+                x0 = v.screenX(x0); y0 = v.screenY(y0); x1 = v.screenX(x1); y1 = v.screenY(y1);
+            }
+            double scaleX = (double) surfaceView.getWidth() / surfaceWidth();
+            double scaleY = (double) surfaceView.getHeight() / surfaceHeight();
+            textInputView.updateCursorAnchor(new Rect(
+                    (int) Math.round(x0 * scaleX) + surfaceView.getLeft(),
+                    (int) Math.round(y0 * scaleY) + surfaceView.getTop(),
+                    (int) Math.round(x1 * scaleX) + surfaceView.getLeft(),
+                    (int) Math.round(y1 * scaleY) + surfaceView.getTop()));
         } else if (imeVisible) {
             hideIme();
         }
@@ -532,22 +926,22 @@ public final class SiglusActivity extends AppCompatActivity implements
 
     @Override
     public void onCommitText(String text) {
-        if (handle != 0L && text != null && !text.isEmpty()) {
-            NativeSiglus.textInput(handle, text);
+        if (engineReady && text != null && !text.isEmpty()) {
+            engine.textInput(text);
         }
     }
 
     @Override
     public void onPreedit(String text, int cursorStart, int cursorEnd) {
-        if (handle == 0L) {
+        if (!engineReady) {
             return;
         }
-        NativeSiglus.imePreedit(handle, text, cursorStart, cursorEnd);
+        engine.imePreedit(text, cursorStart, cursorEnd);
     }
 
     @Override
     public void onImeKeyEvent(int keyCode, boolean down) {
-        if (handle == 0L || !down) {
+        if (!engineReady || !down) {
             return;
         }
         int vk = vkCodeFor(keyCode);
@@ -560,14 +954,18 @@ public final class SiglusActivity extends AppCompatActivity implements
 
     @Override
     public void onMessagebox(long engineHandle, long requestId, int kind, String title, String message) {
-        runOnUiThread(() -> showMessagebox(engineHandle, requestId, kind, title, message));
+        // Always enqueue, even for the direct main-thread owner: returning from
+        // the native callback must precede any reply that re-enters the VM.
+        main.post(() -> showMessagebox(engineHandle, requestId, kind, title, message));
     }
 
     private void showMessagebox(long engineHandle, long requestId, int kind, String title, String message) {
+        if (engine == null || !engine.matchesHandle(engineHandle) || destroying) return;
         if (isFinishing() || isDestroyed()) {
-            NativeSiglus.submitMessageboxResult(engineHandle, requestId, fallbackMessageboxValue(kind));
+            submitMessagebox(engineHandle, requestId, fallbackMessageboxValue(kind));
             return;
         }
+        if (!messageboxRequests.add(requestId)) return;
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle(EngineUiText.localizeCommonDialogText(this, title));
         builder.setMessage(message == null ? "" : message);
@@ -575,39 +973,50 @@ public final class SiglusActivity extends AppCompatActivity implements
         switch (kind) {
             case 1: // OK / CANCEL
                 builder.setPositiveButton(uiString(R.string.engine_ok),
-                        (dialog, which) -> NativeSiglus.submitMessageboxResult(engineHandle, requestId, 0));
+                        (dialog, which) -> submitMessagebox(engineHandle, requestId, 0));
                 builder.setNegativeButton(uiString(R.string.engine_cancel),
-                        (dialog, which) -> NativeSiglus.submitMessageboxResult(engineHandle, requestId, 1));
+                        (dialog, which) -> submitMessagebox(engineHandle, requestId, 1));
                 builder.setOnCancelListener(dialog ->
-                        NativeSiglus.submitMessageboxResult(engineHandle, requestId, 1));
+                        submitMessagebox(engineHandle, requestId, 1));
                 break;
             case 2: // YES / NO
                 builder.setPositiveButton(uiString(R.string.engine_yes),
-                        (dialog, which) -> NativeSiglus.submitMessageboxResult(engineHandle, requestId, 0));
+                        (dialog, which) -> submitMessagebox(engineHandle, requestId, 0));
                 builder.setNegativeButton(uiString(R.string.engine_no),
-                        (dialog, which) -> NativeSiglus.submitMessageboxResult(engineHandle, requestId, 1));
+                        (dialog, which) -> submitMessagebox(engineHandle, requestId, 1));
                 builder.setOnCancelListener(dialog ->
-                        NativeSiglus.submitMessageboxResult(engineHandle, requestId, 1));
+                        submitMessagebox(engineHandle, requestId, 1));
                 break;
             case 3: // YES / NO / CANCEL
                 builder.setPositiveButton(uiString(R.string.engine_yes),
-                        (dialog, which) -> NativeSiglus.submitMessageboxResult(engineHandle, requestId, 0));
+                        (dialog, which) -> submitMessagebox(engineHandle, requestId, 0));
                 builder.setNegativeButton(uiString(R.string.engine_no),
-                        (dialog, which) -> NativeSiglus.submitMessageboxResult(engineHandle, requestId, 1));
+                        (dialog, which) -> submitMessagebox(engineHandle, requestId, 1));
                 builder.setNeutralButton(uiString(R.string.engine_cancel),
-                        (dialog, which) -> NativeSiglus.submitMessageboxResult(engineHandle, requestId, 2));
+                        (dialog, which) -> submitMessagebox(engineHandle, requestId, 2));
                 builder.setOnCancelListener(dialog ->
-                        NativeSiglus.submitMessageboxResult(engineHandle, requestId, 2));
+                        submitMessagebox(engineHandle, requestId, 2));
                 break;
             case 0: // OK
             default:
                 builder.setPositiveButton(uiString(R.string.engine_ok),
-                        (dialog, which) -> NativeSiglus.submitMessageboxResult(engineHandle, requestId, 0));
+                        (dialog, which) -> submitMessagebox(engineHandle, requestId, 0));
                 builder.setOnCancelListener(dialog ->
-                        NativeSiglus.submitMessageboxResult(engineHandle, requestId, 0));
+                        submitMessagebox(engineHandle, requestId, 0));
                 break;
         }
-        builder.show();
+        try { builder.show(); }
+        catch (RuntimeException failure) {
+            Log.w(TAG, "Native message box unavailable", failure);
+            submitMessagebox(engineHandle, requestId, fallbackMessageboxValue(kind));
+        }
+    }
+
+    private void submitMessagebox(long engineHandle, long requestId, long value) {
+        if (!destroying && engine != null && engine.matchesHandle(engineHandle)) {
+            engine.submitMessagebox(engineHandle, requestId, value);
+            messageboxRequests.remove(requestId);
+        }
     }
 
     private static long fallbackMessageboxValue(int kind) {

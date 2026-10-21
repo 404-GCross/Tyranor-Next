@@ -11,6 +11,7 @@ import com.tyranor.next.core.game.storage.GameLibraryRepository
 import com.tyranor.next.core.settings.EngineSettingsStore
 import com.tyranor.next.core.settings.PrefsRenameMigration
 import com.tyranor.next.core.updater.BackgroundUpdateWorker
+import com.tyranor.next.core.updater.GitHubUpdateChecker
 import com.tyranor.next.core.updater.UpdateNotificationManager
 
 /** 在整个应用进入后台时安排一次静默更新检查。 */
@@ -35,6 +36,7 @@ class TyranorNextApplication : Application(), DefaultLifecycleObserver, Configur
         // 被删的旧 Winlator 设置实现遗留键清理（一次性，标记位保证只跑一次）。
         EngineSettingsStore.cleanupLegacyWinlatorKeys(this)
         UpdateNotificationManager.createChannel(this)
+        GitHubUpdateChecker.restoreState(this)
         // 游戏库 Room 迁移检查 + 首页缓存预热，避免主线程首次读库阻塞（迁移方案阶段 0）。
         GameLibraryRepository.init(this)
         ProcessLifecycleOwner.get().lifecycle.addObserver(this)

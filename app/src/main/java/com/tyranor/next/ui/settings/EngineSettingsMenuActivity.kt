@@ -31,7 +31,7 @@ import com.tyranor.next.ui.common.AppScreenActivity
 import com.tyranor.next.ui.common.AppTopBar
 import com.tyranor.next.ui.game.startActivityWithPageTransition
 import top.yukonga.miuix.kmp.basic.Card as MiuixCard
-import top.yukonga.miuix.kmp.basic.Scaffold as MiuixScaffold
+import com.tyranor.next.ui.common.MiuixTopBarBlurScaffold
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
@@ -56,10 +56,8 @@ internal fun EngineSettingsMenuScreen() {
     val ctx = LocalContext.current
 
     MiuixSettingsTheme {
-        MiuixScaffold(
+        MiuixTopBarBlurScaffold(
             modifier = Modifier.fillMaxSize(),
-            containerColor = ComposeColor.Transparent,
-            contentWindowInsets = WindowInsets(0.dp),
             topBar = {
                 AppTopBar(
                     title = stringResource(R.string.settings_engine_settings),
@@ -67,14 +65,11 @@ internal fun EngineSettingsMenuScreen() {
                     contentColor = MiuixTheme.colorScheme.onBackground,
                 )
             },
-        ) { innerPadding ->
+        ) { topInset ->
             LazyColumn(
-                // 顶栏透明：列表整体垫在顶栏下方（持久 padding），避免滚动时内容穿过顶栏
-                modifier = Modifier.fillMaxSize()
-                    .padding(horizontal = 12.dp)
-                    .padding(top = innerPadding.calculateTopPadding()),
+                modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
                 contentPadding = PaddingValues(
-                    top = 12.dp,
+                    top = 12.dp + topInset,
                     bottom = 24.dp,
                 ),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -118,7 +113,9 @@ enum class EngineSettingsKind(@param:StringRes val titleRes: Int, @param:Drawabl
     SIGLUS(R.string.engine_settings_siglus_title, R.drawable.ic_settings_engine),
     FRAMEBUFFER(R.string.engine_settings_framebuffer_title, R.drawable.ic_settings_engine),
     FVP(R.string.engine_settings_fvp_title, R.drawable.ic_settings_engine),
+    ETHORNELL(R.string.ethornell_settings_title, R.drawable.ic_settings_engine),
     XSYS35(R.string.engine_settings_xsys35_title, R.drawable.ic_settings_engine),
+    XSYS4(R.string.engine_settings_xsys4_title, R.drawable.ic_settings_engine),
     PPSSPP(R.string.engine_settings_ppsspp_title, R.drawable.ic_settings_engine),
     WINLATOR(R.string.engine_settings_winlator_title, R.drawable.ic_settings_engine),
 }
